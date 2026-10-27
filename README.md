@@ -278,6 +278,34 @@ Vercel 默认会为你分配一个免费的二级域名：
 
 ---
 
+### 4. 控制台的密码登录与远程访问
+
+本地双击 `Start.bat` 时，控制台和内容引擎跑在同一台电脑上，直接访问即可，**默认不需要密码**。
+
+如果你把控制台部署到了服务器上（例如 `http://服务器IP:3001`），请务必开启密码登录，否则任何人都能改你的文章和设置。开启方式是在服务器上准备一个环境变量文件：
+
+```bash
+cd /opt/xinghui-blog/my-blog-manager
+node scripts/manager-passwd.mjs "你的管理密码" --env-file /etc/xhblogs-manager.env
+node scripts/manager-passwd.mjs --secret --env-file /etc/xhblogs-manager.env
+```
+
+第一个命令写入密码的 scrypt 哈希，第二个生成随机会话密钥。两者都只落在服务器上，仓库里不会保存任何口令。写好之后让服务读取这个文件并重启：
+
+```ini
+# /etc/systemd/system/xhblogs-manager-web.service 的 [Service] 段
+EnvironmentFile=-/etc/xhblogs-manager.env
+Environment=HOSTNAME=0.0.0.0
+```
+
+重启后访问控制台会先跳转到 `/login` 页面，输入刚才设置的密码即可进入，会话有效期 7 天，Cookie 为 HttpOnly。控制台右上角还有一个退出登录按钮。
+
+> **安全提醒**：用 IP + HTTP 访问时密码是明文传输的，务必在云厂商安全组里限制来源 IP（例如只放行你自己的公网 IP），或者接入域名后配置 HTTPS，再把 `MANAGER_COOKIE_SECURE` 改成 `1`。
+
+> **为什么改完之后不用改代码**：控制台前端原先直接请求 `http://127.0.0.1:<引擎端口>`，这只在本机有效，一旦从别的电脑打开就会去连访问者自己的 127.0.0.1。现在所有引擎调用统一走同源的 `/api/proxy`，由服务端转发到本机引擎，因此局域网和公网访问都能正常工作。
+
+---
+
 ## 二、更新设置及上传文件
 
 为了保护数据安全，本控制台采用了**“操作暂存区”**机制。**请特别注意！！** 许多设置在修改后，必须主动执行“更新到本地”才能真正保存。需要执行此操作时，界面上方通常会有高亮提示。
