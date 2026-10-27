@@ -1,5 +1,7 @@
 import os
+import platform
 import shutil
+import subprocess
 from fastapi import APIRouter, Request
 
 router = APIRouter()
@@ -7,6 +9,26 @@ router = APIRouter()
 # 动态定位 Manager 根目录
 CURRENT_API_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_API_DIR, "..", ".."))
+
+# 服务器部署时的异步重建入口：公开站跑的是预构建产物，
+# 源码同步过去之后必须重新 build 才会反映到线上。
+REBUILD_HELPER = "/usr/local/bin/xhblogs-async-rebuild"
+
+
+def trigger_rebuild():
+    """同步成功后触发公开站重建（仅服务器部署环境具备该助手脚本）"""
+    if platform.system() != "Linux" or not os.path.exists(REBUILD_HELPER):
+        return False
+    try:
+        subprocess.Popen(
+            ["sudo", "-n", REBUILD_HELPER],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except Exception:
+        return False
+
 
 # 需要镜像覆盖的文件夹 (先清空目标，再全量复制)
 SYNC_DIRS = ["posts", "chatters", "moments"]
@@ -96,6 +118,9 @@ async def execute_sync(request: Request):
                     # 其他普通文件，直接物理拷贝
                     shutil.copy2(src_file, dst_file)
 
+        rebuilt = trigger_rebuild()
+        if rebuilt:
+            return {"success": True, "message": "🎉 完美撒花！所有文章与配置已镜像覆盖至目标博客，并已触发线上重建（约 1-3 分钟生效）。"}
         return {"success": True, "message": "🎉 完美撒花！所有文章与配置已镜像覆盖至目标博客。"}
     except Exception as e:
         return {"success": False, "message": f"同步过程中发生致命错误: {str(e)}"}
