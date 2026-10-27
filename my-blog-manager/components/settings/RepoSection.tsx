@@ -38,9 +38,7 @@ export default function RepoSection() {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-        const config = await configRes.json();
-        const res = await fetch(`http://127.0.0.1:${config.api_port}/api/deploy/config`);
+        const res = await fetch(`/api/proxy/api/deploy/config`);
         if (res.ok) {
           const data = await res.json();
           setDeployData({
@@ -61,9 +59,7 @@ export default function RepoSection() {
     if (!deployData.blogPath) { showToast("路径不能为空！", "warning"); return; }
     setIsCheckingPath(true);
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const config = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/sync/check`, {
+      const res = await fetch(`/api/proxy/api/sync/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: deployData.blogPath })
@@ -79,9 +75,7 @@ export default function RepoSection() {
     if (!deployData.blogPath) { showToast("请先配置物理路径！", "warning"); return; }
     setIsCheckingGit(true);
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const config = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/deploy/check`, {
+      const res = await fetch(`/api/proxy/api/deploy/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: deployData.blogPath })
@@ -96,10 +90,8 @@ export default function RepoSection() {
   // 🌟 核心升级：传入 type 区分请求 A 线还是 B 线的密匙
   const handleGetSSH = async (type: 'static' | 'source') => {
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const config = await configRes.json();
       // 向后端传递参数 ?type=static 或 ?type=source
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/deploy/ssh/key?type=${type}`);
+      const res = await fetch(`/api/proxy/api/deploy/ssh/key?type=${type}`);
       const data = await res.json();
       if (data.success) {
         setSshConfig({ key: data.key, type });
@@ -115,9 +107,7 @@ export default function RepoSection() {
     setIsInitializing(true);
     showToast("🪄 正在施展魔法改造项目代码...", "info");
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/deploy/init`, {
+      const res = await fetch(`/api/proxy/api/deploy/init`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(deployData)
@@ -134,9 +124,7 @@ export default function RepoSection() {
     setIsDeploying(true);
     showToast("⏳ 正在编译打包并推送至静态仓库...", "info");
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/deploy/publish`, {
+      const res = await fetch(`/api/proxy/api/deploy/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: deployData.blogPath })
@@ -153,9 +141,7 @@ export default function RepoSection() {
     setIsUploading(true);
     showToast("☁️ 正在同步源码至 Vercel 触发仓库...", "info");
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/deploy/source`, {
+      const res = await fetch(`/api/proxy/api/deploy/source`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: deployData.blogPath })
@@ -170,9 +156,7 @@ export default function RepoSection() {
   const handleSaveConfig = async () => {
     setIsSaving(true);
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const config = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/deploy/config`, {
+      const res = await fetch(`/api/proxy/api/deploy/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(deployData)

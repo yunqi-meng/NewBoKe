@@ -118,16 +118,13 @@ export default function BackgroundSection({ formData, handleUpdate, pushToQueue 
     showToast("正在将图片传送至图床引擎...", "info");
 
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-
       // 构建 multipart/form-data
       const uploadData = new FormData();
       uploadData.append('file', file);
       uploadData.append('url', picUrl);
       uploadData.append('token', picToken);
 
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/picbed/upload`, {
+      const res = await fetch(`/api/proxy/api/picbed/upload`, {
         method: 'POST',
         body: uploadData,
       });

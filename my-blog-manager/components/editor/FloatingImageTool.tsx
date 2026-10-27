@@ -34,14 +34,12 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
     showToast("正在将图片传送至云端...", "success");
 
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
       const uploadData = new FormData();
       uploadData.append('file', file);
       uploadData.append('url', picUrl);
       uploadData.append('token', picToken);
 
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/picbed/upload`, {
+      const res = await fetch(`/api/proxy/api/picbed/upload`, {
         method: 'POST',
         body: uploadData,
       });

@@ -87,15 +87,13 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     setIsUploading(true);
     showToast(`正在上传 ${files.length} 张图片...`, "info");
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
       const newUrls: string[] = [];
       for (let i = 0; i < files.length; i++) {
         const uploadData = new FormData();
         uploadData.append('file', files[i]);
         uploadData.append('url', picUrl);
         uploadData.append('token', picToken);
-        const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/picbed/upload`, {
+        const res = await fetch(`/api/proxy/api/picbed/upload`, {
           method: 'POST',
           body: uploadData,
         });
@@ -163,10 +161,6 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     showToast("🚀 正在强行直连 Python 引擎...", "info");
 
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      if (!configRes.ok) throw new Error("无法读取 backend_config.json");
-      const configData = await configRes.json();
-
       const payload = {
         id: `moment-${Date.now()}`,
         date: new Date().toISOString(),
@@ -174,7 +168,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
         location: newMoment.location,
         images: newMoment.images
       };
-      const apiUrl = `http://127.0.0.1:${configData.api_port}/api/moments/save`;
+      const apiUrl = `/api/proxy/api/moments/save`;
 
       const res = await fetch(apiUrl, {
         method: 'POST',
@@ -204,9 +198,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     if (!deleteConfirmId) return;
     setIsDeleting(true);
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-      const apiUrl = `http://127.0.0.1:${configData.api_port}/api/moments/delete`;
+      const apiUrl = `/api/proxy/api/moments/delete`;
 
       const res = await fetch(apiUrl, {
         method: 'POST',

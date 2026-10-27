@@ -51,9 +51,7 @@ function EditorContent() {
     const fetchTags = async () => {
       setIsLoadingTags(true);
       try {
-        const configRes = await fetch(`/backend_config.json`);
-        const config = await configRes.json();
-        const res = await fetch(`http://127.0.0.1:${config.api_port}/api/drafts/all_tags`);
+        const res = await fetch(`/api/proxy/api/drafts/all_tags`);
         const data = await res.json();
         if (data.success) {
           setHistoryPostTags(data.postTags || []);
@@ -69,10 +67,7 @@ function EditorContent() {
     if (currentDocId !== 'new') {
       const loadDraft = async () => {
         try {
-          const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-          const config = await configRes.json();
-
-          const res = await fetch(`http://127.0.0.1:${config.api_port}/api/drafts/get`, {
+          const res = await fetch(`/api/proxy/api/drafts/get`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: currentDocId, type: docType })
@@ -152,9 +147,7 @@ function EditorContent() {
 
     setIsSaving(true);
     try {
-      const configRes = await fetch(`/backend_config.json`);
-      const config = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/drafts/save`, {
+      const res = await fetch(`/api/proxy/api/drafts/save`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
       });
       const data = await res.json();

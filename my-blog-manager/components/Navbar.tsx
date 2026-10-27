@@ -6,13 +6,14 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOperations } from '../context/OperationContext';
 import { useToast } from './ToastProvider';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, LogOut } from 'lucide-react';
 import { siteConfig } from '../siteConfig';
 
 export default function Navbar({ previewOnly = false, compact = false }: { previewOnly?: boolean; compact?: boolean }) {
   const [showNav, setShowNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isOpBoxOpen, setIsOpBoxOpen] = useState(false);
+  const [authOn, setAuthOn] = useState(false);
 
   const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [targetBlogPath, setTargetBlogPath] = useState("");
@@ -25,9 +26,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     if (previewOnly) return;
     const fetchPath = async () => {
       try {
-        const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-        const config = await configRes.json();
-        const res = await fetch(`http://127.0.0.1:${config.api_port}/api/deploy/config`);
+        const res = await fetch(`/api/proxy/api/deploy/config`);
         if (res.ok) {
           const data = await res.json();
           if (data.blogPath) {
@@ -86,6 +85,23 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     }
   };
 
+  // 🔐 公网访问时需要知道是否开启了密码登录，才决定要不要显示"退出登录"
+  useEffect(() => {
+    fetch('/api/auth/login', { cache: 'no-store' })
+      .then((res) => res.json())
+      .then((data) => setAuthOn(Boolean(data?.authEnabled)))
+      .catch(() => setAuthOn(false));
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch {
+      /* 忽略网络错误，本地 Cookie 也会随跳转失效 */
+    }
+    window.location.href = '/login';
+  };
+
   // 🌟 监控增强版更新逻辑
   const handleUpdateLocal = async () => {
       if (operations.length === 0) {
@@ -96,9 +112,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
       try {
         showToast(`🔍 正在准备发送 ${operations.length} 个任务...`, "info");
 
-        const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-        const configData = await configRes.json();
-        const apiBase = `http://127.0.0.1:${configData.api_port}`;
+        const apiBase = `/api/proxy`;
 
         for (const op of operations) {
           let apiUrl = '';
@@ -172,11 +186,9 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     setSyncModalOpen(false);
 
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
       showToast("🚀 正在镜像数据至目标项目，请稍候...", "info");
 
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/sync/execute`, {
+      const res = await fetch(`/api/proxy/api/sync/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: targetBlogPath })
@@ -266,6 +278,11 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
             </div>
 
             <div className="flex items-center gap-2 ml-2 pl-6 border-l border-slate-300/50 dark:border-slate-600/50">
+              {authOn && !previewOnly && (
+                <button onClick={handleLogout} title="退出登录" className="w-8 h-8 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center hover:scale-105 transition-all border border-white/20 shadow-sm cursor-pointer">
+                  <LogOut size={14} className="text-slate-600 dark:text-slate-300" />
+                </button>
+              )}
               <button onClick={handleMinimize} className="w-3.5 h-3.5 rounded-full bg-yellow-400 hover:bg-yellow-500 flex items-center justify-center group transition-colors shadow-sm cursor-pointer z-[101]">
                 <span className="opacity-0 group-hover:opacity-100 text-[8px] text-yellow-900 font-black">-</span>
               </button>

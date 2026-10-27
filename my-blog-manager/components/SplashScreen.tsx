@@ -12,6 +12,12 @@ export default function SplashScreen() {
     setIsMounted(true);
     const hasSeenSplash = sessionStorage.getItem('hasSeenSplash') === 'true';
 
+    // 登录页要立刻可见，不能被开屏动画挡住
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/login')) {
+      document.documentElement.classList.add('splash-seen');
+      return;
+    }
+
     if (!hasSeenSplash) {
       setShow(true);
       const timer = setTimeout(() => {

@@ -1,13 +1,17 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
+import { SESSION_COOKIE, verifySessionToken } from '../../../lib/auth';
 
 export const runtime = 'nodejs';
 const readable = new Set(['settings', 'issues', 'status', 'drafts', 'agents', 'events', 'assets', 'connection-info']);
 
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const host = request.headers.get('host') ?? '';
-  if (!/^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(host)) return Response.json({ detail: '此预览仅供本机访问' }, { status: 403 });
+  const isLocalHost = /^(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?$/.test(host);
+  // 公网访问时本机限制会失效，改为要求携带有效登录会话
+  const isAuthenticated = verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
+  if (!isLocalHost && !isAuthenticated) return Response.json({ detail: '此接口需要登录管理后台' }, { status: 403 });
   const parts = (await context.params).path;
   const endpoint = parts.join('/');
   const valid = request.method === 'GET' ? parts.length === 1 && readable.has(endpoint)
@@ -16,7 +20,8 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   if (!valid) return Response.json({ detail: '接口或操作不存在' }, { status: 404 });
   if (request.method !== 'GET') {
     const origin = request.headers.get('origin');
-    if (origin && origin !== `http://${host}`) return Response.json({ detail: '仅允许本机控制台保存' }, { status: 403 });
+    const originHost = origin ? (() => { try { return new URL(origin).host; } catch { return ''; } })() : '';
+    if (origin && originHost !== host) return Response.json({ detail: '仅允许控制台页面自身发起保存' }, { status: 403 });
   }
   try {
     const body = request.method !== 'GET' ? await request.text() : undefined;

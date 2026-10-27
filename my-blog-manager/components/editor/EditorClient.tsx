@@ -39,9 +39,7 @@ export default function EditorClient({ historyPostTags, historyChatterTags, hist
     if (currentDocId !== 'new') {
       const loadDraft = async () => {
         try {
-          const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-          const config = await configRes.json();
-          const res = await fetch(`http://127.0.0.1:${config.api_port}/api/drafts/get`, {
+          const res = await fetch(`/api/proxy/api/drafts/get`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ blog_path: "F:/Projects/my-blog", id: currentDocId })
@@ -84,10 +82,7 @@ export default function EditorClient({ historyPostTags, historyChatterTags, hist
     };
 
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const config = await configRes.json();
-
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/drafts/save`, {
+      const res = await fetch(`/api/proxy/api/drafts/save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

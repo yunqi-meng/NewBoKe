@@ -55,9 +55,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
   const confirmDelete = async () => {
     if (!deleteModal.slug) return;
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const config = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${config.api_port}/api/drafts/delete`, {
+      const res = await fetch(`/api/proxy/api/drafts/delete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: deleteModal.slug })

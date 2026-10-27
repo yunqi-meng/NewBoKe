@@ -94,7 +94,7 @@ function SettingsContent() {
           return;
         }
 
-        const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/config/get`, { cache: 'no-store', signal: controller.signal });
+        const res = await fetch(`/api/proxy/api/config/get`, { cache: 'no-store', signal: controller.signal });
         if (!res.ok) throw new Error('网站设置服务尚未就绪');
         const data = await res.json();
 
@@ -133,9 +133,7 @@ function SettingsContent() {
 
   const fetchMusicDetail = async (id: string) => {
     try {
-      const configRes = await fetch(`/backend_config.json?t=${Date.now()}`);
-      const configData = await configRes.json();
-      const res = await fetch(`http://127.0.0.1:${configData.api_port}/api/music/query/${id}`, { cache: 'no-store' });
+      const res = await fetch(`/api/proxy/api/music/query/${id}`, { cache: 'no-store' });
       const data = await res.json();
       return data.success ? data.data : { error: true, id, name: "查询失败或无版权" };
     } catch (error) {
