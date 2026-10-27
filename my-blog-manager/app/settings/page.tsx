@@ -252,12 +252,6 @@ function SettingsContent() {
                 ))}
               </nav>
             </div>
-            {backendMode === 'live' && <div className="bg-amber-500/10 border border-amber-500/30 rounded-3xl p-4 mt-4">
-              <p className="text-xs font-black text-amber-600 dark:text-amber-400 mb-2">🔄 数据中枢操作</p>
-              <button className="w-full py-2 bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-bold hover:bg-amber-500 hover:text-white transition-all text-left px-4 flex justify-between">
-                <span>拉取 my-blog 数据</span><span>📥</span>
-              </button>
-            </div>}
           </div>
 
           <div className="min-w-0 flex-1 w-full">
