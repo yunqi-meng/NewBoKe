@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { buildClearCookie } from '../../../lib/auth';
+import { buildClearCookie } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

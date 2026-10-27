@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { NextRequest } from 'next/server';
-import { SESSION_COOKIE, verifySessionToken } from '../../../lib/auth';
+import { SESSION_COOKIE, verifySessionToken } from '../../../../lib/auth';
 
 export const runtime = 'nodejs';
 const readable = new Set(['settings', 'issues', 'status', 'drafts', 'agents', 'events', 'assets', 'connection-info']);
