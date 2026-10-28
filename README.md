@@ -115,6 +115,12 @@ cd ../my-blog-manager && npm ci
 > 控制台源码里有两个**每台机器都不一样**的文件，它们不入库，请自行维护：
 > `my-blog-manager/data/deploy_config.json`（网站源码目录）和 `my-blog-manager/public/backend_config.json`（内容引擎端口）。
 
+> **异地备份**：工作区还挂了一个 `github` 远端，指向你自己的备份仓库（本项目用的是
+> `yunqi-meng/NewBoKe`）。发布助手每次发布会把同一提交再推一份到这个远端，于是线上内容
+> 除了留在服务器上，还有一份 GitHub 存档。备份用的是仓库级 SSH 部署密钥，私钥只放在服务器
+> 的 `/home/xhblogs/.ssh/` 下，不入库、不进脚本，也不写进任何文档。
+> 备份失败只会记进 `/var/log/xhblogs-publish.log`，不会影响发布本身。
+
 ### 3. 注册 systemd 服务
 
 公开站 `/etc/systemd/system/xhblogs.service`：

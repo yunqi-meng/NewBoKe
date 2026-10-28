@@ -122,6 +122,13 @@ cd ../my-blog-manager && npm ci
 > Two files in the console differ on every machine and are therefore not tracked by Git:
 > `my-blog-manager/data/deploy_config.json` (blog source directory) and `my-blog-manager/public/backend_config.json` (content engine port).
 
+> **Off-site backup**: the working tree also carries a `github` remote pointing at your own
+> backup repository (this project uses `yunqi-meng/NewBoKe`). Every publish pushes the same
+> commit there as well, so the live content is not only kept on the server but also archived
+> on GitHub. The backup authenticates with a repository-scoped SSH deploy key; the private key
+> stays in `/home/xhblogs/.ssh/` on the server and is never committed, scripted or documented.
+> A failing backup is only recorded in `/var/log/xhblogs-publish.log` and never blocks a publish.
+
 **Register the systemd services**
 
 Public site `/etc/systemd/system/xhblogs.service`:

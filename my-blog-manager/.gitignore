@@ -41,6 +41,9 @@ next-env.d.ts
 /data/deploy_config.json
 /public/backend_config.json
 
+# 图床凭证 (Token 绝不入库，只留在本机)
+/data/picbed.json
+
 # Local briefing credentials, drafts and runtime data
 /manager_data/briefing/
 *.connection.json
