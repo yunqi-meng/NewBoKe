@@ -5,7 +5,7 @@ import time
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, UploadFile
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 import requests
 
 router = APIRouter()
@@ -277,7 +277,7 @@ def get_local_cover(track_id: str):
 
     target = os.path.normpath(os.path.join(MUSIC_DIR, track["cover"]))
     if not _is_inside(MUSIC_DIR, target) or not os.path.isfile(target):
-        return {"success": False, "message": "封面文件不存在"}
+        return JSONResponse({"success": False, "message": "封面文件不存在"}, status_code=404)
 
     ext = os.path.splitext(target)[1].lower()
     return FileResponse(target, media_type=CONTENT_TYPES.get(ext, "application/octet-stream"))
@@ -349,9 +349,9 @@ def get_local_music_file(filename: str):
     _ensure_music_dir()
     target = os.path.normpath(os.path.join(MUSIC_DIR, filename))
     if not _is_inside(MUSIC_DIR, target):
-        return {"success": False, "message": "非法路径"}
+        return JSONResponse({"success": False, "message": "非法路径"}, status_code=400)
     if not os.path.isfile(target):
-        return {"success": False, "message": "文件不存在"}
+        return JSONResponse({"success": False, "message": "文件不存在"}, status_code=404)
 
     ext = os.path.splitext(target)[1].lower()
     return FileResponse(target, media_type=CONTENT_TYPES.get(ext, "application/octet-stream"))

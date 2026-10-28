@@ -434,6 +434,26 @@ Copy and paste this ID into the search box in the console to add the song to you
 
 ---
 
+## VI·1. Uploading Local Music (without NetEase)
+
+Prefer not to depend on NetEase links? Upload the audio files straight from the console — it hosts them and syncs them to your blog on publish.
+
+Open the console → **音乐播放设置** (Music Settings) → **本地音乐** (Local Music) tab:
+
+1. Drop an audio file into the upload box, or click to pick one. Supported: `mp3 / m4a / aac / ogg / wav / flac / weba`, up to 100MB each.
+2. Fill in the title (the filename is used if you skip it); the artist is optional. A cover image and a `.lrc` lyric file are optional too.
+3. Click **上传并加入歌单**. The track shows up in the list right away, where you can preview it, replace the cover, add lyrics, or delete it.
+
+Then go to **线上发布** (Publish) and publish once: the console incrementally syncs `my-blog-manager/music/` into the blog's `XHBlogs/public/audio/`, and the public player reads that local playlist first.
+
+Worth knowing:
+
+- **The audio itself never enters Git.** Only the `playlist.json` metadata is tracked; the audio files stay on the server's disk — a public backup repo is no place for copyrighted music, and it keeps the repo small. The sync compares size and mtime, so only new or changed files are copied.
+- **Next.js snapshots `public/` at startup**, so freshly uploaded audio only becomes publicly visible after a publish (rebuild + restart).
+- The NetEase playlist is still there as a supplementary source. Both sources are merged in the player, with local music listed first.
+
+---
+
 ## Conclusion
 
 XHBlogs has detailed features waiting to be explored during actual use. This project aims to provide an out-of-the-box frontend static display and backend management solution. If you are a developer and feel the console operations can be optimized, you can do secondary development based on the Next.js source code, or write Markdown manually for deployment!
