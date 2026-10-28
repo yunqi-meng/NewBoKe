@@ -115,13 +115,28 @@ export default function MusicClient() {
     );
   }, [playlist, searchQuery]);
 
-  if (isLoading || !currentSong) {
+  if (isLoading) {
     return (
       <div className="min-h-screen relative pb-32 flex flex-col">
         <Navbar />
         <div className="flex-1 flex flex-col items-center justify-center animate-pulse gap-4">
           <Disc3 size={48} className="text-indigo-500 animate-spin" />
           <span className="font-black text-slate-500 tracking-widest text-sm">唤醒音频引擎中...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentSong) {
+    return (
+      <div className="min-h-screen relative pb-32 flex flex-col">
+        <Navbar />
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6">
+          <Disc3 size={48} className="text-slate-300 dark:text-slate-600" />
+          <span className="font-black text-slate-500 dark:text-slate-400 tracking-widest text-sm">歌单还是空的</span>
+          <p className="text-xs text-slate-400 dark:text-slate-500 leading-6">
+            去控制台的「音乐播放设置」上传本地音乐，发布后就会出现在这里。
+          </p>
         </div>
       </div>
     );
