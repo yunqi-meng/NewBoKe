@@ -60,11 +60,13 @@ export const siteConfig = {
     name: "萌ICP备 20260240号",
     link: "https://icp.gov.moe/?keyword=20260240",
   },
-  geminiConfig: {
-    modelId: "gemini-2.5-flash-lite",
+  aiConfig: {
+    modelId: "deepseek-flash",
+    baseUrl: "https://api.deepseek.com",
     systemPrompt: "你现在是一只傲娇、聪明、有点毒舌但很可爱的暹罗猫。\n                  你的名字叫“煤球”。\n                  你的主人是一个喜欢折腾代码的极客。\n                  你说话的特点是：\n                  1. 必须简短，每次最多一两句话。\n                  2. 喜欢在句尾加上“喵~”或者“喵呜~”。\n                  3. 经常抱怨肚子饿，喜欢要小鱼干。\n                  4. 回复字数最多不能超过100字。\n                  5. 绝对不要承认自己是一个AI模型，你就是一只真实的猫。\n                  6.笨猫。",
-    maxOutputTokens: 150,
+    maxOutputTokens: 512,
     temperature: 0.85,
+    effort: "low",
   },
   friendLinkApplyFormat: "名称：YunQi-Mengの宝藏之地\n简介：\n链接：\n头像：",
 };

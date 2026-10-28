@@ -1,72 +1,130 @@
 // app/api/chat/route.ts
-import { siteConfig } from '../../../siteConfig'; // 确保这里的路径指向你的 siteConfig
+import { siteConfig } from '../../../siteConfig';
 
-export const runtime = 'edge';
+/**
+ * AI 煤球的对话接口。
+ *
+ * 走 OpenAI 兼容协议（DeepSeek 等），密钥只从环境变量读，仓库里不存任何口令：
+ *   DEEPSEEK_API_KEY  DeepSeek 官方密钥
+ *   OPENAI_API_KEY    其它兼容渠道的密钥（备用）
+ *   GEMINI_API_KEY    兼容旧配置的兜底
+ *   AI_BASE_URL       覆盖接口地址，默认取配置里的 baseUrl
+ *
+ * 站点配置在 siteConfig.aiConfig 里：模型、接口地址、性格 Prompt、生成预算、发散度。
+ *
+ * 为什么用 nodejs 而不是 edge：
+ *   edge 运行时对环境变量的处理依赖构建期注入，而密钥是运行时才写进环境文件的；
+ *   node 运行时直接读进程环境，改完密钥重启服务即可生效，不必重新构建。
+ */
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/** 读取密钥：没有任何一个可用就返回空串 */
+function readApiKey(): string {
+  return (
+    process.env.DEEPSEEK_API_KEY ||
+    process.env.OPENAI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    ''
+  ).trim();
+}
+
+/** 接口地址，末尾斜杠去掉，避免拼出双斜杠 */
+function readBaseUrl(): string {
+  const raw = process.env.AI_BASE_URL || siteConfig.aiConfig.baseUrl || 'https://api.deepseek.com';
+  return raw.trim().replace(/\/+$/, '');
+}
 
 export async function POST(req: Request) {
-  console.log("🚀 [1/5] 路由进入：开始对接 Gemini 3 脑回路");
-
   try {
     const { message } = await req.json();
+    const cfg = siteConfig.aiConfig;
 
-    // 🌟 纯粹靠环境变量读取 API Key
-    const apiKey = (process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || '').trim();
-
+    const apiKey = readApiKey();
     if (!apiKey) {
-      console.error("❌ 找不到 API Key");
-      return new Response(JSON.stringify({ error: "Key missing" }), { status: 500 });
+      console.error('❌ 找不到 API Key');
+      return Response.json({ error: 'Key missing' }, { status: 500 });
     }
 
-    // 调用 siteConfig 的参数
-    const modelId = siteConfig.geminiConfig.modelId;
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`;
+    const baseUrl = readBaseUrl();
+    const modelId = (cfg.modelId || 'deepseek-flash').trim();
+    const payload = {
+      model: modelId,
+      messages: [
+        { role: 'system', content: cfg.systemPrompt },
+        { role: 'user', content: String(message ?? '') },
+      ],
+      max_tokens: cfg.maxOutputTokens,
+      temperature: cfg.temperature,
+      // 推理强度：低配省时间，高配让煤球多想一会儿
+      ...(cfg.effort ? { effort: cfg.effort } : {}),
+    };
 
-    console.log(`📡 [2/5] 正在呼叫模型: ${modelId}`);
+    console.log(`📡 正在呼叫模型: ${modelId} @ ${baseUrl}`);
 
-    const response = await fetch(url, {
+    let response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        system_instruction: {
-          parts: [{
-            text: siteConfig.geminiConfig.systemPrompt
-          }]
-        },
-        contents: [{
-          parts: [{ text: message }]
-        }],
-        generationConfig: {
-          maxOutputTokens: siteConfig.geminiConfig.maxOutputTokens,
-          temperature: siteConfig.geminiConfig.temperature,
-        }
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+      cache: 'no-store',
     });
 
-    const data = await response.json();
+    // 有些兼容渠道不认识 effort 参数，遇到 400 就摘掉重试一次
+    if (response.status === 400 && payload.effort) {
+      const { effort, ...rest } = payload;
+      console.warn('⚠️ 接口不接受 effort 参数，摘掉后重试');
+      response = await fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(rest),
+        cache: 'no-store',
+      });
+    }
+
+    const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      console.error("🚨 Gemini 3 拒绝了请求:", JSON.stringify(data));
-      return new Response(JSON.stringify({
-        error: `模型拒绝访问: ${response.status}`,
-        details: data.error?.message || "未知错误"
-      }), { status: response.status });
+      console.error('🚨 模型拒绝了请求:', JSON.stringify(data));
+      return Response.json(
+        {
+          error: `模型拒绝访问: ${response.status}`,
+          details: data?.error?.message || '未知错误',
+        },
+        { status: response.status },
+      );
     }
 
-    console.log("✅ [3/5] Google 成功响应");
-    const reply = data.candidates?.[0]?.content?.parts?.[0]?.text || "本喵现在不想理你喵...";
+    const choice = data?.choices?.[0];
+    const content = typeof choice?.message?.content === 'string' ? choice.message.content.trim() : '';
 
-    console.log("🎉 [4/5] 回复已生成，准备传回前端");
+    if (!content) {
+      // 推理模型可能把预算全花在思考上，正文就空了，这时给个兜底台词
+      console.warn('⚠️ 模型没有返回正文（可能推理预算用尽）');
+      return Response.json({ reply: '本喵想得太入神，话卡在嘴边了喵…' });
+    }
 
-    return new Response(JSON.stringify({ reply }), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-
-  } catch (error: any) {
-    console.error("🔥 [5/5] 运行时崩溃:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    console.log('✅ 回复已生成，准备传回前端');
+    return Response.json({ reply: content });
+  } catch (error) {
+    console.error('🔥 运行时崩溃:', error instanceof Error ? error.message : error);
+    return Response.json(
+      { error: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    );
   }
 }
 
 export async function GET() {
-  return new Response(JSON.stringify({ status: "Ready", model: "Gemini 3 Flash Preview" }), { status: 200 });
+  return Response.json({
+    status: 'Ready',
+    model: siteConfig.aiConfig.modelId,
+    provider: readBaseUrl(),
+  });
 }

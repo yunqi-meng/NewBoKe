@@ -61,11 +61,13 @@ function SettingsContent() {
     icpConfig: siteConfig.icpConfig || { name: "", link: "" },
     footerBadges: [...(siteConfig.footerBadges || [])],
     // 👇 🌟 初始化小猫 AI 配置数据
-    geminiConfig: siteConfig.geminiConfig || {
-      modelId: 'gemini-2.5-flash-lite',
+    aiConfig: siteConfig.aiConfig || {
+      modelId: 'deepseek-flash',
+      baseUrl: 'https://api.deepseek.com',
       systemPrompt: '',
-      maxOutputTokens: 150,
-      temperature: 0.85
+      maxOutputTokens: 512,
+      temperature: 0.85,
+      effort: 'low'
     }
   });
 
@@ -98,7 +100,7 @@ function SettingsContent() {
             icpConfig: data.data.icpConfig || prev.icpConfig,
             footerBadges: data.data.footerBadges ? [...data.data.footerBadges] : prev.footerBadges,
             // 👇 🌟 合并后端发来的小猫配置
-            geminiConfig: { ...(prev.geminiConfig || {}), ...(data.data.geminiConfig || {}) }
+            aiConfig: { ...(prev.aiConfig || {}), ...(data.data.aiConfig || {}) }
           }));
           setBackendMode('live');
         } else {

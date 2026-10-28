@@ -380,23 +380,29 @@ After filling in the corresponding API Token and other information, you can clic
 
 ## IV. AI Cat Assistant Settings
 
-The blog system has a built-in AI Cat Assistant (connected to the Gemini model by default). Users can also modify the source code to connect other large language models.
+The blog system has a built-in AI Cat Assistant (connected to **DeepSeek** by default, using the OpenAI-compatible protocol). The model, endpoint and personality prompt can all be changed in the console, so any compatible provider can be plugged in.
 
-First, you need to apply for a Gemini API Key. After obtaining the API Key, configure it in the console as follows:
+First, you need to apply for a DeepSeek API Key. After obtaining the API Key, configure it in the console as follows:
 
 ![猫猫设置](picture/Pasted%20image%2020260427134211.png)
+
+In **Settings → AI Cat Config 🐾** you can adjust: model id (default `deepseek-flash`, i.e. DeepSeek-V4.1-Flash), endpoint (default `https://api.deepseek.com`), personality prompt, generation budget, temperature and reasoning effort.
 
 After setting the exclusive system prompt (personality) for the cat locally, we need to give the online environment the ability to call the AI. Write the key into an environment file on the server:
 
 ```bash
-echo 'GEMINI_API_KEY=your-real-api-key' >> /etc/xhblogs.env
+echo 'DEEPSEEK_API_KEY=your-real-api-key' >> /etc/xhblogs.env
 chmod 600 /etc/xhblogs.env
 systemctl restart xhblogs
 ```
 
-`/etc/systemd/system/xhblogs.service` already declares `EnvironmentFile=-/etc/xhblogs.env`, so the public site picks the key up. When the console itself calls the AI, add the same variable to `/etc/xhblogs-manager.env` and restart `xhblogs-manager-api`.
+`/etc/systemd/system/xhblogs.service` already declares `EnvironmentFile=-/etc/xhblogs.env`, so the public site picks the key up. When the console itself calls the AI, add the same variable to `/etc/xhblogs-manager.env` and restart `xhblogs-manager-web`.
+
+For the local desktop edition, put the key in each app's `.env.local` (already ignored by `.gitignore`, so it never reaches the repository).
 
 > **Never write secrets into code, documentation or the repository** — keep them in environment files with mode 600 on the server.
+
+> Reasoning models spend the generation budget on "thinking" first, so a budget that is too small yields no answer at all — that is why the default is 512. Lower the reasoning effort to make the cat answer faster.
 
 ---
 

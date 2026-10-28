@@ -372,23 +372,29 @@ Environment=HOSTNAME=0.0.0.0
 
 ## 四、AI 猫猫助理设置
 
-博客系统内置了一只聪明的 AI 猫猫助理（默认接入 Gemini 模型）。极客玩家也可以通过修改源码接入其他大语言模型。
+博客系统内置了一只聪明的 AI 猫猫助理（默认接入 **DeepSeek**，走 OpenAI 兼容协议）。模型、接口地址、性格提示词都能在控制台里改，理论上换成任何兼容服务都行。
 
-首先，你需要申请一个 Gemini 的 API Key（申请教程网络资源丰富，在此不赘述）。拿到 API Key 后，在控制台进行如下配置：
+首先，你需要申请一个 DeepSeek 的 API Key（申请教程网络资源丰富，在此不赘述）。拿到 API Key 后，在控制台进行如下配置：
 
 ![猫猫设置](picture/Pasted%20image%2020260427134211.png)
+
+控制台「设置 → AI 煤球配置 🐾」里可调：模型 ID（默认 `deepseek-flash`，即 DeepSeek-V4.1-Flash）、接口地址（默认 `https://api.deepseek.com`）、性格 Prompt、生成预算、发散度和思考强度。
 
 在本地设定好猫猫的专属系统提示词（性格）后，我们需要让线上环境也拥有调用 AI 的能力。在服务器上把密钥写进环境变量文件：
 
 ```bash
-echo 'GEMINI_API_KEY=你的真实 API 密钥' >> /etc/xhblogs.env
+echo 'DEEPSEEK_API_KEY=你的真实 API 密钥' >> /etc/xhblogs.env
 chmod 600 /etc/xhblogs.env
 systemctl restart xhblogs
 ```
 
-`/etc/systemd/system/xhblogs.service` 里已经声明了 `EnvironmentFile=-/etc/xhblogs.env`，因此公开站会读到这份密钥。控制台自己调用 AI 时，把同一份变量加进 `/etc/xhblogs-manager.env` 并重启 `xhblogs-manager-api` 即可。
+`/etc/systemd/system/xhblogs.service` 里已经声明了 `EnvironmentFile=-/etc/xhblogs.env`，因此公开站会读到这份密钥。控制台自己调用 AI 时，把同一份变量加进 `/etc/xhblogs-manager.env` 并重启 `xhblogs-manager-web` 即可。
+
+本地桌面版把密钥写进各应用的 `.env.local`（已被 `.gitignore` 忽略，不会进仓库）。
 
 > **密钥不要写进代码、文档或仓库**，只放在服务器上权限为 600 的环境变量文件里。
+
+> 推理模型会把生成预算花在"思考"上，预算调太小就只会想、不会说，所以默认值给到 512；想更快就调低"思考强度"。
 
 ---
 

@@ -2,15 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Save, Bot, Sparkles, Sliders, MessageSquareText, Cpu } from 'lucide-react';
+import { Save, Bot, Sparkles, Sliders, MessageSquareText, Cpu, Globe, Brain } from 'lucide-react';
 
 export default function AICatSection({ formData, handleUpdate, pushToQueue }: any) {
   // 防止 undefined
-  const config = formData.geminiConfig || {
-    modelId: 'gemini-2.5-flash-lite',
+  const config = formData.aiConfig || {
+    modelId: 'deepseek-flash',
+    baseUrl: 'https://api.deepseek.com',
     systemPrompt: '',
-    maxOutputTokens: 150,
-    temperature: 0.85
+    maxOutputTokens: 512,
+    temperature: 0.85,
+    effort: 'low'
   };
 
   // 🌟 核心防崩魔法：将系统提示词的状态独立出来
@@ -24,7 +26,7 @@ export default function AICatSection({ formData, handleUpdate, pushToQueue }: an
   }, []); // 仅挂载时同步一次，防止死循环
 
   const updateConfig = (key: string, value: any) => {
-    handleUpdate('geminiConfig', { ...config, [key]: value });
+    handleUpdate('aiConfig', { ...config, [key]: value });
   };
 
   // 🌟 拦截文本框输入
@@ -74,9 +76,26 @@ export default function AICatSection({ formData, handleUpdate, pushToQueue }: an
             value={config.modelId}
             onChange={(e) => updateConfig('modelId', e.target.value)}
             className="w-full bg-white/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl py-3.5 px-5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 font-medium"
-            placeholder="例如: gemini-2.5-flash-lite"
+            placeholder="例如: deepseek-flash"
           />
-          <p className="text-[11px] text-slate-400 mt-2 ml-1">推荐使用默认的轻量级模型，响应速度最快。</p>
+          <p className="text-[11px] text-slate-400 mt-2 ml-1">默认使用 DeepSeek-V4.1-Flash，响应快又便宜。</p>
+        </div>
+
+        {/* 接口地址 */}
+        <div className="group">
+          <label className="flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-300 mb-3">
+            <Globe size={16} className="text-slate-400 group-focus-within:text-indigo-500 transition-colors" /> 模型接口地址 (Base URL)
+          </label>
+          <input
+            type="text"
+            value={config.baseUrl}
+            onChange={(e) => updateConfig('baseUrl', e.target.value)}
+            className="w-full bg-white/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700/50 rounded-2xl py-3.5 px-5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 font-medium"
+            placeholder="例如: https://api.deepseek.com"
+          />
+          <p className="text-[11px] text-slate-400 mt-2 ml-1">
+            任何 OpenAI 兼容的地址都能用；密钥只从服务器环境变量读取，不会写进这里。
+          </p>
         </div>
 
         {/* System Prompt */}
@@ -92,24 +111,25 @@ export default function AICatSection({ formData, handleUpdate, pushToQueue }: an
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Max Tokens */}
           <div className="group">
             <div className="flex justify-between items-center mb-3">
               <label className="flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-300">
-                <Sliders size={16} className="text-slate-400" /> 最大回复字数 (Tokens)
+                <Sliders size={16} className="text-slate-400" /> 生成预算 (Tokens)
               </label>
               <span className="text-xs font-black text-indigo-500 bg-indigo-500/10 px-2 py-1 rounded-md">{config.maxOutputTokens}</span>
             </div>
             <input
               type="range"
               min="50"
-              max="1000"
+              max="4000"
               step="10"
               value={config.maxOutputTokens}
               onChange={(e) => updateConfig('maxOutputTokens', Number(e.target.value))}
               className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
+            <p className="text-[11px] text-slate-400 mt-2">思考也要花预算，别调太小否则煤球会“想”半天没下文。</p>
           </div>
 
           {/* Temperature */}
@@ -130,6 +150,35 @@ export default function AICatSection({ formData, handleUpdate, pushToQueue }: an
               className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-indigo-500"
             />
             <p className="text-[11px] text-slate-400 mt-2">数值越大，猫咪说话越随机、越具创意；数值越小越严谨。</p>
+          </div>
+
+          {/* 思考强度 */}
+          <div className="group">
+            <label className="flex items-center gap-2 text-sm font-black text-slate-700 dark:text-slate-300 mb-3">
+              <Brain size={16} className="text-slate-400" /> 思考强度 (Effort)
+            </label>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { value: 'low', label: '低', hint: '秒回' },
+                { value: 'high', label: '高', hint: '均衡' },
+                { value: 'max', label: '最大', hint: '较慢' },
+              ].map((item) => (
+                <button
+                  key={item.value}
+                  type="button"
+                  onClick={() => updateConfig('effort', item.value)}
+                  className={`rounded-2xl py-2.5 text-sm font-black transition-all ${
+                    config.effort === item.value
+                      ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30'
+                      : 'bg-white/50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-700/50 text-slate-600 dark:text-slate-300 hover:border-indigo-300'
+                  }`}
+                >
+                  {item.label}
+                  <span className="block text-[10px] font-medium opacity-70">{item.hint}</span>
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-slate-400 mt-2">思考越久回答越细致，但每句等待也更长。</p>
           </div>
         </div>
 
