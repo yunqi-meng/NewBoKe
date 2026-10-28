@@ -130,17 +130,21 @@ fi
 
 # 3. 推送回服务器上的裸仓库，保持源码仓库与线上同步
 #    推送失败时再同步一次（期间开发机可能又推了新代码），仍失败才算发布失败
-if ! as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1; then
+PUSH_OK=0
+if as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1; then
+  PUSH_OK=1
+else
   log "首次推送被拒，重新同步后重试"
   as_app_user git -C "$REPO" fetch origin main >> "$LOG" 2>&1
   if as_app_user git -C "$REPO" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
-      merge --no-edit origin/main >> "$LOG" 2>&1; then
-    as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1
+      merge --no-edit --autostash origin/main >> "$LOG" 2>&1; then
+    if as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1; then
+      PUSH_OK=1
+    fi
   fi
 fi
 
-if ! as_app_user git -C "$REPO" rev-parse --verify origin/main >/dev/null 2>&1 ||
-   ! as_app_user git -C "$REPO" merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+if [ "$PUSH_OK" != "1" ]; then
   log "推送失败"
   write_status failed "推送源码仓库失败，请查看 $LOG" "$START_TS"
   exit 1
