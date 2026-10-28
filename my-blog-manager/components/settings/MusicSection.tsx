@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { CloudUpload, ListMusic, Trash2, Play, Pause, Disc3, Image as ImageIcon, FileText, RefreshCw } from 'lucide-react';
 
 const AUDIO_ACCEPT = '.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac,.weba';
@@ -13,20 +13,7 @@ function formatSize(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-export default function MusicSection({
-  formData,
-  handleUpdate,
-  pushToQueue,
-  musicDetails,
-  queryMusic,
-  queryLoading,
-  queryResult,
-  confirmAddMusic,
-  removeSong,
-  showToast,
-}: any) {
-  const [tab, setTab] = useState<'local' | 'netease'>('local');
-
+export default function MusicSection({ showToast }: any) {
   // ---------------- 本地音乐状态 ----------------
   const [localTracks, setLocalTracks] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
@@ -164,205 +151,132 @@ export default function MusicSection({
     <motion.section initial={{ opacity: 0, x: 10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -10 }} className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 rounded-[40px] p-8 shadow-2xl">
       <h2 className="text-xl font-black text-slate-800 dark:text-white mb-6">🎵 音乐播放设置</h2>
 
-      <div className="flex items-center justify-center gap-1 p-1 mb-8 mx-auto bg-white/50 dark:bg-slate-900/50 rounded-full shadow-inner border border-white/40 w-72">
-        <button onClick={() => setTab('local')} className={`flex-1 py-2 rounded-full font-black text-[13px] transition-all ${tab === 'local' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500'}`}>本地音乐</button>
-        <button onClick={() => setTab('netease')} className={`flex-1 py-2 rounded-full font-black text-[13px] transition-all ${tab === 'netease' ? 'bg-indigo-500 text-white shadow-md' : 'text-slate-500'}`}>网易云补充</button>
-      </div>
+      <div className="space-y-8">
+        {/* 上传区 */}
+        <div className="bg-slate-100/50 dark:bg-slate-800/50 rounded-3xl p-6 space-y-5">
+          <p className="text-[10px] font-black text-slate-400 uppercase">上传本地音乐</p>
 
-      {tab === 'local' ? (
-        <div className="space-y-8">
-          {/* 上传区 */}
-          <div className="bg-slate-100/50 dark:bg-slate-800/50 rounded-3xl p-6 space-y-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase">上传本地音乐</p>
+          <label
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); pickAudio(e.dataTransfer.files?.[0]); }}
+            className={`flex flex-col items-center justify-center gap-3 py-10 rounded-3xl border-2 border-dashed transition-all cursor-pointer ${dragging ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400'}`}
+          >
+            <CloudUpload className={dragging ? 'text-indigo-500 animate-bounce' : 'text-slate-400'} size={30} />
+            <span className="text-sm font-black text-slate-700 dark:text-slate-200">
+              {audioFile ? audioFile.name : '把音频拖进来，或点击选择文件'}
+            </span>
+            <span className="text-[10px] text-slate-400">
+              {audioFile ? formatSize(audioFile.size) : '支持 mp3 / m4a / aac / ogg / wav / flac，单个不超过 100MB'}
+            </span>
+            <input
+              type="file"
+              accept={AUDIO_ACCEPT}
+              className="hidden"
+              onChange={(e) => { pickAudio(e.target.files?.[0]); e.target.value = ''; }}
+            />
+          </label>
 
-            <label
-              onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(e) => { e.preventDefault(); setDragging(false); pickAudio(e.dataTransfer.files?.[0]); }}
-              className={`flex flex-col items-center justify-center gap-3 py-10 rounded-3xl border-2 border-dashed transition-all cursor-pointer ${dragging ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-300 dark:border-slate-600 hover:border-indigo-400'}`}
-            >
-              <CloudUpload className={dragging ? 'text-indigo-500 animate-bounce' : 'text-slate-400'} size={30} />
-              <span className="text-sm font-black text-slate-700 dark:text-slate-200">
-                {audioFile ? audioFile.name : '把音频拖进来，或点击选择文件'}
-              </span>
-              <span className="text-[10px] text-slate-400">
-                {audioFile ? formatSize(audioFile.size) : '支持 mp3 / m4a / aac / ogg / wav / flac，单个不超过 100MB'}
-              </span>
-              <input
-                type="file"
-                accept={AUDIO_ACCEPT}
-                className="hidden"
-                onChange={(e) => { pickAudio(e.target.files?.[0]); e.target.value = ''; }}
-              />
-            </label>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <input type="text" placeholder="歌曲名" value={title} onChange={(e) => setTitle(e.target.value)} className="bg-white dark:bg-slate-900 border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
-              <input type="text" placeholder="歌手 / 专辑（选填）" value={artist} onChange={(e) => setArtist(e.target.value)} className="bg-white dark:bg-slate-900 border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <label className="flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-slate-900/60 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-colors">
-                <ImageIcon size={16} className="text-pink-500 shrink-0" />
-                <span className="truncate">{coverFile ? coverFile.name : '封面图片（选填）'}</span>
-                <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" className="hidden" onChange={(e) => { setCoverFile(e.target.files?.[0] || null); e.target.value = ''; }} />
-              </label>
-              <label className="flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-slate-900/60 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-colors">
-                <FileText size={16} className="text-indigo-500 shrink-0" />
-                <span className="truncate">{lyricFile ? lyricFile.name : 'LRC 歌词（选填）'}</span>
-                <input type="file" accept=".lrc" className="hidden" onChange={(e) => { setLyricFile(e.target.files?.[0] || null); e.target.value = ''; }} />
-              </label>
-            </div>
-
-            <div className="flex gap-3">
-              <button onClick={submitUpload} disabled={uploading || !audioFile} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-500/20 disabled:opacity-40 active:scale-95 transition-all">
-                {uploading ? '上传中…' : '上传并加入歌单'}
-              </button>
-              {(audioFile || coverFile || lyricFile) && (
-                <button onClick={resetForm} className="px-6 py-4 bg-white/60 dark:bg-slate-800/60 rounded-2xl text-sm font-black text-slate-500 hover:text-red-500 transition-colors">清空</button>
-              )}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input type="text" placeholder="歌曲名" value={title} onChange={(e) => setTitle(e.target.value)} className="bg-white dark:bg-slate-900 border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
+            <input type="text" placeholder="歌手 / 专辑（选填）" value={artist} onChange={(e) => setArtist(e.target.value)} className="bg-white dark:bg-slate-900 border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
           </div>
 
-          {/* 已上传列表 */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] font-black text-slate-400 uppercase">本地歌单 ({localTracks.length})</p>
-              <button onClick={loadLocalTracks} className="flex items-center gap-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 transition-colors">
-                <RefreshCw size={12} /> 刷新
-              </button>
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <label className="flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-slate-900/60 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-colors">
+              <ImageIcon size={16} className="text-pink-500 shrink-0" />
+              <span className="truncate">{coverFile ? coverFile.name : '封面图片（选填）'}</span>
+              <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" className="hidden" onChange={(e) => { setCoverFile(e.target.files?.[0] || null); e.target.value = ''; }} />
+            </label>
+            <label className="flex items-center gap-3 px-4 py-3 bg-white/60 dark:bg-slate-900/60 rounded-2xl text-xs font-bold text-slate-600 dark:text-slate-300 cursor-pointer hover:bg-white dark:hover:bg-slate-800 transition-colors">
+              <FileText size={16} className="text-indigo-500 shrink-0" />
+              <span className="truncate">{lyricFile ? lyricFile.name : 'LRC 歌词（选填）'}</span>
+              <input type="file" accept=".lrc" className="hidden" onChange={(e) => { setLyricFile(e.target.files?.[0] || null); e.target.value = ''; }} />
+            </label>
+          </div>
 
-            {listLoading ? (
-              <div className="flex items-center justify-center gap-3 py-10 text-xs font-bold text-slate-400">
-                <Disc3 size={18} className="animate-spin" /> 正在读取本地歌单…
-              </div>
-            ) : localTracks.length === 0 ? (
-              <div className="flex flex-col items-center gap-3 py-12 rounded-3xl border border-dashed border-slate-300 dark:border-slate-600 text-center">
-                <ListMusic size={28} className="text-slate-300 dark:text-slate-500" />
-                <p className="text-xs font-bold text-slate-400">本地歌单还是空的，上传一首歌试试</p>
-              </div>
-            ) : (
-              <div className="max-h-[460px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                {localTracks.map((track: any) => (
-                  <div key={track.id} className="flex items-center gap-3 p-3 bg-white/40 dark:bg-slate-800/40 rounded-2xl border border-white/20 group">
-                    <button
-                      onClick={() => togglePreview(track)}
-                      className="relative w-11 h-11 shrink-0 rounded-xl overflow-hidden shadow-sm bg-slate-200 dark:bg-slate-700"
-                      title={playingId === track.id ? '暂停' : '试听'}
-                    >
-                      <img
-                        src={track.cover ? `/api/proxy/api/music/cover/${encodeURIComponent(track.id)}` : DEFAULT_COVER}
-                        alt="cover"
-                        className="w-full h-full object-cover"
-                      />
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                        {playingId === track.id ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
-                      </span>
-                    </button>
-
-                    <div className="flex flex-col min-w-0 flex-1">
-                      <span className="text-sm font-bold line-clamp-1 text-slate-800 dark:text-white">{track.title || '未知歌曲'}</span>
-                      <span className="text-[10px] text-slate-500 font-medium line-clamp-1">
-                        {track.artist || '本地音乐'} · {formatSize(track.size)}
-                      </span>
-                      <div className="flex items-center gap-2 mt-1">
-                        {track.cover && <span className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500/15 text-pink-500 font-bold">有封面</span>}
-                        {track.lyrics && <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-500 font-bold">有歌词</span>}
-                        {!track.available && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-500 font-bold">文件丢失</span>}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0">
-                      <label className="w-8 h-8 rounded-lg bg-slate-500/10 text-slate-500 hover:bg-pink-500 hover:text-white flex items-center justify-center cursor-pointer transition-all" title="更换封面">
-                        <ImageIcon size={14} />
-                        <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" className="hidden" onChange={(e) => { uploadExtra(track.id, 'cover', e.target.files?.[0] || null); e.target.value = ''; }} />
-                      </label>
-                      <label className="w-8 h-8 rounded-lg bg-slate-500/10 text-slate-500 hover:bg-indigo-500 hover:text-white flex items-center justify-center cursor-pointer transition-all" title="上传歌词">
-                        <FileText size={14} />
-                        <input type="file" accept=".lrc" className="hidden" onChange={(e) => { uploadExtra(track.id, 'lyrics', e.target.files?.[0] || null); e.target.value = ''; }} />
-                      </label>
-                      <button onClick={() => removeLocalTrack(track.id, track.title)} className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white flex items-center justify-center" title="删除">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className="flex gap-3">
+            <button onClick={submitUpload} disabled={uploading || !audioFile} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl text-sm font-black shadow-xl shadow-indigo-500/20 disabled:opacity-40 active:scale-95 transition-all">
+              {uploading ? '上传中…' : '上传并加入歌单'}
+            </button>
+            {(audioFile || coverFile || lyricFile) && (
+              <button onClick={resetForm} className="px-6 py-4 bg-white/60 dark:bg-slate-800/60 rounded-2xl text-sm font-black text-slate-500 hover:text-red-500 transition-colors">清空</button>
             )}
-
-            <p className="text-[10px] leading-5 text-slate-400 pt-2">
-              音频文件只保存在控制台服务器上，不会进 Git 仓库；发布时会被镜像到网站的 <code className="px-1 py-0.5 rounded bg-slate-500/10">public/audio</code> 目录。改完记得去「线上发布」点一次发布。
-            </p>
           </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-          <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase ml-1 mb-4">当前绑定的网易云 ID ({formData.cloudMusicIds.length})</p>
-            <div className="max-h-[400px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-              {formData.cloudMusicIds.map((id: string, index: number) => {
-                const detail = musicDetails[id];
-                return (
-                  <div key={index} className="flex justify-between items-center p-3 bg-white/40 dark:bg-slate-800/40 rounded-2xl border border-white/20 group">
-                    <div className="flex items-center gap-3">
-                      {detail?.cover ? (
-                        <img src={detail.cover} alt="cover" className="w-10 h-10 rounded-lg object-cover shadow-sm" />
-                      ) : (
-                        <div className="w-10 h-10 rounded-lg bg-slate-200 dark:bg-slate-700 animate-pulse flex items-center justify-center text-xs">💿</div>
-                      )}
-                      <div className="flex flex-col">
-                        {detail ? (
-                          <>
-                            <span className={`text-sm font-bold line-clamp-1 ${detail.error ? 'text-red-500' : 'text-slate-800 dark:text-white'}`}>{detail.name}</span>
-                            {!detail.error && <span className="text-[10px] text-slate-500 font-medium">{detail.artist}</span>}
-                          </>
-                        ) : (
-                          <span className="text-xs text-slate-400">正在解析...</span>
-                        )}
-                        <span className="text-[10px] font-mono text-pink-500 mt-0.5">#{id}</span>
-                      </div>
-                    </div>
-                    <button onClick={() => removeSong(index)} className="w-8 h-8 shrink-0 rounded-lg bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white flex items-center justify-center">✕</button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
 
-          <div className="bg-slate-100/50 dark:bg-slate-800/50 rounded-3xl p-6 space-y-6">
-            <p className="text-[10px] font-black text-slate-400 uppercase">校验并添加新 ID</p>
-            <div className="flex gap-2">
-              <input type="text" placeholder="输入歌曲 ID" value={formData.newMusicId} onChange={e => handleUpdate('newMusicId', e.target.value)} className="flex-1 bg-white dark:bg-slate-900 border-none rounded-2xl px-4 py-3 text-sm outline-none shadow-sm" />
-              <button onClick={queryMusic} disabled={queryLoading} className="px-6 py-3 bg-pink-500 text-white rounded-2xl text-xs font-black shadow-lg shadow-pink-500/20 disabled:opacity-50">
-                {queryLoading ? "请求中..." : "真实查询"}
-              </button>
-            </div>
-
-            <AnimatePresence>
-              {queryResult && !queryResult.error && (
-                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-3 bg-white dark:bg-slate-900 rounded-2xl border-2 border-green-500/30 flex justify-between items-center shadow-xl">
-                  <div className="flex items-center gap-3">
-                    <img src={queryResult.cover} alt="cover" className="w-10 h-10 rounded-lg object-cover" />
-                    <div>
-                      <p className="text-[10px] font-black text-green-600">获取成功</p>
-                      <p className="text-xs font-bold line-clamp-1">{queryResult.name}</p>
-                    </div>
-                  </div>
-                  <button onClick={confirmAddMusic} className="px-3 py-2 bg-green-500 text-white rounded-xl text-[10px] font-black shrink-0 hover:bg-green-600 transition-colors">存入列表</button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <button
-              onClick={() => pushToQueue('网易云歌单', 'cloudMusicIds', formData.cloudMusicIds)}
-              className="w-full py-4 bg-indigo-500 text-white rounded-2xl text-sm font-black shadow-xl mt-4 active:scale-95 transition-all"
-            >
-              暂存音乐修改
+        {/* 已上传列表 */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-black text-slate-400 uppercase">本地歌单 ({localTracks.length})</p>
+            <button onClick={loadLocalTracks} className="flex items-center gap-1 text-[10px] font-black text-slate-400 hover:text-indigo-500 transition-colors">
+              <RefreshCw size={12} /> 刷新
             </button>
           </div>
+
+          {listLoading ? (
+            <div className="flex items-center justify-center gap-3 py-10 text-xs font-bold text-slate-400">
+              <Disc3 size={18} className="animate-spin" /> 正在读取本地歌单…
+            </div>
+          ) : localTracks.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 py-12 rounded-3xl border border-dashed border-slate-300 dark:border-slate-600 text-center">
+              <ListMusic size={28} className="text-slate-300 dark:text-slate-500" />
+              <p className="text-xs font-bold text-slate-400">本地歌单还是空的，上传一首歌试试</p>
+            </div>
+          ) : (
+            <div className="max-h-[460px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+              {localTracks.map((track: any) => (
+                <div key={track.id} className="flex items-center gap-3 p-3 bg-white/40 dark:bg-slate-800/40 rounded-2xl border border-white/20 group">
+                  <button
+                    onClick={() => togglePreview(track)}
+                    className="relative w-11 h-11 shrink-0 rounded-xl overflow-hidden shadow-sm bg-slate-200 dark:bg-slate-700"
+                    title={playingId === track.id ? '暂停' : '试听'}
+                  >
+                    <img
+                      src={track.cover ? `/api/proxy/api/music/cover/${encodeURIComponent(track.id)}` : DEFAULT_COVER}
+                      alt="cover"
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                      {playingId === track.id ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" className="ml-0.5" />}
+                    </span>
+                  </button>
+
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-bold line-clamp-1 text-slate-800 dark:text-white">{track.title || '未知歌曲'}</span>
+                    <span className="text-[10px] text-slate-500 font-medium line-clamp-1">
+                      {track.artist || '本地音乐'} · {formatSize(track.size)}
+                    </span>
+                    <div className="flex items-center gap-2 mt-1">
+                      {track.cover && <span className="text-[9px] px-1.5 py-0.5 rounded bg-pink-500/15 text-pink-500 font-bold">有封面</span>}
+                      {track.lyrics && <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-500 font-bold">有歌词</span>}
+                      {!track.available && <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-500/15 text-red-500 font-bold">文件丢失</span>}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <label className="w-8 h-8 rounded-lg bg-slate-500/10 text-slate-500 hover:bg-pink-500 hover:text-white flex items-center justify-center cursor-pointer transition-all" title="更换封面">
+                      <ImageIcon size={14} />
+                      <input type="file" accept=".jpg,.jpeg,.png,.webp,.gif" className="hidden" onChange={(e) => { uploadExtra(track.id, 'cover', e.target.files?.[0] || null); e.target.value = ''; }} />
+                    </label>
+                    <label className="w-8 h-8 rounded-lg bg-slate-500/10 text-slate-500 hover:bg-indigo-500 hover:text-white flex items-center justify-center cursor-pointer transition-all" title="上传歌词">
+                      <FileText size={14} />
+                      <input type="file" accept=".lrc" className="hidden" onChange={(e) => { uploadExtra(track.id, 'lyrics', e.target.files?.[0] || null); e.target.value = ''; }} />
+                    </label>
+                    <button onClick={() => removeLocalTrack(track.id, track.title)} className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white flex items-center justify-center" title="删除">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="text-[10px] leading-5 text-slate-400 pt-2">
+            音频文件只保存在控制台服务器上，不会进 Git 仓库；发布时会被镜像到网站的 <code className="px-1 py-0.5 rounded bg-slate-500/10">public/audio</code> 目录。改完记得去「线上发布」点一次发布。
+          </p>
         </div>
-      )}
+      </div>
 
       <audio ref={audioRef} onEnded={() => setPlayingId(null)} className="hidden" />
     </motion.section>

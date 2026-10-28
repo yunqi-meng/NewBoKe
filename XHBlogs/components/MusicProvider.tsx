@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
-import { siteConfig } from '../siteConfig';
 
 // 【增强版 LRC 歌词解析】
 function parseLrc(lrcText: string) {
@@ -94,29 +93,6 @@ async function loadLocalPlaylist(): Promise<any[]> {
   }
 }
 
-/** 网易云歌单，作为本地音乐之外的补充来源 */
-async function loadNeteasePlaylist(): Promise<any[]> {
-  try {
-    const res = await fetch(`/api/music?ids=${siteConfig.cloudMusicIds.join(',')}`);
-    const rawResults = await res.json();
-
-    return rawResults
-      .filter((song: any) => song && song.url && !song.error)
-      .map((song: any) => ({
-        id: song.id || Math.random().toString(),
-        title: song.name || '未知歌曲',
-        artist: song.artist || song.author || '未知歌手',
-        cover: song.cover || song.pic || DEFAULT_COVER,
-        src: song.url,
-        lrcUrl: null,
-        lyrics: song.lrc ? parseLrc(song.lrc) : [],
-        source: 'netease',
-      }));
-  } catch {
-    return [];
-  }
-}
-
 export function MusicProvider({ children }: { children: ReactNode }) {
   const [playlist, setPlaylist] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -139,17 +115,11 @@ export function MusicProvider({ children }: { children: ReactNode }) {
     let isMounted = true;
 
     const loadAll = async () => {
-      // 本地音乐优先，网易云作为补充；两者互不阻塞
-      const [localSongs, neteaseSongs] = await Promise.all([
-        loadLocalPlaylist(),
-        siteConfig.cloudMusicIds?.length > 0 ? loadNeteasePlaylist() : Promise.resolve([]),
-      ]);
-
-      const merged = [...localSongs, ...neteaseSongs];
+      const songs = await loadLocalPlaylist();
 
       if (!isMounted) return;
-      if (merged.length > 0) {
-        setPlaylist(merged);
+      if (songs.length > 0) {
+        setPlaylist(songs);
       } else {
         setCurrentLyric("还没有可播放的音乐");
       }

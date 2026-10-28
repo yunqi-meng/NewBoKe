@@ -20,7 +20,6 @@ const commonConfigs = [
   { key: 'bgImages', snippet: `\n  bgImages: ["https://bu.dusays.com/2026/03/24/69c1e38b4c370.jpg", "https://bu.dusays.com/2026/03/24/69c26fe4acdb5.jpg", "https://bu.dusays.com/2026/03/24/69c26fe4d9486.jpg"],` },
   { key: 'defaultPostCover', snippet: `\n  // 4. 文章默认封面图\n  defaultPostCover: "https://bu.dusays.com/2026/03/24/69c1e38b346cb.jpg",` },
   { key: 'photoWallImage', snippet: `\n  // 5. 首页照片墙预览图\n  photoWallImage: "https://bu.dusays.com/2026/03/24/69c1e38b4c370.jpg",` },
-  { key: 'cloudMusicIds', snippet: `\n  cloudMusicIds: ["1809646618", "3361076230", "1859390262"],` },
   { key: 'social', snippet: `\n  social: {\n    github: "",\n    gitee: "",\n    google: "",\n    email: "",\n    qq: "1124533793",\n    wechat: "XingHuisama",\n  },` },
   { key: 'counts', snippet: `\n  counts: {\n    photos: 128,\n  },` },
   { key: 'chatterTitle', snippet: `\n  chatterTitle: "云端杂谈",` },

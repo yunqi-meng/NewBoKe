@@ -52,7 +52,6 @@ function SettingsContent() {
     bio: siteConfig.bio || "",
     avatarUrl: siteConfig.avatarUrl || "",
     social: siteConfig.social || {},
-    cloudMusicIds: [...(siteConfig.cloudMusicIds || [])],
     bgImages: [...(siteConfig.bgImages || [])],
     // 👇 🌟 壁纸分组系统初始化
     bgGroups: ((siteConfig as any).bgGroups || []).map((g: any) => ({ ...g, images: [...(g.images || [])] })),
@@ -64,7 +63,6 @@ function SettingsContent() {
       owner: '',
       admin: []
     },
-    newMusicId: '',
     danmakuList: [...(siteConfig.danmakuList || [])],
     buildDate: siteConfig.buildDate || "2026-03-23T00:00:00",
     icpConfig: siteConfig.icpConfig || { name: "", link: "" },
@@ -77,10 +75,6 @@ function SettingsContent() {
       temperature: 0.85
     }
   });
-
-  const [queryLoading, setQueryLoading] = useState(false);
-  const [queryResult, setQueryResult] = useState<any>(null);
-  const [musicDetails, setMusicDetails] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const controller = new AbortController();
@@ -129,78 +123,6 @@ function SettingsContent() {
 
   const handleUpdate = (field: string, value: any) => {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
-  };
-
-  const fetchMusicDetail = async (id: string) => {
-    try {
-      const res = await fetch(`/api/proxy/api/music/query/${id}`, { cache: 'no-store' });
-      const data = await res.json();
-      return data.success ? data.data : { error: true, id, name: "查询失败或无版权" };
-    } catch (error) {
-      return { error: true, id, name: "后端通信通道断开" };
-    }
-  };
-
-  useEffect(() => {
-    if (backendMode !== 'live') return;
-    const loadInitialMusicDetails = async () => {
-      const details: Record<string, any> = { ...musicDetails };
-      let hasUpdate = false;
-      for (const id of formData.cloudMusicIds || []) {
-        if (!details[id]) {
-          const info = await fetchMusicDetail(id);
-          if (info) {
-            details[id] = info;
-            hasUpdate = true;
-          }
-        }
-      }
-      if (hasUpdate) setMusicDetails(details);
-    };
-    if (formData.cloudMusicIds?.length > 0) {
-      loadInitialMusicDetails();
-    }
-  }, [formData.cloudMusicIds, backendMode]);
-
-  const queryMusic = async () => {
-    if (!formData.newMusicId) {
-      showToast("ID不能为空哦", "warning");
-      return;
-    }
-    setQueryLoading(true);
-    setQueryResult(null);
-
-    const info = await fetchMusicDetail(formData.newMusicId);
-    if (info && !info.error) {
-      setQueryResult(info);
-      showToast("获取成功！", "success");
-    } else {
-      showToast(info?.name || "未找到该歌曲", "error");
-    }
-    setQueryLoading(false);
-  };
-
-  const removeSong = (index: number) => {
-    const newList = [...formData.cloudMusicIds];
-    newList.splice(index, 1);
-    handleUpdate('cloudMusicIds', newList);
-    showToast("已移除一首歌曲", "success");
-  };
-
-  const confirmAddMusic = () => {
-    if (!queryResult) return;
-    const targetId = String(queryResult.id);
-    const exists = formData.cloudMusicIds.some((id: string | number) => String(id) === targetId);
-
-    if (exists) {
-      showToast(`⚠️ 《${queryResult.name}》已经在列表里啦，不要重复添加！`, "warning");
-    } else {
-      handleUpdate('cloudMusicIds', [...formData.cloudMusicIds, targetId]);
-      setMusicDetails(prev => ({ ...prev, [targetId]: queryResult }));
-      setQueryResult(null);
-      handleUpdate('newMusicId', '');
-      showToast("✅ 成功存入播放列表！", "success");
-    }
   };
 
   const pushToQueue = (label: string, key?: string, value?: any) => {
@@ -262,7 +184,7 @@ function SettingsContent() {
               {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'display' && <DisplaySection key="display" showToast={showToast} />}
               {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
-              {activeTab === 'music' && <MusicSection key="music" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} musicDetails={musicDetails} queryMusic={queryMusic} queryLoading={queryLoading} queryResult={queryResult} confirmAddMusic={confirmAddMusic} removeSong={removeSong} showToast={showToast} />}
+              {activeTab === 'music' && <MusicSection key="music" showToast={showToast} />}
               {activeTab === 'gallery' && <GallerySection key="gallery" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'danmaku' && <DanmakuSection key="danmaku" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
