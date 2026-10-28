@@ -4,9 +4,10 @@
 # 控制台改完内容后点击「发布上线」，会依次完成：
 #   1. 把控制台工作区的内容镜像覆盖到网站源码目录（由控制台本身完成）
 #   2. 提交这些改动到服务器上的 Git 仓库并推送
-#   3. 重新构建公开站并重启服务
+#   3. 备份到 GitHub 仓库（异地存档，失败不影响发布）
+#   4. 重新构建公开站并重启服务
 #
-# 本脚本只负责第 2、3 步，由控制台通过 sudo 免密调用
+# 本脚本只负责第 2、3、4 步，由控制台通过 sudo 免密调用
 # （授权见 /etc/sudoers.d/xhblogs-rebuild）。
 set -uo pipefail
 
@@ -95,7 +96,16 @@ if ! as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1; then
   exit 1
 fi
 
-# 3. 重新构建并重启公开站
+# 3. 备份到 GitHub（异地存档，失败不影响本次发布）
+if as_app_user git -C "$REPO" remote get-url github >/dev/null 2>&1; then
+  if as_app_user git -C "$REPO" push github HEAD:main >> "$LOG" 2>&1; then
+    log "已备份到 GitHub"
+  else
+    log "GitHub 备份失败（不影响本次发布）"
+  fi
+fi
+
+# 4. 重新构建并重启公开站
 if [ ! -x "$REBUILD" ]; then
   log "未找到重建脚本 $REBUILD"
   write_status failed "未找到重建脚本 $REBUILD" "$START_TS"
