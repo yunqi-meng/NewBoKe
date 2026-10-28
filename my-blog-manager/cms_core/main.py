@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from cms_core.api import music, config, picbed, drafts, moments
 from cms_core.api import gallery, friends, projects
 from cms_core.api import sync, deploy
+from cms_core.api import comments
 
 app = FastAPI(title="XingHuiSama CMS Backend", version="1.0.0")
 
@@ -32,6 +33,8 @@ app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(moments.router, prefix="/api/moments", tags=["Moments"])
 app.include_router(sync.router, prefix="/api/sync", tags=["Sync"])
 app.include_router(deploy.router, prefix="/api/deploy", tags=["Deploy"])
+# 🌟 自建评论系统：前台读写 + 后台审核（控制台「评论管理」页面用）
+app.include_router(comments.router, prefix="/api/comments", tags=["Comments"])
 
 # Fall-through service: existing routes remain first and retain their behavior.
 from cms_core.briefing_integration import BriefingIntegration

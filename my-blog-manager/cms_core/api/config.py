@@ -191,7 +191,7 @@ def get_site_config():
         root_content = content
 
         # 1. 🌟 预先提取并隔离所有已知的“嵌套对象”，防止内部属性泄露到外层！
-        known_dicts = ['social', 'gitalkConfig', 'geminiConfig', 'icpConfig']
+        known_dicts = ['social', 'geminiConfig', 'icpConfig']
         for dict_name in known_dicts:
             dict_match = re.search(rf'{dict_name}\s*:\s*\{{([\s\S]+?)\}}', content)
             if dict_match:
@@ -204,15 +204,6 @@ def get_site_config():
                 for m in re.finditer(r'([a-zA-Z0-9_]+)\s*:\s*(["\'])([\s\S]*?)\2', dict_str):
                     # 将转义的 \\n 恢复为真实的换行，供前端显示
                     sub_dict[m.group(1)] = m.group(3).replace('\\n', '\n')
-
-                # Gitalk 的管理员数组特供处理
-                if dict_name == 'gitalkConfig':
-                    admin_match = re.search(r'admin\s*:\s*\[(.*?)\]', dict_str)
-                    if admin_match:
-                        admin_raw = admin_match.group(1)
-                        sub_dict['admin'] = [x.strip(" \"'") for x in admin_raw.split(',') if x.strip(" \"'")]
-                    else:
-                        sub_dict['admin'] = []
 
                 parsed_config[dict_name] = sub_dict
 
@@ -270,7 +261,7 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
         "title", "authorName", "bio", "avatarUrl", "useGradient", "themeColors",
         "bgImages", "defaultPostCover", "photoWallImage", "social",
         "counts", "chatterTitle", "chatterDescription", "picBedName", "picBedUrl",
-        "picBedToken", "danmakuList", "gitalkConfig", "buildDate", "footerBadges",
+        "picBedToken", "danmakuList", "buildDate", "footerBadges",
         "icpConfig", "geminiConfig",
         "faviconUrl",
         "navTitle",
@@ -303,34 +294,7 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
                 picbed_updates[key] = value
                 value = ""
 
-            # 专属通道 1：Gitalk 特殊格式组装
-            if key == "gitalkConfig":
-                admin_list = value.get("admin", [])
-                if isinstance(admin_list, str):
-                    admin_list = [admin_list]
-                admin_str = '["' + '", "'.join(admin_list) + '"]'
-
-                # 安全转义客户端凭据
-                cid = json.dumps(value.get('clientID', ''), ensure_ascii=False)
-                csec = json.dumps(value.get('clientSecret', ''), ensure_ascii=False)
-                repo = json.dumps(value.get('repo', ''), ensure_ascii=False)
-                owner = json.dumps(value.get('owner', ''), ensure_ascii=False)
-
-                gitalk_ts_code = f"""{{
-    clientID: {cid},
-    clientSecret: {csec},
-    repo: {repo},
-    owner: {owner},
-    admin: {admin_str},
-  }}"""
-                pattern = rf"({key}\s*:\s*)\{{[\s\S]*?\}}"
-                if re.search(pattern, content):
-                    content = re.sub(pattern, lambda m: m.group(1) + gitalk_ts_code, content, count=1)
-                    print(f"  ✅ 成功修改并落盘(专列) -> [{key}]")
-                    updated_count += 1
-                continue
-
-            # 专属通道 2：壁纸分组（数组内嵌 images 数组，非贪婪正则会截断，必须括号平衡替换）
+            # 专属通道 1：壁纸分组（数组内嵌 images 数组，非贪婪正则会截断，必须括号平衡替换）
             if key == "bgGroups":
                 val_str = json.dumps(value, ensure_ascii=False)
                 m = re.search(r'bgGroups\s*:\s*\[', content)

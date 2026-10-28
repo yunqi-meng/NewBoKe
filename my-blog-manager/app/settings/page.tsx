@@ -56,13 +56,6 @@ function SettingsContent() {
     // 👇 🌟 壁纸分组系统初始化
     bgGroups: ((siteConfig as any).bgGroups || []).map((g: any) => ({ ...g, images: [...(g.images || [])] })),
     activeBgGroup: (siteConfig as any).activeBgGroup || 'default',
-    gitalkConfig: siteConfig.gitalkConfig || {
-      clientID: '',
-      clientSecret: '',
-      repo: '',
-      owner: '',
-      admin: []
-    },
     danmakuList: [...(siteConfig.danmakuList || [])],
     buildDate: siteConfig.buildDate || "2026-03-23T00:00:00",
     icpConfig: siteConfig.icpConfig || { name: "", link: "" },
@@ -97,7 +90,6 @@ function SettingsContent() {
             ...prev,
             ...data.data,
             social: { ...(prev.social || {}), ...(data.data.social || {}) },
-            gitalkConfig: { ...(prev.gitalkConfig || {}), ...(data.data.gitalkConfig || {}) },
             // 👇 🌟 合并后端发来的壁纸分组数据
             bgGroups: data.data.bgGroups?.length ? data.data.bgGroups : prev.bgGroups,
             activeBgGroup: data.data.activeBgGroup || prev.activeBgGroup,
@@ -188,7 +180,7 @@ function SettingsContent() {
               {activeTab === 'gallery' && <GallerySection key="gallery" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'danmaku' && <DanmakuSection key="danmaku" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
-              {activeTab === 'comment' && <CommentSection key="comment" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
+              {activeTab === 'comment' && <CommentSection key="comment" />}
               {/* 👇 🌟 挂载 AI 猫咪面板 */}
               {activeTab === 'aicat' && <AICatSection key="aicat" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
 

@@ -44,6 +44,12 @@ next-env.d.ts
 # 图床凭证 (Token 绝不入库，只留在本机)
 /data/picbed.json
 
+# 评论数据库 (访客留言只存在本机，绝不入库)
+/data/comments.db
+/data/comments.db-wal
+/data/comments.db-shm
+/data/comments.db-journal
+
 # 本地音乐 (音频/歌词/封面二进制不入库，只有播放列表元数据入库)
 /music/*
 !/music/playlist.json

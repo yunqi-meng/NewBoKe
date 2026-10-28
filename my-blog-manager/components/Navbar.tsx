@@ -62,6 +62,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     { name: '说说', href: '/moments' },
     { name: '杂谈', href: '/chatter' },
     { name: '📝 草稿箱', href: '/drafts' },
+    { name: '💬 评论管理', href: '/comments' },
     { name: '友链', href: '/friends' },
     { name: '关于', href: '/about' },
     { name: '⚙️ 设置', href: '/settings' },

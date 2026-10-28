@@ -1,3 +1,17 @@
+# Version 0.4.2 - Self-Hosted Comment System
+
+**The comment system has been rebuilt from scratch; the old Gitalk setup is gone.** Comments used to live in GitHub Issues, where the owner could neither see nor moderate them. They now live in a local SQLite database on the server, and every moderation action happens in the console.
+
+- **Self-hosted comments**: visitors can post, reply and like on articles and moments. Identity comes from a browser-generated visitor token, used for rate limiting (5 per 10 minutes, 20 per hour) and admin traceability — no real-world identity is collected.
+- **Comment management console**: a new **💬 评论管理** page lists every comment on the site with nickname, email, IP, likes, reply count, timestamp and source page; filter by status / page / keyword, then approve, hide, mark as spam or delete — one by one or in bulk.
+- **Owner replies**: reply to any comment as the site owner; the reply appears publicly with an "站长" (admin) badge.
+- **Instant effect**: comment options (master switch, approval, anonymous, likes, title, placeholder, notice, max length) live in the engine, so saving changes the public site right away — **no publish required**.
+- **Removed**: the Spirit Realm (灵境) page, the creative workshop and battleship it hosted, and the RPG level/badge system are fully gone from both the site and the console.
+
+> Before upgrading: you can archive the old GitHub comment repository, and the GitHub OAuth credentials are no longer needed.
+
+---
+
 # Version 0.4.1 - Wallpaper and Editor Improvements
 
 Includes 0.4.0 Daily Briefing plus wallpaper groups (PR #25, original commit author Kai) and GFM table/code-block improvements (PR #15, original commit author ILoveFurina). Original commits and maintainer fixes are retained. Empty wallpaper groups, special-character configuration round trips, literal prose characters, strikethrough, code formatting and fenced-code table-of-contents handling have been corrected. See UpdateLog.md and the Chinese README for details.
@@ -388,34 +402,41 @@ systemctl restart xhblogs
 
 ## V. Comment System Configuration
 
-The comment system of this blog is based on GitHub Issues (Gitalk or similar solutions). You need to create a **Public** repository on GitHub specifically to store comments from visitors.
+The comment system is **self-hosted**: visitor comments live in a local SQLite database on the server (`my-blog-manager/data/comments.db`). The public site reads and writes through the content engine, and the console can moderate, reply to, hide or delete them. **No GitHub repository and no OAuth app required.**
 
-In the console's comment settings, enter your GitHub username and the name of this public repository:
+> The old Gitalk setup (comments living in GitHub Issues) has been removed entirely — it left the owner unable to see or manage a single comment. The console's **💬 评论管理** (Comment Management) page now lists every comment on the site.
 
+### On the public site
 
-**Next, configure OAuth authorization to allow visitors to log in and leave comments:**
+- Every article and moment has a comment area where visitors leave a nickname (and optionally an email), reply, and like.
+- Visitor identity comes from a browser-generated token, used for **rate limiting** (max 5 comments per 10 minutes, 20 per hour) and for traceability in the admin panel. No real-world identity is collected.
 
-1. Log in to GitHub, click on your profile picture in the top right corner, and go to **Settings**.
-2. Scroll to the bottom of the left menu bar and click **Developer settings**.
-3. Select **OAuth Apps** on the left, and click **New OAuth App** in the top right corner.
+### In the console
 
-**Key Application Information Filling Guide:**
+Open the console → **💬 评论管理** (Comment Management):
 
-| Field Name | Suggestion |
+- Overview stats: total, pending, published, spam, hidden, and new today.
+- Filter by **status**, **page**, and **keyword**, sorted by newest, oldest or most-liked.
+- Approve, hide, mark as spam or delete — one by one or in bulk. Deleting a comment also removes its replies.
+- Reply as the **site owner**; the reply shows up on the public site with a "站长" (admin) badge.
+- Every row shows the nickname, email, IP, visitor token, like count, reply count, timestamp and source page.
+
+### Comment options
+
+Console → **⚙️ 设置 → 💬 评论系统配置** (Comment Settings). Changes take effect on the public site **immediately, no publish required**:
+
+| Option | Meaning |
 | --- | --- |
-| **Application name** | Custom name, e.g., `My-Blog-Comments` |
-| **Homepage URL** | The **complete address of your blog's homepage** (e.g., `[https://www.xinghuisama.top](https://www.xinghuisama.top)`) |
-| **Application description** | Optional |
-| **Authorization callback URL** | **Core parameter**: Must be your blog domain. If debugging locally frequently, you can enter `http://localhost:3000` |
+| Enable comments | Master switch — hides the comment area but keeps the data |
+| Require approval | New comments stay pending until approved in the comment manager |
+| Allow anonymous comments | When off, visitors must supply an email address |
+| Allow likes | When off, the like button disappears |
+| Title / placeholder / notice | Copy shown on the public site |
+| Max length | Characters per comment (10 - 2000) |
 
-**Extract Core Keys:**
+### Data and backups
 
-1. Submit registration (Register application).
-2. You will see the **Client ID** on the redirected page, which is the first required piece of data.
-3. Click **Generate a new client secret** below to generate the secret.
-4. **🚨 Immediately copy and securely save this secret!** Due to security mechanisms, this secret will be permanently hidden once you leave this page.
-
-Accurately enter this `Client ID` and `Client Secret` into the corresponding fields in the console, and save to activate the comment function.
+Comments live only on the server's disk and **never enter Git** (`.gitignore` excludes `data/comments.db`). To back them up, copy `my-blog-manager/data/comments.db` along with the rest of the site; drop it back in place after a migration and every comment returns.
 
 ---
 

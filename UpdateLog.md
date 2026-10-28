@@ -1,3 +1,16 @@
+## 0.4.2 - 2026-10-28
+
+- 评论系统整体重建，旧的 Gitalk（GitHub Issues）方案整体下线，不再需要 GitHub 公开仓库与 OAuth 授权。
+- 引擎新增 `cms_core/api/comments.py`：SQLite 存储（`my-blog-manager/data/comments.db`），评论、设置、点赞三张表；访客令牌限流（10 分钟 5 条 / 1 小时 20 条）、蜜罐反垃圾、同源字段清洗、父子回复校验。
+- 公开站新增 `/api/comments` 网关与 `components/Comments.tsx` 评论区组件，支持留言、回复、点赞、分页加载、相对时间、访客标识本地记忆。
+- 控制台新增 `components/CommentManager.tsx` 与 `/comments` 页面：全站评论统计、按状态/主题/关键词筛选、排序、逐条与批量审核、隐藏、垃圾、删除、站长回复。
+- 评论参数（总开关、审核、匿名、点赞、标题、占位符、提示语、最大字数）存于引擎数据库，控制台保存后前台即时生效，无需重新发布。
+- 「允许匿名留言」关闭时前台强制填写邮箱；「开放点赞」关闭时前台隐藏点赞按钮且引擎拒绝点赞请求。
+- 站点与控制台各自的 `/api/comments` 网关保持一致，同一份评论区组件同时服务两个应用。
+- 移除 `gitalkConfig` 配置项与 `gitalk` 依赖（含两个 lockfile）；删除 GitHub 评论 API 路由与旧的 LabComments 组件；友链页留言板锚点改为 `#comment-board`。
+- 灵境页面及其关联的创意工坊、帝江号舰船与 RPG 等级系统从站点与控制台完整移除（3973 行）。
+- `data/comments.db` 及其 WAL/SHM 文件加入 `.gitignore`，访客留言不入库。
+
 ## 0.4.1 - 2026-10-23
 
 - 基于 0.4.0，合并 pr-review 的两个原作者提交及维护者兼容性修复，保留原始历史与署名。
