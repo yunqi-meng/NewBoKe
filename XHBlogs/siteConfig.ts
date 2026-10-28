@@ -70,5 +70,4 @@ export const siteConfig = {
     temperature: 0.85,
   },
   friendLinkApplyFormat: "名称：YunQi-Mengの宝藏之地\n简介：\n链接：\n头像：",
-  enableLevelSystem: true,
 };

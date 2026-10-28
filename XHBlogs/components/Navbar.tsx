@@ -74,15 +74,11 @@ export default function Navbar() {
     { name: '归档', href: '/timeline' },
     { name: '照片墙', href: '/photowall' },
     { name: '音乐', href: '/music' },
-    { name: '灵境', href: '/tree' },
     { name: '说说', href: '/moments' },
     { name: '杂谈', href: '/chatter' },
     { name: '友链', href: '/friends' },
     { name: '关于', href: '/about' },
   ];
-
-  // 🌟 核心：过滤掉“灵境”，专供手机端使用，保证圆盘自动重新均匀排布
-  const mobileNavLinks = navLinks.filter(link => link.href !== '/tree');
 
   return (
     <>
@@ -162,11 +158,11 @@ export default function Navbar() {
                     </button>
                   </div>
 
-                  {/* 🌟 手机端轮盘渲染：使用过滤后的 mobileNavLinks */}
-                  {mobileNavLinks.map((link, index) => {
+                  {/* 🌟 手机端轮盘渲染 */}
+                  {navLinks.map((link, index) => {
                     const isActive = pathname === link.href || pathname === `${link.href}/`;
-                    // 🌟 角度计算也会基于过滤后的长度，保证图标自动均匀排布！
-                    const angle = index * (360 / mobileNavLinks.length);
+                    // 🌟 角度计算同样基于导航项数量，保证图标自动均匀排布！
+                    const angle = index * (360 / navLinks.length);
 
                     return (
                       <div

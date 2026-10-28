@@ -277,7 +277,6 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
         "navSuffix",
         "navAfter",
         "friendLinkApplyFormat",
-        "enableLevelSystem", # 👈 你加的字段在这里，完美！
         "bgGroups",       # 👈 🌟 壁纸分组系统
         "activeBgGroup"   # 👈 🌟 当前启用的分组 id
     }
