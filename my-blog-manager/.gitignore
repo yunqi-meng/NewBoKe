@@ -37,6 +37,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Machine-local runtime settings (每台机器的端口/路径都不一样，不入库)
+/data/deploy_config.json
+/public/backend_config.json
+
 # Local briefing credentials, drafts and runtime data
 /manager_data/briefing/
 *.connection.json
