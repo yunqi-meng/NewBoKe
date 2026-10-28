@@ -3,11 +3,12 @@
 #
 # 控制台改完内容后点击「发布上线」，会依次完成：
 #   1. 把控制台工作区的内容镜像覆盖到网站源码目录（由控制台本身完成）
-#   2. 提交这些改动到服务器上的 Git 仓库并推送
-#   3. 备份到 GitHub 仓库（异地存档，失败不影响发布）
-#   4. 重新构建公开站并重启服务
+#   2. 先与仓库最新版本合并（开发机也会推代码，不合并会被非快进拒绝）
+#   3. 提交这些改动到服务器上的 Git 仓库并推送
+#   4. 备份到 GitHub 仓库（异地存档，失败不影响发布）
+#   5. 重新构建公开站并重启服务
 #
-# 本脚本只负责第 2、3、4 步，由控制台通过 sudo 免密调用
+# 本脚本只负责第 2~5 步，由控制台通过 sudo 免密调用
 # （授权见 /etc/sudoers.d/xhblogs-rebuild）。
 set -uo pipefail
 
@@ -17,6 +18,8 @@ STATUS_FILE="$REPO/.publish-status.json"
 LOG="/var/log/xhblogs-publish.log"
 REBUILD="/usr/local/bin/xhblogs-rebuild"
 APP_USER="xhblogs"
+GIT_NAME="Blog CMS"
+GIT_EMAIL="cms@localhost"
 
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
 
@@ -67,11 +70,47 @@ if pgrep -f "next build" >/dev/null 2>&1 || pgrep -f "npm run build" >/dev/null 
   exit 0
 fi
 
-# 1. 只把内容相关的路径加入暂存区，避免误提交运行时文件
+# 1. 先与仓库最新版本同步
+#    开发机和服务器都会往同一个分支提交（开发机推代码，服务器推控制台发布的内容），
+#    服务器不先合并就提交的话，推送会被非快进拒绝，整个发布直接失败。
+if as_app_user git -C "$REPO" fetch origin main >> "$LOG" 2>&1; then
+  if ! as_app_user git -C "$REPO" merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
+    STASHED=0
+    if ! as_app_user git -C "$REPO" diff --quiet 2>/dev/null || ! as_app_user git -C "$REPO" diff --cached --quiet 2>/dev/null; then
+      if as_app_user git -C "$REPO" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
+          stash push -m "publish-autostash" >> "$LOG" 2>&1; then
+        STASHED=1
+      fi
+    fi
+
+    if as_app_user git -C "$REPO" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
+        merge --no-edit origin/main >> "$LOG" 2>&1; then
+      log "已合并 origin/main（服务器此前落后于仓库）"
+    else
+      as_app_user git -C "$REPO" merge --abort >> "$LOG" 2>&1 || true
+      if [ "$STASHED" = "1" ]; then
+        as_app_user git -C "$REPO" stash pop >> "$LOG" 2>&1 || true
+      fi
+      write_status failed "合并仓库最新版本失败，请查看 $LOG" "$START_TS"
+      exit 1
+    fi
+
+    if [ "$STASHED" = "1" ]; then
+      if ! as_app_user git -C "$REPO" stash pop >> "$LOG" 2>&1; then
+        log "恢复控制台改动失败，改动仍保留在 stash 里"
+        write_status failed "恢复控制台改动失败，请查看 $LOG" "$START_TS"
+        exit 1
+      fi
+    fi
+  fi
+fi
+
+# 2. 只把内容相关的路径加入暂存区，避免误提交运行时文件
 PATHS=()
 for p in \
   XHBlogs/posts XHBlogs/chatters XHBlogs/moments XHBlogs/data XHBlogs/app/about XHBlogs/siteConfig.ts \
-  my-blog-manager/posts my-blog-manager/chatters my-blog-manager/moments my-blog-manager/data my-blog-manager/siteConfig.ts
+  my-blog-manager/posts my-blog-manager/chatters my-blog-manager/moments my-blog-manager/data \
+  my-blog-manager/app/about my-blog-manager/siteConfig.ts
 do
   [ -e "$REPO/$p" ] && PATHS+=("$p")
 done
@@ -84,19 +123,30 @@ if as_app_user git -C "$REPO" diff --cached --quiet; then
   log "内容没有变化，跳过提交"
 else
   as_app_user git -C "$REPO" \
-    -c user.name="Blog CMS" -c user.email="cms@localhost" \
+    -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
     commit -m "chore(publish): 控制台发布 $(date '+%F %T')" >> "$LOG" 2>&1
   log "提交完成：$(as_app_user git -C "$REPO" rev-parse --short HEAD)"
 fi
 
-# 2. 推送回服务器上的裸仓库，保持源码仓库与线上同步
+# 3. 推送回服务器上的裸仓库，保持源码仓库与线上同步
+#    推送失败时再同步一次（期间开发机可能又推了新代码），仍失败才算发布失败
 if ! as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1; then
+  log "首次推送被拒，重新同步后重试"
+  as_app_user git -C "$REPO" fetch origin main >> "$LOG" 2>&1
+  if as_app_user git -C "$REPO" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
+      merge --no-edit origin/main >> "$LOG" 2>&1; then
+    as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1
+  fi
+fi
+
+if ! as_app_user git -C "$REPO" rev-parse --verify origin/main >/dev/null 2>&1 ||
+   ! as_app_user git -C "$REPO" merge-base --is-ancestor origin/main HEAD 2>/dev/null; then
   log "推送失败"
   write_status failed "推送源码仓库失败，请查看 $LOG" "$START_TS"
   exit 1
 fi
 
-# 3. 备份到 GitHub（异地存档，失败不影响本次发布）
+# 4. 备份到 GitHub（异地存档，失败不影响本次发布）
 if as_app_user git -C "$REPO" remote get-url github >/dev/null 2>&1; then
   if as_app_user git -C "$REPO" push github HEAD:main >> "$LOG" 2>&1; then
     log "已备份到 GitHub"
@@ -105,7 +155,7 @@ if as_app_user git -C "$REPO" remote get-url github >/dev/null 2>&1; then
   fi
 fi
 
-# 4. 重新构建并重启公开站
+# 5. 重新构建并重启公开站
 if [ ! -x "$REBUILD" ]; then
   log "未找到重建脚本 $REBUILD"
   write_status failed "未找到重建脚本 $REBUILD" "$START_TS"
