@@ -290,6 +290,21 @@ After the restart the console redirects to `/login`; the session lasts 7 days an
 
 You can still double-click `my-blog-manager/Start.bat` to debug on Windows. The local machine has no publish helper, so publishing only mirrors the content into the blog source directory and you build and deploy it yourself.
 
+**Working together with the server**
+
+Publishing from the console on the server creates commits in `/opt/xinghui-blog`, and the development
+machine pushes code to the same branch. Two writers on one branch collide easily, so keep to this:
+
+| Who | What to do |
+| --- | --- |
+| Development machine | Run `git pull --rebase aliyun main` before committing (this picks up the server's publish commits), then `git push aliyun main` |
+| Server | The publish helper fetches and merges `origin/main` before committing, so a publish is never rejected for being behind |
+
+> Push the sources through the `xhblogs-git` SSH host alias, which writes to the bare repository as
+> the `xhblogs` user. Pushing as root leaves root-owned objects in the bare repository, and the
+> server's own publish push is then rejected for lack of permissions. Nothing has to be changed in
+> the console itself.
+
 ---
 
 ## II. Update Settings and Publish
@@ -339,6 +354,13 @@ If you prefer using direct external links, the console also supports direct inse
 ![图床配置](picture/Pasted%20image%2020260427124930.png)
 
 After filling in the corresponding API Token and other information, you can click **[Send Probe to Test Token]** to verify in real-time whether the image hosting interface is functional.
+
+> Image hosting credentials live only in `my-blog-manager/data/picbed.json` on the console host.
+> That file is listed in `.gitignore`, so it never enters the repository and is never pushed to a
+> remote by a publish. `siteConfig.ts` keeps only empty placeholders and the sensitive fields are
+> stripped when mirroring to the public site, so the public site can never obtain your token.
+> If an older version stored the token inside `siteConfig.ts`, save the image hosting settings once
+> again in the console after upgrading: the value is moved to the new file and erased from the old one.
 
 ---
 
