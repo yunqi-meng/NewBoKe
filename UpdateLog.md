@@ -1,3 +1,12 @@
+## 0.4.3 - 2026-10-28
+
+- AI 煤球改接 DeepSeek：`/api/chat` 由 Gemini 原生协议改为 OpenAI 兼容协议，默认模型 `deepseek-flash`（DeepSeek-V4.1-Flash），接口地址与思考强度均可在控制台配置。
+- 聊天接口运行时由 `edge` 改为 `nodejs`：密钥在运行时才写进环境文件，node 运行时直接读进程环境，改密钥只需重启服务，无需重新构建。
+- 配置项 `geminiConfig` 更名 `aiConfig`，新增 `baseUrl` 与 `effort` 字段，配置不再与单一模型厂商绑定；引擎的配置解析白名单同步更新。
+- 控制台「AI 煤球配置」新增接口地址输入框与思考强度三档按钮，生成预算上限从 1000 提到 4000（推理模型需要为思考留出预算）。
+- 引擎解析嵌套配置时一并抓取数字与布尔值，生成预算、发散度不再被丢弃。
+- 密钥仅存于服务器环境文件（`/etc/xhblogs.env`、`/etc/xhblogs-manager.env`，权限 600）与本地 `.env.local`（已被 `.gitignore` 忽略），仓库内无任何口令。
+
 ## 0.4.2 - 2026-10-28
 
 - 评论系统整体重建，旧的 Gitalk（GitHub Issues）方案整体下线，不再需要 GitHub 公开仓库与 OAuth 授权。

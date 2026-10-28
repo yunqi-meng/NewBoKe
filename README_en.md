@@ -1,3 +1,16 @@
+# Version 0.4.3 - AI Cat on DeepSeek
+
+**The AI cat now runs on DeepSeek through the OpenAI-compatible protocol.** The old Gemini setup could never work on this server: the machine cannot reach `generativelanguage.googleapis.com` and no key was ever configured, so the cat could only fall back to canned lines. Now it actually answers.
+
+- **New model**: `deepseek-flash` by default, i.e. **DeepSeek-V4.1-Flash**, with a selectable reasoning effort (low / high / max).
+- **Pluggable endpoint**: **Settings → AI Cat Config 🐾** gained an **endpoint URL** field and a **reasoning effort** switch; model id, personality prompt, generation budget and temperature remain editable, so any OpenAI-compatible provider can be used.
+- **Secrets stay in environment files**: no key is stored in the repository, code or documentation. Put it in `/etc/xhblogs.env` and `/etc/xhblogs-manager.env` on the server (mode 600), or in each app's `.env.local` for the local desktop edition.
+- **Runtime switched from edge to nodejs**: the key is only written into the environment file at runtime, and edge handles environment variables at build time. The node runtime reads the live process environment, so **adding or rotating a key only needs a service restart — no rebuild**.
+
+> Before upgrading: until the key is configured the cat can only answer with fallback lines; and do not set the generation budget too low, because reasoning models spend that budget on "thinking" and may end up with no answer at all.
+
+---
+
 # Version 0.4.2 - Self-Hosted Comment System
 
 **The comment system has been rebuilt from scratch; the old Gitalk setup is gone.** Comments used to live in GitHub Issues, where the owner could neither see nor moderate them. They now live in a local SQLite database on the server, and every moderation action happens in the console.
