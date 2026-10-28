@@ -11,7 +11,7 @@ TARGET=/console/flow
 
 # 用服务器上的会话密钥签一个 10 分钟有效的临时会话 Cookie
 # 密钥只在服务器内存里用一次，不落盘、不打印。
-if [ "$(id -u)" = "0" ]; then PY="python3"; else PY="sudo python3"; fi
+if [ -r /etc/xhblogs-manager.env ]; then PY="python3"; else PY="sudo -n python3"; fi
 TOKEN=$($PY -c "
 import hmac, hashlib, base64, time
 line = [l for l in open('/etc/xhblogs-manager.env') if l.startswith('MANAGER_SESSION_SECRET=')][0]
