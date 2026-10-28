@@ -200,10 +200,21 @@ def get_site_config():
                 root_content = re.sub(rf'{dict_name}\s*:\s*\{{[\s\S]+?\}},?', '', root_content)
 
                 sub_dict = {}
-                # 提取字符串（支持安全匹配包含 \n 的字符串）
-                for m in re.finditer(r'([a-zA-Z0-9_]+)\s*:\s*(["\'])([\s\S]*?)\2', dict_str):
-                    # 将转义的 \\n 恢复为真实的换行，供前端显示
-                    sub_dict[m.group(1)] = m.group(3).replace('\\n', '\n')
+                # 提取嵌套对象里的字段：字符串（含 \n 的多行）、布尔值与数字都要抓，
+                # 少了数字的话控制台读到的就是一份残缺配置（比如生成预算、发散度）
+                for m in re.finditer(
+                    r'([a-zA-Z0-9_]+)\s*:\s*(?:(["\'])([\s\S]*?)\2|(true|false|\d+(?:\.\d+)?))',
+                    dict_str,
+                ):
+                    key = m.group(1)
+                    if m.group(3) is not None:
+                        # 将转义的 \\n 恢复为真实的换行，供前端显示
+                        sub_dict[key] = m.group(3).replace('\\n', '\n')
+                    elif m.group(4) in ('true', 'false'):
+                        sub_dict[key] = m.group(4) == 'true'
+                    else:
+                        num = float(m.group(4))
+                        sub_dict[key] = int(num) if num.is_integer() else num
 
                 parsed_config[dict_name] = sub_dict
 
