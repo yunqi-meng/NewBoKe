@@ -1,5 +1,16 @@
 {
   "version": 1,
-  "updatedAt": "",
-  "tracks": []
+  "updatedAt": "2026-10-28 17:16:06",
+  "tracks": [
+    {
+      "id": "t1793178955906",
+      "title": "控制台上传测试",
+      "artist": "Qoder",
+      "file": "控制台上传测试.wav",
+      "cover": "",
+      "lyrics": "",
+      "size": 88244,
+      "addedAt": "2026-10-28 17:15:55"
+    }
+  ]
 }
