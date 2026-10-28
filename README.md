@@ -305,6 +305,8 @@ Environment=HOSTNAME=0.0.0.0
 
 整个过程约 1-3 分钟。构建日志见 `/var/log/xhblogs-publish.log`。
 
+> 如果你直接在服务器上改了源码，可以用 `sudo -u xhblogs sudo -n /usr/local/bin/xhblogs-async-rebuild` 只触发一次重建（跳过镜像与提交步骤）。
+
 博客文章、说说（碎碎念）、杂谈等所有内容的发布与修改，均遵循此流程。
 
 > **💡 黄金法则**：暂存队列 → 更新本地 → 发布上线
