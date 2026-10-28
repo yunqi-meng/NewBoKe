@@ -6,3 +6,6 @@ __pycache__/
 *.py[cod]
 /tests/tmp*/
 .publish-status.json
+
+# 本地临时测试文件
+.tmp-*
