@@ -1,7 +1,5 @@
 import os
-import platform
 import shutil
-import subprocess
 from fastapi import APIRouter, Request
 
 router = APIRouter()
@@ -9,26 +7,6 @@ router = APIRouter()
 # 动态定位 Manager 根目录
 CURRENT_API_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_API_DIR, "..", ".."))
-
-# 服务器部署时的异步重建入口：公开站跑的是预构建产物，
-# 源码同步过去之后必须重新 build 才会反映到线上。
-REBUILD_HELPER = "/usr/local/bin/xhblogs-async-rebuild"
-
-
-def trigger_rebuild():
-    """同步成功后触发公开站重建（仅服务器部署环境具备该助手脚本）"""
-    if platform.system() != "Linux" or not os.path.exists(REBUILD_HELPER):
-        return False
-    try:
-        subprocess.Popen(
-            ["sudo", "-n", REBUILD_HELPER],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        return True
-    except Exception:
-        return False
-
 
 # 需要镜像覆盖的文件夹 (先清空目标，再全量复制)
 SYNC_DIRS = ["posts", "chatters", "moments"]
@@ -41,10 +19,60 @@ SYNC_FILES = [
     "siteConfig.ts"
 ]
 
+# siteConfig.ts 里的敏感行，镜像时必须剔除（图床凭证只留在本机控制台）
+SENSITIVE_SITE_CONFIG_MARKERS = [
+    "picBedName:",
+    "picBedUrl:",
+    "picBedToken:",
+    "图床核心配置"
+]
+
 
 def is_safe_blog_dir(target_path):
     """防呆检测：只有包含 package.json 的才被认为是安全的博客目录"""
     return os.path.exists(os.path.join(target_path, "package.json"))
+
+
+def mirror_content(target_path):
+    """把控制台工作区的内容镜像覆盖到网站源码目录。
+
+    返回 (是否成功, 说明文字)。这是纯文件操作，不碰 Git，也不触发构建，
+    发布上线（git 提交 + 重建）由 deploy.publish 负责。
+    """
+    if not is_safe_blog_dir(target_path):
+        return False, "安全拦截：目标路径不合法！"
+
+    for d in SYNC_DIRS:
+        src_dir = os.path.join(PROJECT_ROOT, d)
+        dst_dir = os.path.join(target_path, d)
+
+        if os.path.exists(src_dir):
+            if os.path.exists(dst_dir):
+                shutil.rmtree(dst_dir)
+            shutil.copytree(src_dir, dst_dir)
+
+    for f in SYNC_FILES:
+        src_file = os.path.join(PROJECT_ROOT, f.replace("/", os.sep))
+        dst_file = os.path.join(target_path, f.replace("/", os.sep))
+
+        if not os.path.exists(src_file):
+            continue
+
+        os.makedirs(os.path.dirname(dst_file), exist_ok=True)
+
+        if f == "siteConfig.ts":
+            with open(src_file, "r", encoding="utf-8") as file_in:
+                lines = file_in.readlines()
+
+            with open(dst_file, "w", encoding="utf-8") as file_out:
+                for line in lines:
+                    if any(marker in line for marker in SENSITIVE_SITE_CONFIG_MARKERS):
+                        continue
+                    file_out.write(line)
+        else:
+            shutil.copy2(src_file, dst_file)
+
+    return True, "内容已镜像覆盖至网站源码目录"
 
 
 @router.post("/check")
@@ -77,50 +105,15 @@ async def check_blog_path(request: Request):
 
 @router.post("/execute")
 async def execute_sync(request: Request):
-    """执行物理覆盖同步"""
+    """仅做物理覆盖同步（不提交 Git、不重建站点）"""
     try:
         payload = await request.json()
         target_path = payload.get("blogPath", "").strip()
 
-        if not is_safe_blog_dir(target_path):
-            return {"success": False, "message": "安全拦截：目标路径不合法！"}
+        ok, message = mirror_content(target_path)
+        if not ok:
+            return {"success": False, "message": message}
 
-        # 1. 同步文件夹 (先彻底删除目标文件夹，再把 Manager 的复制过去)
-        for d in SYNC_DIRS:
-            src_dir = os.path.join(PROJECT_ROOT, d)
-            dst_dir = os.path.join(target_path, d)
-
-            if os.path.exists(src_dir):
-                if os.path.exists(dst_dir):
-                    shutil.rmtree(dst_dir)
-                shutil.copytree(src_dir, dst_dir)
-
-        # 2. 同步单个文件 (直接覆盖或过滤)
-        for f in SYNC_FILES:
-            src_file = os.path.join(PROJECT_ROOT, f.replace("/", os.sep))
-            dst_file = os.path.join(target_path, f.replace("/", os.sep))
-
-            if os.path.exists(src_file):
-                os.makedirs(os.path.dirname(dst_file), exist_ok=True)
-
-                # 🌟 核心过滤逻辑：如果是 siteConfig.ts，拦截并剔除敏感信息
-                if f == "siteConfig.ts":
-                    with open(src_file, "r", encoding="utf-8") as file_in:
-                        lines = file_in.readlines()
-
-                    with open(dst_file, "w", encoding="utf-8") as file_out:
-                        for line in lines:
-                            # 只要这一行包含以下关键词，直接跳过不写入
-                            if "picBedName:" in line or "picBedUrl:" in line or "picBedToken:" in line or "图床核心配置" in line:
-                                continue
-                            file_out.write(line)
-                else:
-                    # 其他普通文件，直接物理拷贝
-                    shutil.copy2(src_file, dst_file)
-
-        rebuilt = trigger_rebuild()
-        if rebuilt:
-            return {"success": True, "message": "🎉 完美撒花！所有文章与配置已镜像覆盖至目标博客，并已触发线上重建（约 1-3 分钟生效）。"}
-        return {"success": True, "message": "🎉 完美撒花！所有文章与配置已镜像覆盖至目标博客。"}
+        return {"success": True, "message": "✅ 内容已镜像覆盖至网站源码目录。"}
     except Exception as e:
         return {"success": False, "message": f"同步过程中发生致命错误: {str(e)}"}

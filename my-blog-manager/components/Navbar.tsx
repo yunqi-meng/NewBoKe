@@ -35,7 +35,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
           }
         }
       } catch (e) {
-        const path = localStorage.getItem('targetBlogPath') || "F:/Projects/my-blog";
+        const path = localStorage.getItem('targetBlogPath') || "";
         setTargetBlogPath(path);
       }
     };
@@ -160,7 +160,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
           }
         }
 
-        showToast("✅ 任务已全部执行，本地数据已写入！", "success");
+        showToast("✅ 已写入控制台，点击「发布上线」即可生效！", "success");
         clearOperations();
         setIsOpBoxOpen(false);
 
@@ -175,7 +175,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
 
   const handleSyncBlogClick = () => {
     if (!targetBlogPath) {
-       const fallback = localStorage.getItem('targetBlogPath') || "F:/Projects/my-blog";
+       const fallback = localStorage.getItem('targetBlogPath') || "";
        setTargetBlogPath(fallback);
     }
     setIsOpBoxOpen(false);
@@ -186,9 +186,9 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     setSyncModalOpen(false);
 
     try {
-      showToast("🚀 正在镜像数据至目标项目，请稍候...", "info");
+      showToast("🚀 正在发布到公开站，请稍候...", "info");
 
-      const res = await fetch(`/api/proxy/api/sync/execute`, {
+      const res = await fetch(`/api/proxy/api/deploy/publish`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: targetBlogPath })
@@ -198,10 +198,10 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
       if (data.success) {
         showToast(data.message, "success");
       } else {
-        showToast(`❌ 同步失败: ${data.message}`, "error");
+        showToast(`❌ 发布失败: ${data.message}`, "error");
       }
     } catch (error) {
-      showToast("无法连接到 Python 桌面核心引擎进行同步", "error");
+      showToast("无法连接到内容引擎进行发布", "error");
     }
   };
 
@@ -266,10 +266,10 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
 
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={handleSyncBlogClick} className="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                        🔄 同步 Blog
+                        🚀 发布上线
                       </button>
                       <button onClick={handleUpdateLocal} className="py-2.5 rounded-xl bg-indigo-500 text-white text-xs font-black shadow-lg shadow-indigo-500/30 hover:bg-indigo-600 transition-colors">
-                        🚀 更新本地
+                        📥 更新本地
                       </button>
                     </div>
                   </motion.div>
@@ -306,11 +306,13 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
               <div className="w-16 h-16 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="text-amber-500" size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">系统镜像覆盖</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">发布上线</h3>
               <p className="text-sm text-slate-500 mb-8 leading-relaxed text-balance">
-                确认将管理端数据覆盖至<br />
-                <span className="font-bold text-amber-500 break-all">{targetBlogPath}</span> 吗？<br />
-                <span className="text-xs opacity-80 text-red-400 font-bold mt-2 block">此操作将清空目标项目的旧文章与配置！</span>
+                确认把控制台的最新内容发布到公开站吗？<br />
+                <span className="font-bold text-amber-500 break-all">{targetBlogPath || '（未配置源码目录）'}</span>
+                <span className="text-xs opacity-80 text-red-400 font-bold mt-2 block">
+                  发布会覆盖站点源码目录，并重新构建线上站点，约 1-3 分钟生效。
+                </span>
               </p>
               <div className="flex gap-3">
                 <button onClick={() => setSyncModalOpen(false)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">取消</button>

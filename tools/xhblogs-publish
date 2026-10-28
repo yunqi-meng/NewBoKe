@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+# 线上发布助手（服务器部署形态）
+#
+# 控制台改完内容后点击「发布上线」，会依次完成：
+#   1. 把控制台工作区的内容镜像覆盖到网站源码目录（由控制台本身完成）
+#   2. 提交这些改动到服务器上的 Git 仓库并推送
+#   3. 重新构建公开站并重启服务
+#
+# 本脚本只负责第 2、3 步，由控制台通过 sudo 免密调用
+# （授权见 /etc/sudoers.d/xhblogs-rebuild）。
+set -uo pipefail
+
+REPO="${1:-/opt/xinghui-blog}"
+BLOG_DIR="$REPO/XHBlogs"
+STATUS_FILE="$REPO/.publish-status.json"
+LOG="/var/log/xhblogs-publish.log"
+REBUILD="/usr/local/bin/xhblogs-rebuild"
+APP_USER="xhblogs"
+
+log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+
+# 以网站运行用户执行命令，避免 root 触发 git 的 dubious ownership 拦截
+as_app_user() {
+  if command -v runuser >/dev/null 2>&1; then
+    runuser -u "$APP_USER" -- "$@"
+  else
+    su -s /bin/bash "$APP_USER" -c "$*"
+  fi
+}
+
+# 写发布状态文件（JSON），内容保持简单以免需要额外转义
+write_status() {
+  local state="$1"
+  local message="$2"
+  local started_ts="${3:-0}"
+  local safe_message
+  safe_message=$(echo "$message" | tr -d '"' | tr '\n' ' ')
+  local tmp="$STATUS_FILE.tmp"
+  cat > "$tmp" <<JSON
+{
+  "state": "$state",
+  "message": "$safe_message",
+  "startedAtTimestamp": $started_ts,
+  "updatedAt": "$(date '+%F %T')"
+}
+JSON
+  mv -f "$tmp" "$STATUS_FILE" 2>/dev/null || true
+  chown "$APP_USER":"$APP_USER" "$STATUS_FILE" 2>/dev/null || true
+  chmod 644 "$STATUS_FILE" 2>/dev/null || true
+}
+
+START_TS=$(date +%s)
+write_status running "正在提交源码并重建站点" "$START_TS"
+log "=== 收到发布请求：仓库 $REPO ==="
+
+if [ ! -d "$REPO/.git" ]; then
+  log "仓库不存在：$REPO"
+  write_status failed "服务器工作区不是 Git 仓库" "$START_TS"
+  exit 1
+fi
+
+# 已有构建在跑就不要重复触发
+if pgrep -f "next build" >/dev/null 2>&1 || pgrep -f "npm run build" >/dev/null 2>&1; then
+  log "已有构建任务在运行，跳过本次发布"
+  write_status busy "已有构建任务在运行，本次发布请求已跳过" "$START_TS"
+  exit 0
+fi
+
+# 1. 只把内容相关的路径加入暂存区，避免误提交运行时文件
+PATHS=()
+for p in \
+  XHBlogs/posts XHBlogs/chatters XHBlogs/moments XHBlogs/data XHBlogs/app/about XHBlogs/siteConfig.ts \
+  my-blog-manager/posts my-blog-manager/chatters my-blog-manager/moments my-blog-manager/data my-blog-manager/siteConfig.ts
+do
+  [ -e "$REPO/$p" ] && PATHS+=("$p")
+done
+
+if [ ${#PATHS[@]} -gt 0 ]; then
+  as_app_user git -C "$REPO" add -- "${PATHS[@]}" >> "$LOG" 2>&1
+fi
+
+if as_app_user git -C "$REPO" diff --cached --quiet; then
+  log "内容没有变化，跳过提交"
+else
+  as_app_user git -C "$REPO" \
+    -c user.name="Blog CMS" -c user.email="cms@localhost" \
+    commit -m "chore(publish): 控制台发布 $(date '+%F %T')" >> "$LOG" 2>&1
+  log "提交完成：$(as_app_user git -C "$REPO" rev-parse --short HEAD)"
+fi
+
+# 2. 推送回服务器上的裸仓库，保持源码仓库与线上同步
+if ! as_app_user git -C "$REPO" push origin HEAD:main >> "$LOG" 2>&1; then
+  log "推送失败"
+  write_status failed "推送源码仓库失败，请查看 $LOG" "$START_TS"
+  exit 1
+fi
+
+# 3. 重新构建并重启公开站
+if [ ! -x "$REBUILD" ]; then
+  log "未找到重建脚本 $REBUILD"
+  write_status failed "未找到重建脚本 $REBUILD" "$START_TS"
+  exit 1
+fi
+
+log "开始重建公开站"
+if ! "$REBUILD" >> "$LOG" 2>&1; then
+  log "重建失败"
+  write_status failed "构建失败，请查看 $LOG" "$START_TS"
+  exit 1
+fi
+
+BUILD_ID=""
+if [ -f "$BLOG_DIR/.next/BUILD_ID" ]; then
+  BUILD_ID=$(cat "$BLOG_DIR/.next/BUILD_ID" 2>/dev/null)
+fi
+
+log "发布完成，构建号 $BUILD_ID"
+write_status done "已发布并完成构建，构建号 ${BUILD_ID:-未知}" "$START_TS"
+exit 0

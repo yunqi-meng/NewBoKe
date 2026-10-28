@@ -13,7 +13,7 @@ import ProfileSection from '../../components/settings/ProfileSection';
 import BackgroundSection from '../../components/settings/BackgroundSection';
 import MusicSection from '../../components/settings/MusicSection';
 import GallerySection from '../../components/settings/GallerySection';
-import RepoSection from '../../components/settings/RepoSection';
+import PublishSection from '../../components/settings/PublishSection';
 import DisplaySection from '../../components/settings/DisplaySection';
 import CommentSection from '../../components/settings/CommentSection';
 import DanmakuSection from '../../components/settings/DanmakuSection';
@@ -30,7 +30,7 @@ function SettingsContent() {
   useEffect(() => {
     const readTab = () => {
       const tab = new URLSearchParams(window.location.search).get('tab');
-      if (tab && ['profile', 'display', 'background', 'music', 'gallery', 'footer', 'danmaku', 'comment', 'aicat', 'repo', 'briefing'].includes(tab)) {
+      if (tab && ['profile', 'display', 'background', 'music', 'gallery', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'briefing'].includes(tab)) {
         setActiveTab(tab);
         if (tab === 'briefing') setBriefingVisited(true);
       }
@@ -229,7 +229,7 @@ function SettingsContent() {
     { id: 'danmaku', name: '全站弹幕设置', icon: '⚡' },
     { id: 'comment', name: '评论系统配置', icon: '💬' },
     { id: 'aicat', name: 'AI 煤球配置', icon: '🐾' }, // 👈 新增的小猫设置
-    { id: 'repo', name: '项目仓库设置', icon: '🚀' },
+    { id: 'publish', name: '线上发布', icon: '🚀' },
   ];
 
 
@@ -270,10 +270,10 @@ function SettingsContent() {
               {/* 👇 🌟 挂载 AI 猫咪面板 */}
               {activeTab === 'aicat' && <AICatSection key="aicat" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
 
-              {activeTab === 'repo' && backendMode === 'live' && <RepoSection key="repo" />}
+              {activeTab === 'publish' && backendMode === 'live' && <PublishSection key="publish" />}
             </AnimatePresence>
             </fieldset>
-            {activeTab === 'repo' && backendMode !== 'live' && <section className="rounded-3xl border border-white/60 bg-white/60 p-8 text-sm leading-8 text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300"><h2 className="mb-3 text-lg font-semibold">项目仓库设置</h2>原有仓库配置和发布功能已保留。此副本尚未连接网站通用后台，接通后可以在这里管理；当前不会读取密钥或执行发布。</section>}
+            {activeTab === 'publish' && backendMode !== 'live' && <section className="rounded-3xl border border-white/60 bg-white/60 p-8 text-sm leading-8 text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300"><h2 className="mb-3 text-lg font-semibold">线上发布</h2>发布功能需要连接网站通用后台。此副本尚未接通，接通后可以在这里查看线上状态并一键发布；当前不会执行任何发布动作。</section>}
           </div>
 
         </main>

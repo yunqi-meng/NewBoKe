@@ -1,10 +1,11 @@
 import os
 import json
-import subprocess
-import re
-import getpass
 import platform
+import subprocess
+import time
 from fastapi import APIRouter, Request
+
+from cms_core.api.sync import mirror_content
 
 router = APIRouter()
 
@@ -12,242 +13,256 @@ CURRENT_API_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_API_DIR, "..", ".."))
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "data", "deploy_config.json")
 
+# 服务器部署形态：控制台与公开站同机，源码在 Git 仓库工作区里，
+# 发布 = 提交到仓库 + 重新构建 + 重启服务。
+SERVER_PUBLISH_HELPER = "/usr/local/bin/xhblogs-publish"
+DEFAULT_REPO_ROOT = os.path.dirname(PROJECT_ROOT)
+PUBLISH_STATUS_FILE = ".publish-status.json"
+
+
+# --------------------------------------------------------------------------
+# 基础工具
+# --------------------------------------------------------------------------
+
+def _read_json(path, default=None):
+    if not os.path.exists(path):
+        return default
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+
+def _write_json(path, payload):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except PermissionError:
+        # 助手脚本以 root 写过同名文件时，先删掉再用临时文件替换
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_path, path)
+
+
+def _run(cmd, cwd=None, timeout=60):
+    """执行外部命令，返回 (returncode, stdout, stderr)"""
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+        stdout, stderr = proc.communicate(timeout=timeout)
+        return proc.returncode, stdout, stderr
+    except Exception as e:
+        return 1, "", str(e)
+
+
+def _git(repo, args, timeout=60):
+    return _run(["git", "-C", repo] + args, timeout=timeout)
+
+
+def _is_server_mode():
+    """是否运行在服务器部署形态（存在发布助手脚本）"""
+    return platform.system() == "Linux" and os.path.exists(SERVER_PUBLISH_HELPER)
+
+
+def _default_blog_path():
+    return os.path.join(DEFAULT_REPO_ROOT, "XHBlogs")
+
+
+def _resolve_blog_path():
+    """网站源码目录：优先用配置值，配置为空或失效时回落到仓库内的 XHBlogs"""
+    config = _read_json(CONFIG_FILE, {}) or {}
+    configured = (config.get("blogPath") or "").strip()
+    if configured and os.path.exists(configured):
+        return configured
+    default_path = _default_blog_path()
+    if os.path.exists(default_path):
+        return default_path
+    return configured
+
+
+# --------------------------------------------------------------------------
+# 配置
+# --------------------------------------------------------------------------
 
 @router.get("/config")
 async def get_deploy_config():
-    if os.path.exists(CONFIG_FILE):
-        try:
-            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    # 🌟 默认返回双轨结构
+    """只保留当前部署方式真正用到的字段：网站源码路径"""
+    config = _read_json(CONFIG_FILE, {}) or {}
     return {
-        "blogPath": "",
-        "staticRepoUrl": "",
-        "staticBranch": "gh-pages",
-        "sourceRepoUrl": "",
-        "sourceBranch": "main"
+        "blogPath": _resolve_blog_path(),
+        "configuredPath": (config.get("blogPath") or "").strip(),
+        "serverMode": _is_server_mode(),
+        "repoRoot": DEFAULT_REPO_ROOT,
+        "publishHelper": SERVER_PUBLISH_HELPER if _is_server_mode() else "",
     }
 
 
 @router.post("/config")
 async def save_deploy_config(request: Request):
     try:
-        data = await request.json()
-        os.makedirs(os.path.dirname(CONFIG_FILE), exist_ok=True)
-        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        return {"success": True, "message": "✅ 双轨部署配置已永久保存！"}
+        payload = await request.json()
+        blog_path = (payload.get("blogPath") or "").strip()
+
+        if blog_path and not os.path.exists(blog_path):
+            return {"success": False, "message": f"路径不存在：{blog_path}"}
+
+        _write_json(CONFIG_FILE, {"blogPath": blog_path})
+        return {"success": True, "message": "✅ 发布配置已保存！"}
     except Exception as e:
         return {"success": False, "message": f"保存失败: {str(e)}"}
 
 
-# 🔑 核心大升级：根据 type 动态获取/生成不同的 SSH 密匙，并自动配置路由！
-@router.get("/ssh/key")
-async def get_my_ssh_key(type: str = "static"):
-    """获取或生成本地 SSH 公钥 (支持 A/B 双线隔离)"""
+# --------------------------------------------------------------------------
+# 线上状态
+# --------------------------------------------------------------------------
+
+def _collect_status(blog_path, repo_root):
+    status = {
+        "success": True,
+        "serverMode": _is_server_mode(),
+        "blogPath": blog_path,
+        "repoRoot": repo_root,
+        "git": {},
+        "build": {},
+        "service": {},
+        "publish": {},
+        "effective": False,
+    }
+
+    # --- Git 状态 ---
+    if repo_root and os.path.isdir(os.path.join(repo_root, ".git")):
+        code, out, _ = _git(repo_root, ["rev-parse", "--abbrev-ref", "HEAD"])
+        status["git"]["branch"] = out.strip() if code == 0 else ""
+
+        code, out, _ = _git(repo_root, ["rev-parse", "--short", "HEAD"])
+        status["git"]["head"] = out.strip() if code == 0 else ""
+
+        code, out, _ = _git(repo_root, ["log", "-1", "--format=%s"])
+        status["git"]["lastCommit"] = out.strip() if code == 0 else ""
+
+        code, out, _ = _git(repo_root, ["log", "-1", "--format=%cI"])
+        status["git"]["lastCommitTime"] = out.strip() if code == 0 else ""
+
+        code, out, _ = _git(repo_root, ["status", "--porcelain", "--untracked-files=no"])
+        changed = [line for line in out.splitlines() if line.strip()]
+        status["git"]["dirty"] = len(changed) > 0
+        status["git"]["changedFiles"] = changed[:20]
+
+    # --- 构建产物状态 ---
+    build_id_file = os.path.join(blog_path, ".next", "BUILD_ID")
+    if os.path.exists(build_id_file):
+        try:
+            with open(build_id_file, "r", encoding="utf-8") as f:
+                status["build"]["id"] = f.read().strip()
+            status["build"]["time"] = time.strftime(
+                "%Y-%m-%d %H:%M:%S",
+                time.localtime(os.path.getmtime(build_id_file)),
+            )
+            status["build"]["timestamp"] = os.path.getmtime(build_id_file)
+        except Exception:
+            pass
+
+    # --- 是否正在重建 ---
+    code, out, _ = _run(["pgrep", "-f", "next build"], timeout=10)
+    status["build"]["running"] = code == 0 and bool(out.strip())
+
+    # --- systemd 服务状态 ---
+    if _is_server_mode():
+        code, out, _ = _run(["systemctl", "is-active", "xhblogs"], timeout=10)
+        status["service"]["name"] = "xhblogs"
+        status["service"]["active"] = out.strip() == "active"
+
+    # --- 最近一次发布 ---
+    status_file = os.path.join(repo_root, PUBLISH_STATUS_FILE) if repo_root else ""
+    if status_file:
+        publish = _read_json(status_file, None)
+        if publish:
+            status["publish"] = publish
+            started = publish.get("startedAtTimestamp")
+            built = status["build"].get("timestamp")
+            if started and built and built >= started:
+                status["effective"] = True
+            if publish.get("state") == "failed":
+                status["effective"] = False
+
+    return status
+
+
+@router.get("/status")
+async def get_publish_status():
+    """返回当前线上状态：Git、构建产物、服务、最近一次发布"""
     try:
-        ssh_dir = os.path.expanduser("~/.ssh")
-        os.makedirs(ssh_dir, exist_ok=True)
-
-        # 判断是为 A线(static) 还是 B线(source) 打钥匙
-        if type == "source":
-            key_name = "id_ed25519_source"
-            user_tag = f"{getpass.getuser()}@{platform.node()}-Source"
-        else:
-            key_name = "id_ed25519"
-            user_tag = f"{getpass.getuser()}@{platform.node()}-Static"
-
-        pub_key_path = os.path.join(ssh_dir, f"{key_name}.pub")
-        priv_key_path = os.path.join(ssh_dir, key_name)
-
-        # 兼容老用户：如果是 A 线，优先看看有没有老的 id_rsa
-        if type == "static" and not os.path.exists(pub_key_path):
-            if os.path.exists(os.path.join(ssh_dir, "id_rsa.pub")):
-                pub_key_path = os.path.join(ssh_dir, "id_rsa.pub")
-
-        # 如果连指定的钥匙都没有，当场打一把新的！
-        if not os.path.exists(pub_key_path):
-            subprocess.run([
-                "ssh-keygen", "-t", "ed25519",
-                "-C", user_tag,
-                "-N", "",
-                "-f", priv_key_path
-            ], check=True)
-            pub_key_path = f"{priv_key_path}.pub"
-
-        # 🌟 极客魔法：如果是 B 线(source)，自动在本地注入 SSH 路由分流规则！
-        if type == "source":
-            config_path = os.path.join(ssh_dir, "config")
-            # 兼容 Windows 和 Mac 路径分隔符
-            safe_priv_path = priv_key_path.replace('\\', '/')
-            config_entry = f"\n# Auto-generated by Blog CMS for Vercel Source Sync\nHost github-source\n    HostName github.com\n    User git\n    IdentityFile {safe_priv_path}\n"
-
-            config_exists = False
-            if os.path.exists(config_path):
-                with open(config_path, "r", encoding="utf-8") as f:
-                    if "Host github-source" in f.read():
-                        config_exists = True
-
-            if not config_exists:
-                with open(config_path, "a", encoding="utf-8") as f:
-                    f.write(config_entry)
-
-        # 读取公钥内容并返回给前端
-        with open(pub_key_path, "r", encoding="utf-8") as f:
-            key_content = f.read().strip()
-            return {"success": True, "key": key_content}
-
+        blog_path = _resolve_blog_path()
+        repo_root = DEFAULT_REPO_ROOT
+        return _collect_status(blog_path, repo_root)
     except Exception as e:
-        return {"success": False, "message": f"获取 SSH 失败: {str(e)}"}
+        return {"success": False, "message": f"状态采集失败: {str(e)}"}
 
 
-@router.post("/check")
-async def check_git_env(request: Request):
-    try:
-        payload = await request.json()
-        blog_path = payload.get("blogPath", "").strip()
+# --------------------------------------------------------------------------
+# 发布上线
+# --------------------------------------------------------------------------
 
-        if not blog_path or not os.path.exists(blog_path):
-            return {"success": False, "message": "本地物理路径不存在，请先检查路径！"}
-
-        git_dir = os.path.join(blog_path, ".git")
-        if not os.path.exists(git_dir):
-            return {"success": False, "message": "该路径未初始化 Git 仓库，请点击下方【一键初始化】按钮。"}
-
-        return {"success": True, "message": "✅ Git 环境正常！已准备就绪。"}
-    except Exception as e:
-        return {"success": False, "message": f"Git 检测失败: {str(e)}"}
-
-
-@router.post("/init")
-async def init_deploy_env(request: Request):
-    """初始化双轨部署环境"""
-    try:
-        payload = await request.json()
-        blog_path = payload.get("blogPath", "").strip()
-        static_repo = payload.get("staticRepoUrl", "").strip()
-
-        if not blog_path or not os.path.exists(blog_path):
-            return {"success": False, "message": "目标博客路径不存在！"}
-
-        # 1. 基础 Git 初始化
-        subprocess.run(["git", "init"], cwd=blog_path, check=True)
-
-        # 为了兼容老版的静态部署插件，我们把 origin 绑定给 A线 (静态仓库)
-        if static_repo:
-            subprocess.run(["git", "remote", "remove", "origin"], cwd=blog_path, stderr=subprocess.DEVNULL)
-            subprocess.run(["git", "remote", "add", "origin", static_repo], cwd=blog_path, check=True)
-
-        # 2. 修改 package.json 写入 scripts (专供 A 线静态发布)
-        pkg_path = os.path.join(blog_path, "package.json")
-        if os.path.exists(pkg_path):
-            with open(pkg_path, "r", encoding="utf-8") as f:
-                pkg_data = json.load(f)
-            if "scripts" not in pkg_data:
-                pkg_data["scripts"] = {}
-            pkg_data["scripts"]["deploy"] = "next build && gh-pages -d out"
-            with open(pkg_path, "w", encoding="utf-8") as f:
-                json.dump(pkg_data, f, indent=2, ensure_ascii=False)
-
-        # 3. 安装 gh-pages 插件
-        process = subprocess.Popen(
-            ["npm", "install", "gh-pages", "--save-dev"],
-            cwd=blog_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-            text=True,
-            encoding='utf-8'
-        )
-        stdout, stderr = process.communicate()
-
-        return {"success": True, "message": "✨ 太棒了！双轨部署底层依赖与配置初始化完成！"}
-    except Exception as e:
-        return {"success": False, "message": f"初始化发生异常: {str(e)}"}
-
-
-# 🚀 A 线接口：打包静态文件并发布到 GitHub Pages
 @router.post("/publish")
-async def publish_to_github_pages(request: Request):
+async def publish_to_live(request: Request):
+    """把控制台的改动真正发布到线上：镜像源码 → 提交仓库 → 重新构建 → 重启服务"""
     try:
         payload = await request.json()
-        blog_path = payload.get("blogPath", "").strip()
+        config = _read_json(CONFIG_FILE, {}) or {}
 
-        process = subprocess.Popen(
-            ["npm", "run", "deploy"],
-            cwd=blog_path,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            shell=True,
-            text=True,
-            encoding='utf-8'
-        )
-        stdout, stderr = process.communicate()
-        if process.returncode == 0:
-            return {"success": True, "message": "🎉 A线: 网页已成功编译并发布到静态仓库！"}
-        else:
-            return {"success": False, "message": f"发布失败，报错:\n{stderr}"}
+        blog_path = (payload.get("blogPath") or config.get("blogPath") or "").strip()
+        if not blog_path or not os.path.exists(blog_path):
+            blog_path = _resolve_blog_path()
+
+        if not blog_path or not os.path.exists(blog_path):
+            return {"success": False, "message": f"目标路径不存在：{blog_path or '（未配置）'}"}
+
+        # 1. 镜像内容到网站源码目录
+        ok, message = mirror_content(blog_path)
+        if not ok:
+            return {"success": False, "message": message}
+
+        # 2. 触发服务器发布（提交仓库 + 重建 + 重启）
+        if not _is_server_mode():
+            return {
+                "success": True,
+                "message": "✅ 内容已镜像到网站源码目录。当前不是服务器部署环境，请手动执行构建发布。",
+                "serverMode": False,
+            }
+
+        repo_root = DEFAULT_REPO_ROOT
+        status_file = os.path.join(repo_root, PUBLISH_STATUS_FILE)
+        _write_json(status_file, {
+            "state": "requested",
+            "startedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "startedAtTimestamp": time.time(),
+            "message": "已提交发布请求，正在等待构建…",
+        })
+
+        try:
+            proc = subprocess.Popen(
+                ["sudo", "-n", SERVER_PUBLISH_HELPER, repo_root],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            proc.poll()
+        except Exception as e:
+            return {"success": False, "message": f"触发发布失败：{str(e)}"}
+
+        return {
+            "success": True,
+            "message": "🚀 发布请求已提交：内容已镜像，源码正在提交并重建线上站点，约 1-3 分钟生效。",
+            "serverMode": True,
+            "statusFile": status_file,
+        }
     except Exception as e:
-        return {"success": False, "message": f"静态发布引擎崩溃: {str(e)}"}
-
-
-# ☁️ B 线接口：同步源代码到 Vercel 仓库 (全新核心功能)
-# ☁️ B 线接口：同步源代码到 Vercel 仓库 (全新终极强绑定机制)
-@router.post("/source")
-async def sync_source_to_vercel(request: Request):
-    try:
-        payload = await request.json()
-        blog_path = payload.get("blogPath", "").strip()
-
-        # 读取配置
-        if not os.path.exists(CONFIG_FILE):
-            return {"success": False, "message": "未找到配置文件，请先点击保存！"}
-
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            config = json.load(f)
-
-        source_repo = config.get("sourceRepoUrl", "").strip()
-        source_branch = config.get("sourceBranch", "main").strip()
-
-        if not source_repo:
-            return {"success": False, "message": "B 线源码仓库地址为空，无法同步！"}
-
-        os.chdir(blog_path)
-
-        # 1. 添加所有代码改动
-        subprocess.run(["git", "add", "."], check=True)
-
-        # 2. 提交代码 (这里加入容错)
-        commit_cmd = 'git commit -m "Auto sync source code for Vercel 🚀" || echo "No changes to commit"'
-        subprocess.run(commit_cmd, shell=True, capture_output=True)
-
-        # 🌟 终极杀招：强行绑定 B 线专属私钥，无视 Windows 智障路由！
-        ssh_dir = os.path.expanduser("~/.ssh")
-        # 把 Windows 的反斜杠强制替换为正斜杠，防止 Git 识别错误
-        priv_key_path = os.path.join(ssh_dir, "id_ed25519_source").replace("\\", "/")
-
-        # 组装环境变量，用 GIT_SSH_COMMAND 强行逼迫 Git 使用这把钥匙
-        custom_env = os.environ.copy()
-        custom_env["GIT_SSH_COMMAND"] = f'ssh -i "{priv_key_path}" -o IdentitiesOnly=yes -o StrictHostKeyChecking=no'
-
-        # 3. 推送 (携带我们强行塞进去的钥匙环境变量)
-        push_cmd = f'git push "{source_repo}" HEAD:{source_branch}'
-        push_process = subprocess.run(
-            push_cmd,
-            shell=True,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            env=custom_env  # 👈 就是这里！把钥匙按在 Git 脸上！
-        )
-
-        # 判断是否成功
-        if push_process.returncode != 0 and "Everything up-to-date" not in push_process.stderr:
-            return {"success": False, "message": f"源码同步失败:\n{push_process.stderr}"}
-
-        return {"success": True, "message": "☁️ B线: 源码已成功送达 GitHub，Vercel 构建已触发！"}
-
-    except Exception as e:
-        return {"success": False, "message": f"源码同步引擎异常: {str(e)}"}
+        return {"success": False, "message": f"发布过程发生异常: {str(e)}"}
