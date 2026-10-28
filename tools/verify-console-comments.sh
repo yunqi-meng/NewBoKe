@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # 控制台侧评论管理台验证（仅在服务器上运行，密钥不出服务器）
 #
-# 脚本自带测试数据：先造一条待审核评论，跑完整审核链路，最后连同回复一起删除，
-# 并把评论设置恢复默认，因此可以在生产环境反复执行而不留残留。
+# 脚本自带测试数据：先打开「评论需要审核」造一条待审核评论，走完整审核链路，
+# 最后连同站长回复一起删除并恢复默认设置，因此可以在生产环境反复执行而不留残留。
 set -uo pipefail
 
 BASE=http://127.0.0.1:3001
+PUBLIC=http://127.0.0.1:8080
 ENGINE=http://127.0.0.1:8000/api/comments
 TARGET=/console/flow
+PROBE_IP=198.51.100.7
 
 # 用服务器上的会话密钥签一个 10 分钟有效的临时会话 Cookie
 # 密钥只在服务器内存里用一次，不落盘、不打印。
@@ -31,6 +33,8 @@ ck() {
 api() { curl -s -H "Cookie: $COOKIE" "$@"; }
 api_post() { curl -s -X POST -H "Cookie: $COOKIE" -H "Content-Type: application/json" "$@"; }
 jq_get() { python3 -c "import json,sys;d=json.load(sys.stdin);print($1)"; }
+# 中文查询参数必须编码，否则 curl 传出去的原始字节会让 URL 解析失败
+urlenc() { python3 -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1]))" "$1"; }
 
 echo "=== A. 未登录应被拦截 ==="
 code=$(curl -s -o /dev/null -w "%{http_code}" "$BASE/api/proxy/api/comments/admin/list")
@@ -45,11 +49,16 @@ if api "$BASE/api/proxy/api/comments/admin/stats" | grep -q '"success":true'; th
 if api "$BASE/api/proxy/api/comments/admin/targets" | grep -q '"success":true'; then ck "admin/targets 可用" 0; else ck "admin/targets 可用" 1; fi
 if api "$BASE/api/proxy/api/comments/admin/settings" | grep -q '"success":true'; then ck "admin/settings GET 可用" 0; else ck "admin/settings GET 可用" 1; fi
 
-echo "=== C. 准备一条待审核评论 ==="
-newid=$(curl -s -X POST "$ENGINE/create" -H "Content-Type: application/json" -H "x-visitor-token: console-flow" \
+echo "=== C. 打开「评论需要审核」并造一条待审核评论 ==="
+if api_post "$BASE/api/proxy/api/comments/admin/settings" -d '{"settings":{"requireApproval":true}}' | grep -q '"success":true'; then ck "开启「评论需要审核」" 0; else ck "开启「评论需要审核」" 1; fi
+# 走公开站的真实链路创建：公开站负责转发 x-forwarded-for，引擎据此记录访客 IP
+newid=$(curl -s -X POST "$PUBLIC/api/comments" -H "Content-Type: application/json" \
+  -H "x-visitor-token: console-flow" -H "x-forwarded-for: $PROBE_IP" \
   -d "{\"target\":\"$TARGET\",\"target_label\":\"控制台流程验证\",\"author_name\":\"流程访客\",\"content\":\"等待审核的评论\"}" \
   | jq_get "d['data']['id'] if d.get('success') else ''")
-if [ -n "$newid" ] && [ "$newid" != "None" ]; then ck "造出测试评论 (id=$newid)" 0; else ck "造出测试评论" 1; fi
+if [ -n "$newid" ] && [ "$newid" != "None" ]; then ck "公开站提交评论成功 (id=$newid)" 0; else ck "公开站提交评论成功" 1; fi
+pending=$(api "$BASE/api/proxy/api/comments/admin/list?status=pending" | jq_get "d['data']['total']")
+if [ "$pending" -ge 1 ]; then ck "待审核评论进入后台待审队列 (pending=$pending)" 0; else ck "待审核评论进入后台待审队列" 1; fi
 
 echo "=== D. 后台能看到全部评论信息 ==="
 out=$(api "$BASE/api/proxy/api/comments/admin/list")
@@ -60,7 +69,7 @@ if [ "$found" = "1" ]; then ck "列表里能定位到指定评论" 0; else ck "�
 fields=$(echo "$out" | jq_get "'ok' if all(k in d['data']['items'][0] for k in ['id','target','parent_id','author_name','content','status','status_label','is_admin','likes','created_at','updated_at','author_email','author_website','author_ip','visitor_id','author_agent','target_label']) else 'missing'")
 if [ "$fields" = "ok" ]; then ck "后台返回评论全部字段（含 IP/邮箱/访客标识/UA/主题标签）" 0; else ck "后台返回评论全部字段" 1; fi
 ip=$(echo "$out" | jq_get "d['data']['items'][0].get('author_ip') or ''")
-if [ -n "$ip" ]; then ck "后台可见访客 IP ($ip)" 0; else ck "后台可见访客 IP" 1; fi
+if [ "$ip" = "$PROBE_IP" ]; then ck "后台可见访客 IP ($ip)" 0; else ck "后台可见访客 IP (实际 '$ip')" 1; fi
 visitor=$(echo "$out" | jq_get "d['data']['items'][0].get('visitor_id') or ''")
 if [ -n "$visitor" ]; then ck "后台可见访客指纹" 0; else ck "后台可见访客指纹" 1; fi
 vis=$(curl -s "$ENGINE/list?target=$TARGET" | jq_get "len(d['data']['items'])")
@@ -86,7 +95,7 @@ if [ "$vis" = "1" ]; then ck "通过后前台可见" 0; else ck "通过后前台
 echo "=== G. 站长回复 ==="
 rid=$(api_post "$BASE/api/proxy/api/comments/admin/reply" -d "{\"parent_id\":$newid,\"content\":\"站长回复：收到，感谢反馈！\",\"target_label\":\"控制台流程验证\"}" \
   | jq_get "d['data']['id'] if d.get('success') else ''")
-if [ -n "$rid" ]; then ck "后台回复创建成功 (id=$rid)" 0; else ck "后台回复创建成功" 1; fi
+if [ -n "$rid" ] && [ "$rid" != "None" ]; then ck "后台回复创建成功 (id=$rid)" 0; else ck "后台回复创建成功" 1; fi
 marker=$(curl -s "$ENGINE/list?target=$TARGET" | jq_get "'ADMIN_REPLY_OK' if [r for i in d['data']['items'] for r in (i.get('replies') or []) if r['is_admin']] else 'MISSING'")
 if [ "$marker" = "ADMIN_REPLY_OK" ]; then ck "前台看到站长回复并带标识" 0; else ck "前台看到站长回复并带标识" 1; fi
 
@@ -94,7 +103,7 @@ echo "=== H. 删除（含级联回复） ==="
 if api_post "$BASE/api/proxy/api/comments/admin/delete" -d "{\"ids\":[$newid]}" | grep -q '"success":true'; then ck "后台删除评论" 0; else ck "后台删除评论" 1; fi
 left=$(curl -s "$ENGINE/list?target=$TARGET" | jq_get "d['data']['total']")
 if [ "$left" = "0" ]; then ck "删除后前台清空" 0; else ck "删除后前台清空 (剩 $left 条)" 1; fi
-orphan=$(api "$BASE/api/proxy/api/comments/admin/list?keyword=流程访客" | jq_get "d['data']['total']")
+orphan=$(api "$BASE/api/proxy/api/comments/admin/list?keyword=$(urlenc 流程访客)" | jq_get "d['data']['total']")
 if [ "$orphan" = "0" ]; then ck "回复级联删除，无残留" 0; else ck "回复级联删除，无残留 (剩 $orphan 条)" 1; fi
 
 echo "=== I. 恢复默认设置 ==="
