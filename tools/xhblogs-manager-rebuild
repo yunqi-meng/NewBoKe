@@ -13,5 +13,22 @@ runuser -u xhblogs -- env HOME=/home/xhblogs PATH=/usr/bin:/bin NODE_OPTIONS=--m
     && if [ -d public ]; then cp -a public/. .next/standalone/public/; fi \
     && printf "%s\n" "{\"api_port\": 8000}" > .next/standalone/public/backend_config.json'
 
+# 产物自检：standalone 少文件时 Next.js 会在运行期才报 ENOENT（500 页都渲染不出来），
+# 与其等到用户点页面才发现，不如在重启服务前直接失败。
+STANDALONE=/opt/xinghui-blog/my-blog-manager/.next/standalone
+for required in \
+  "$STANDALONE/server.js" \
+  "$STANDALONE/.next/routes-manifest.json" \
+  "$STANDALONE/.next/required-server-files.json" \
+  "$STANDALONE/.next/server/app" \
+  "$STANDALONE/.next/static" \
+  "$STANDALONE/public/backend_config.json"
+do
+  if [ ! -e "$required" ]; then
+    echo "构建产物不完整，缺少：$required" >&2
+    exit 1
+  fi
+done
+
 systemctl restart xhblogs-manager-api xhblogs-manager-web
 echo "Manager rebuilt and restarted."
