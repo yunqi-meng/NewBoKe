@@ -109,8 +109,10 @@ fi
 PATHS=()
 for p in \
   XHBlogs/posts XHBlogs/chatters XHBlogs/moments XHBlogs/data XHBlogs/app/about XHBlogs/siteConfig.ts \
+  XHBlogs/public/audio/playlist.json \
   my-blog-manager/posts my-blog-manager/chatters my-blog-manager/moments my-blog-manager/data \
-  my-blog-manager/app/about my-blog-manager/siteConfig.ts
+  my-blog-manager/app/about my-blog-manager/siteConfig.ts \
+  my-blog-manager/music/playlist.json
 do
   [ -e "$REPO/$p" ] && PATHS+=("$p")
 done

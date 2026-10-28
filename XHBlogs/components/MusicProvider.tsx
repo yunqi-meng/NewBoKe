@@ -62,6 +62,61 @@ interface MusicContextType {
 
 const MusicContext = createContext<MusicContextType | null>(null);
 
+const DEFAULT_COVER = '/images/music-default.svg';
+
+/**
+ * 读取控制台上传的本地音乐清单。
+ * 清单由控制台写入 my-blog-manager/music/playlist.json，
+ * 发布时镜像到 public/audio/playlist.json，公开站运行时直接读静态文件。
+ */
+async function loadLocalPlaylist(): Promise<any[]> {
+  try {
+    const res = await fetch('/audio/playlist.json', { cache: 'no-store' });
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    const tracks = Array.isArray(data?.tracks) ? data.tracks : [];
+
+    return tracks
+      .filter((track: any) => track && track.file)
+      .map((track: any) => ({
+        id: track.id || track.file,
+        title: track.title || '未知歌曲',
+        artist: track.artist || '本地音乐',
+        cover: track.cover ? `/audio/${track.cover}` : DEFAULT_COVER,
+        src: `/audio/${track.file}`,
+        lrcUrl: track.lyrics ? `/audio/${track.lyrics}` : null,
+        lyrics: [],
+        source: 'local',
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** 网易云歌单，作为本地音乐之外的补充来源 */
+async function loadNeteasePlaylist(): Promise<any[]> {
+  try {
+    const res = await fetch(`/api/music?ids=${siteConfig.cloudMusicIds.join(',')}`);
+    const rawResults = await res.json();
+
+    return rawResults
+      .filter((song: any) => song && song.url && !song.error)
+      .map((song: any) => ({
+        id: song.id || Math.random().toString(),
+        title: song.name || '未知歌曲',
+        artist: song.artist || song.author || '未知歌手',
+        cover: song.cover || song.pic || DEFAULT_COVER,
+        src: song.url,
+        lrcUrl: null,
+        lyrics: song.lrc ? parseLrc(song.lrc) : [],
+        source: 'netease',
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export function MusicProvider({ children }: { children: ReactNode }) {
   const [playlist, setPlaylist] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -82,35 +137,26 @@ export function MusicProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let isMounted = true;
-    const fetchMusicData = async () => {
-      try {
-        const res = await fetch(`/api/music?ids=${siteConfig.cloudMusicIds.join(',')}`);
-        const rawResults = await res.json();
 
-        const mergedPlaylist = rawResults
-          .filter((song: any) => song && song.url && !song.error)
-          .map((song: any) => ({
-            id: song.id || Math.random().toString(),
-            title: song.name || '未知歌曲',
-            artist: song.artist || song.author || '未知歌手',
-            cover: song.cover || song.pic || 'https://bu.dusays.com/2026/03/24/69c24230a5ff8.jpg',
-            src: song.url,
-            lrcUrl: null,
-            lyrics: song.lrc ? parseLrc(song.lrc) : []
-          }));
+    const loadAll = async () => {
+      // 本地音乐优先，网易云作为补充；两者互不阻塞
+      const [localSongs, neteaseSongs] = await Promise.all([
+        loadLocalPlaylist(),
+        siteConfig.cloudMusicIds?.length > 0 ? loadNeteasePlaylist() : Promise.resolve([]),
+      ]);
 
-        if (isMounted) {
-          if (mergedPlaylist.length > 0) setPlaylist(mergedPlaylist);
-          else setCurrentLyric("云端链路受阻");
-          setIsLoading(false);
-        }
-      } catch (error) {
-        if (isMounted) { setCurrentLyric("网络初始化失败"); setIsLoading(false); }
+      const merged = [...localSongs, ...neteaseSongs];
+
+      if (!isMounted) return;
+      if (merged.length > 0) {
+        setPlaylist(merged);
+      } else {
+        setCurrentLyric("还没有可播放的音乐");
       }
+      setIsLoading(false);
     };
 
-    if (siteConfig.cloudMusicIds?.length > 0) fetchMusicData();
-    else setIsLoading(false);
+    loadAll();
 
     return () => { isMounted = false; };
   }, []);

@@ -10,6 +10,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_API_DIR, "..", ".."))
 
 # 需要镜像覆盖的文件夹 (先清空目标，再全量复制)
 SYNC_DIRS = ["posts", "chatters", "moments"]
+
 # 需要精确覆盖的单文件
 SYNC_FILES = [
     "app/about/about.md",
@@ -17,6 +18,12 @@ SYNC_FILES = [
     "data/friends.ts",
     "data/projects.ts",
     "siteConfig.ts"
+]
+
+# 增量镜像的目录对：(控制台源目录, 博客目标目录)
+# 本地音乐体积大，用增量方式避免每次发布都全量重拷一遍
+SYNC_DIR_PAIRS = [
+    ("music", os.path.join("public", "audio")),
 ]
 
 # siteConfig.ts 里的敏感行，镜像时必须剔除（图床凭证只留在本机控制台）
@@ -31,6 +38,66 @@ SENSITIVE_SITE_CONFIG_MARKERS = [
 def is_safe_blog_dir(target_path):
     """防呆检测：只有包含 package.json 的才被认为是安全的博客目录"""
     return os.path.exists(os.path.join(target_path, "package.json"))
+
+
+def _same_file(src_stat, dst_path):
+    """目标文件是否与源文件一致（大小 + 修改时间）"""
+    try:
+        dst_stat = os.stat(dst_path)
+    except OSError:
+        return False
+    return (src_stat.st_size == dst_stat.st_size
+            and int(src_stat.st_mtime) == int(dst_stat.st_mtime))
+
+
+def sync_dir_incremental(src_dir, dst_dir):
+    """增量同步一个目录树：只复制新增/变更的文件，删掉目标里多余的旧文件。
+
+    相比 copytree 全量覆盖，这样几十上百 MB 的音频不会被反复重拷。
+    返回 (复制数量, 删除数量)。
+    """
+    copied = 0
+    removed = 0
+
+    # 目标端先建好目录
+    os.makedirs(dst_dir, exist_ok=True)
+
+    source_files = {}
+    for root, _dirs, files in os.walk(src_dir):
+        for name in files:
+            src_path = os.path.join(root, name)
+            rel = os.path.relpath(src_path, src_dir)
+            source_files[rel.replace(os.sep, "/")] = src_path
+
+    # 复制新增或变更的文件
+    for rel, src_path in source_files.items():
+        dst_path = os.path.join(dst_dir, rel.replace("/", os.sep))
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
+        if not os.path.isfile(dst_path) or not _same_file(os.stat(src_path), dst_path):
+            shutil.copy2(src_path, dst_path)
+            copied += 1
+
+    # 清掉目标里源端已经没有的文件（比如控制台删掉的旧曲目）
+    for root, _dirs, files in os.walk(dst_dir):
+        for name in files:
+            dst_path = os.path.join(root, name)
+            rel = os.path.relpath(dst_path, dst_dir).replace(os.sep, "/")
+            if rel not in source_files:
+                try:
+                    os.remove(dst_path)
+                    removed += 1
+                except OSError:
+                    pass
+
+    # 清理空目录
+    for root, dirs, files in os.walk(dst_dir, topdown=False):
+        if not dirs and not files and os.path.abspath(root) != os.path.abspath(dst_dir):
+            try:
+                os.rmdir(root)
+            except OSError:
+                pass
+
+    return copied, removed
 
 
 def mirror_content(target_path):
@@ -50,6 +117,18 @@ def mirror_content(target_path):
             if os.path.exists(dst_dir):
                 shutil.rmtree(dst_dir)
             shutil.copytree(src_dir, dst_dir)
+
+    music_note = ""
+    for src_rel, dst_rel in SYNC_DIR_PAIRS:
+        src_dir = os.path.join(PROJECT_ROOT, src_rel)
+        dst_dir = os.path.join(target_path, dst_rel)
+
+        if not os.path.isdir(src_dir):
+            continue
+
+        copied, removed = sync_dir_incremental(src_dir, dst_dir)
+        if copied or removed:
+            music_note = "；本地音乐同步 {0} 个新增 / {1} 个清理".format(copied, removed)
 
     for f in SYNC_FILES:
         src_file = os.path.join(PROJECT_ROOT, f.replace("/", os.sep))
@@ -72,7 +151,7 @@ def mirror_content(target_path):
         else:
             shutil.copy2(src_file, dst_file)
 
-    return True, "内容已镜像覆盖至网站源码目录"
+    return True, "内容已镜像覆盖至网站源码目录" + music_note
 
 
 @router.post("/check")

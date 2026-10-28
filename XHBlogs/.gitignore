@@ -42,3 +42,7 @@ next-env.d.ts
 *.connection.json
 __pycache__/
 *.py[cod]
+
+# 本地音乐 (音频二进制不入库，只有播放列表元数据入库)
+/public/audio/*
+!/public/audio/playlist.json

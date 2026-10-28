@@ -44,6 +44,10 @@ next-env.d.ts
 # 图床凭证 (Token 绝不入库，只留在本机)
 /data/picbed.json
 
+# 本地音乐 (音频/歌词/封面二进制不入库，只有播放列表元数据入库)
+/music/*
+!/music/playlist.json
+
 # Local briefing credentials, drafts and runtime data
 /manager_data/briefing/
 *.connection.json
