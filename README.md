@@ -1,8 +1,10 @@
 # 🌟 欢迎使用 XHBlogs！
 
-这是一个采用 Next.js 构建的高颜值、毛玻璃（Glassmorphism）风格个人博客系统。本项目自带完善的前端展示与独立的本地后台控制台，支持 Markdown 沉浸式写作、草稿管理以及便捷的图床配置。
+这是一个采用 Next.js 构建的高颜值、毛玻璃（Glassmorphism）风格个人博客系统。本项目自带完善的前端展示与独立的后台控制台，支持 Markdown 沉浸式写作、草稿管理以及便捷的图床配置。
 
-本指南将带你从零开始，轻松部署并使用 XHBlogs。
+**当前推荐的部署形态：把公开站与控制台一起部署在你自己的 Linux 服务器上**（systemd 托管公开站、控制台前端与内容引擎，Git 管理每一版源码）。控制台里改完内容，点一次「发布上线」就会自动提交源码、重新构建并重启公开站，改动直接出现在线上。
+
+本指南将带你完成服务器部署，并说明控制台的日常使用。
 
 ---
 ## 语言
@@ -28,17 +30,17 @@
 
 - 展示开关、板块文字、封面、轮播与历史范围可以配置，关闭展示保留内容。
 - 自定义兴趣、排除词、来源、语言、栏目与条目数；支持任意领域。
-- 新建或编辑草稿、逐条整理、阅读预览、上传封面，核对后发布到本地网站目录。
+- 新建或编辑草稿、逐条整理、阅读预览、上传封面，核对后发布到本地网站。
 - 本机 Agent 使用独立授权，支持读取偏好、历史、提交与回执；不覆盖人工草稿或已发布日期。
 - 提供首次使用引导、JSON 连接文件四步说明、客户端下载和可复制的 Codex 指令。
-- 选刊服务随原后台启动，使用实际端口与“项目仓库设置”中的网站路径；切换网站时私有数据隔离。
+- 选刊服务随控制台启动，使用实际端口与「线上发布」中的网站路径；切换网站时私有数据隔离。
 
 ### 快速使用每日选刊
 
-1. 使用原 `my-blog-manager/Start.bat` 启动本地控制台；先在项目仓库设置中确认网站目录。标准目录结构会默认使用同级 `XHBlogs`。
+1. 启动控制台（服务器上访问 `http://服务器IP:3001`，本地则是双击 `my-blog-manager/Start.bat`）；先在「设置 → 线上发布」里确认网站源码目录，标准目录结构会默认使用同级的 `XHBlogs`。
 2. 在设置侧栏打开每日选刊，设置展示、兴趣与栏目，点击“保存本地设置”。
 3. 在“内容与审核”建立草稿，编辑内容和来源、选择封面，再阅读预览。默认新安装没有示例期刊。
-4. 核对内容、日期与原始来源后勾选确认，发布到本地网站。上线仍需走原有同步、源码提交和部署流程；保存选刊不会自动推送 Git。
+4. 核对内容、日期与原始来源后勾选确认，发布到网站目录；随后点击控制台右上角的 **🚀 发布上线**，选刊内容就会随网站一起构建生效。
 
 ### Agent 授权 JSON 怎么用
 
@@ -47,11 +49,11 @@
 3. 点击“JSON 怎么用？”，填写文件完整路径，复制首次连接指令交给 Codex；连接文件由客户端读取，无需导入 Codex 设置，也无需粘贴授权全文。
 4. 首次连接只读配置和历史。刷新记录确认访问，再复制整理一期指令；实际提交以回执和待审核列表为准。
 
-电脑、本机后台和生成内容的 Agent 需要运行，控制台网页可以关闭。期望更新时间不会自动创建定时任务；DSH 本版暂未接入。字段和日期校验不能替代事实核查。
+电脑、服务器上的控制台和生成内容的 Agent 需要运行，控制台网页可以关闭。期望更新时间不会自动创建定时任务；DSH 本版暂未接入。字段和日期校验不能替代事实核查。
 
 ### 更新时会保留什么
 
-更新器保留文章、个人 `siteConfig.ts`、已有选刊数据和配置、已有公开图片及管理端私有授权/草稿。首次升级会补齐缺失的选刊模块初始文件。替换的程序文件保存在 `.update-backups/`，有本地未保存程序修改时停止并提示处理。
+更新器保留文章、个人 `siteConfig.ts`、已有选刊数据和配置、已有公开图片及控制端私有授权/草稿。首次升级会补齐缺失的选刊模块初始文件。替换的程序文件保存在 `.update-backups/`，有本地未保存程序修改时停止并提示处理。
 
 升级前仍应保存和备份自己的内容，更新后核对配置及授权状态。此更新不保证自动合并个人修改过的程序代码。PDF 审阅说明只供本地阅读，不随源码提交。
 
@@ -75,214 +77,182 @@
 
 > 已更换API，修复网易云音乐显示bug。更新即可
 
-## 一、快速开始部署
+---
+
+## 一、部署到自己的服务器
 
 ### 1. 环境配置
 
-在开始之前，请确保你的电脑已安装以下运行环境，否则后续程序将无法正常启动：
-
-- **Node.js** (版本 20.9.0 或以上（适配当前 Next.js 16）)
-- **包管理器** (npm)
-- **Git** (用于拉取代码与版本控制)
-- **Python** (建议版本 3.10 及以上，本系统在 3.10 环境下测试通过)
-- *可选：云存储/图床服务（后续会有详细配置说明）*
-
-### 2. 博客源码更新
-
-为了让你能轻松跟上项目的最新功能，请使用更新器对源码进行更新！
-使用更新器前先保存并备份内容。更新器保留个人配置、文章、已有选刊数据与图片，并备份替换的程序文件；检测到本地程序修改时会停止，需先处理后再更新。
-
-🛠️ 更新步骤：
-
-第一步：获取无损更新器 (仅首次需要)
-
-#### 1 下载项目根目录下的 update.bat 和 update.py 文件。
-
-#### 2  将下载好的 update.bat 和 update.py 移动到你本地博客项目的最外层根目录（也就是和 my-blog-manager、XHBlogs 文件夹放在一起的地方）。
-
-如下图所示
-
-![img.png](picture/333.png)
-
-#### 3 双击update.bat文件实现更新，如果闪退 请使用cmd运行update.py文件
-
-### 3. 快速开始
-
-#### ① 启动脚本
-
-当你完成上述环境的配置后，恭喜你，最基础的准备工作已经搞定了！
-首先，进入 `my-blog-manager` 文件夹（**⚠️ 注意：请绝对不要重命名此文件夹，否则会导致环境路径解析失败！**）
-
-双击运行文件夹中的启动脚本：
-`Start.bat`
-脚本会自动检测并安装所需的依赖包。等待环境配置完成后，程序会自动唤起精美的后台控制台。
-
-#### ② 部署你的博客到 Vercel
-
-> **提示**：本教程主要演示如何将项目部署至 Vercel，因为 Vercel 对 Next.js 框架有着最顶级的原生支持。
->
-> **前提**：请确保已安装 Git，并拥有一个 GitHub 账号。**接下来的步骤请务必按顺序操作！**
-
-> **请确保你已完成以下操作**：
->
-> **第一步：本地全局配置**
-
-设置用户名
-
-`git config --global user.name "你的Github用户名"`
-
-设置邮箱（必须是你在 GitHub 绑定的邮箱）
-
-`git config --global user.email "你绑定在Github的邮箱@example.com"`
-
-> **第二步：初始化本地仓库**
->
-> 进入你的项目文件夹，执行以下CMD命令行操作：(及前端部署文件夹，这里是XHBlogs)
-
-1. 初始化 Git 仓库，生成隐藏的 .git 文件夹
-   `git init`
-2. 将所有文件添加到暂存区（注意后面有个点）
-   `git add .`
-3. 提交到本地版本库，并添加备注
-   `git commit -m "first commit"`
-
-**1. 配置本地物理路径**
-打开控制台的“设置”页面。
-在拉取的源码中，包含 `XHBlogs-mananger` 和 `XHBlogs` 两个核心文件夹。请在控制台中指定 `XHBlogs` 的本地物理路径。
-
-![选择物理路径](picture/Pasted%20image%2020260427111646.png)
-
-例如：`F:\Test2\XHBlogs`
-
-![填入本地BLOG物理路径](picture/Pasted%20image%2020260427112311.png)
-
-> **关键步骤**：填入路径后，请务必点击 **[测试路径]** 进行连通性验证！！！验证通过后，再点击下方的 **[保存双轨配置]**。
-
-**2. 在 GitHub 创建私有仓库**
-登录 GitHub，新建一个用于托管博客源码的仓库（建议设置为 **Private 私有仓库** 以保护数据隐私）。
-
-![创建仓库](picture/Pasted%20image%2020260427112905.png)
-
-仓库名称可自定义。
-
-![仓库命名](picture/Pasted%20image%2020260427113030.png)
-
-获取该仓库的 SSH 地址，并将其复制粘贴到控制台的“B线”配置中：
-
-![复制SSH](picture/Pasted%20image%2020260427113120.png)
-
-源码分支填写为 `main`。确认无误后，再次点击 **[保存双轨配置]**。
-
-**3. 获取并配置部署密钥**
-点击控制台中的 **[获取B线专属密钥]** 按钮：
-
-![专属密钥](picture/98b965b5-6193-4690-a478-fe1a9abd594e.png)
-
-进入你的 GitHub 仓库页面，导航至 `Settings` -> `Deploy keys` 界面：
-
-![Deploy Keys](picture/Pasted%20image%2020260427113705.png)
-
-将刚才复制的密钥填入 `Key` 框中，`Title` 可随意命名（例如：`XHBlogs-Deploy-Key`）。
-
-> **🚨 严重警告**：下方的 **Allow write access** 选项必须勾选！！！
-> 设置完毕后，点击 **Add key** 保存。
-
-**4. 初始化并推送源码**
-返回本地控制台，点击 **[智能初始化双轨环境]**，静待程序执行完毕。
-完成后，点击 **[仅同步源码]** 按钮：
-
-![仅同步源码](picture/Pasted%20image%2020260427121539.png)
-
-程序将开始向 GitHub 推送代码。**在此期间，请千万不要切换页面或关闭窗口**：
-
-![同步进度](picture/Pasted%20image%2020260427121702.png)
-
-进度条完成后，说明前端静态页面源码已成功托管至 GitHub。
-
-> **此处可能出现无法推送bug**：
->
-> **请尝试**
->
-> 将SSH仓库地址改成如下图所示再进行初始化及同步源码
->
-> ![img.png](picture/img.png)
-
-**5. 部署至 Vercel 平台**
-访问 Vercel 官网，注册账号并绑定你的 GitHub 授权！
-
-![绑定账号](picture/Pasted%20image%2020260427121844.png)
-
-点击 `Add New...` 添加一个新的 Project，在 Import 列表中选择你刚刚推送到 GitHub 的仓库：
-
-![导入项目](picture/Pasted%20image%2020260427121939.png)
-
-例如我选择的是 `XHBlogS2`：
-
-![选择项目](picture/Pasted%20image%2020260427122034.png)
-
-在 Framework Preset（框架预设）中选择 **Next.js**，然后点击 **Deploy** 按钮开始部署：
-
-![点击Deploy](picture/Pasted%20image%2020260427122141.png)
-
-静候 Vercel 服务器构建你的博客~~
-
-![部署中](picture/Pasted%20image%2020260427122245.png)
-
-撒花！部署成功后，点击预览图即可直接访问你的专属网站！
-
-![部署成功](picture/Pasted%20image%2020260427122338.png)
-
-在项目仪表盘（Dashboard）中，你可以随时查看部署状态与详细日志：
-
-![查看详情](picture/Pasted%20image%2020260427122453.png)
-
-Vercel 默认会为你分配一个免费的二级域名：
-
-![分配域名](picture/Pasted%20image%2020260427122553.png)
-
----
-
-### 问题 1：我要怎么样绑定自己的专属域名？
-
-**答：** 这里以“阿里云”购买的域名为例（其他服务商如腾讯云、Cloudflare 等操作逻辑基本一致）。
-
-首先登录阿里云控制台，进入【域名管理】页面：
-
-![域名管理](picture/Pasted%20image%2020260427123636.png)
-
-点击对应域名右侧的【解析】按钮：
-
-![点击解析](picture/Pasted%20image%2020260427123737.png)
-
-接着回到 Vercel，进入你的项目仪表盘，点击 **Settings**（或者直接点击域名旁的加号）：
-
-![点击加号](picture/Pasted%20image%2020260427123156.png)
-
-![进入设置](picture/Pasted%20image%2020260427123838.png)
-
-在 Domains 选项卡中，输入你购买的域名（例如我的是 `xinghuisama.top`），点击 **Add** 保存：
-
-![输入域名](picture/afb9fe5f-bf1e-4a8a-ae6b-379938f0924d.png)
-
-添加后，Vercel 会提供 `A` 记录和 `CNAME` 记录的配置参数。请将这些参数完整添加到阿里云的 DNS 解析设置中：
-
-![添加记录](picture/Pasted%20image%2020260427124533.png)
-
-> **注意**：添加记录时，请务必仔细核去记录类型和记录值（Value）！
-
-配置完成后等待几分钟（DNS 传播需要时间），在 Vercel 页面点击 **Refresh** 刷新状态！！
-
-![Refresh](picture/Pasted%20image%2020260427124625.png)
-
-当状态显示为正常后，你就可以通过自己的专属域名访问博客了！（例如：`www.xinghuisama.top`）。
-
----
-
-### 4. 控制台的密码登录与远程访问
-
-本地双击 `Start.bat` 时，控制台和内容引擎跑在同一台电脑上，直接访问即可，**默认不需要密码**。
-
-如果你把控制台部署到了服务器上（例如 `http://服务器IP:3001`），请务必开启密码登录，否则任何人都能改你的文章和设置。开启方式是在服务器上准备一个环境变量文件：
+服务器建议使用 Linux（CentOS / Alibaba Cloud Linux / Ubuntu 均可），需要准备：
+
+- **Node.js**（20.9.0 以上，适配当前 Next.js 16）
+- **npm**
+- **Git**
+- **Python**（3.10 以上，本系统在 3.10 环境下测试通过）
+- *可选：域名与 Nginx（用于 HTTPS 与自定义域名）*
+
+### 2. 目录与仓库
+
+整套系统跑在一个 Git 工作区里，裸仓库用于保存每一版源码：
+
+```
+/opt/xinghui-blog/            # Git 工作区
+├── XHBlogs/                  # 公开站源码
+└── my-blog-manager/          # 控制台源码
+/srv/git/xinghui-blog.git     # 裸仓库，保存每一版源码
+```
+
+准备源码：
+
+```bash
+mkdir -p /opt/xinghui-blog && cd /opt/xinghui-blog
+git clone /srv/git/xinghui-blog.git .
+
+cd XHBlogs && npm ci
+cd ../my-blog-manager && npm ci
+```
+
+> 控制台源码里有两个**每台机器都不一样**的文件，它们不入库，请自行维护：
+> `my-blog-manager/data/deploy_config.json`（网站源码目录）和 `my-blog-manager/public/backend_config.json`（内容引擎端口）。
+
+### 3. 注册 systemd 服务
+
+公开站 `/etc/systemd/system/xhblogs.service`：
+
+```ini
+[Unit]
+Description=XHBlogs public Next.js site
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xhblogs
+Group=xhblogs
+WorkingDirectory=/opt/xinghui-blog/XHBlogs
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PATH=/usr/bin:/bin
+EnvironmentFile=-/etc/xhblogs.env
+ExecStart=/opt/xinghui-blog/XHBlogs/node_modules/.bin/next start -H 0.0.0.0 -p 8080
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+```
+
+控制台前端 `/etc/systemd/system/xhblogs-manager-web.service`：
+
+```ini
+[Unit]
+Description=XHBlogs manager Next.js console
+After=network.target xhblogs-manager-api.service
+Wants=xhblogs-manager-api.service
+
+[Service]
+Type=simple
+User=xhblogs
+Group=xhblogs
+WorkingDirectory=/opt/xinghui-blog/my-blog-manager/.next/standalone
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PORT=3001
+Environment=HOSTNAME=0.0.0.0
+Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
+Environment=XHS_BRIEFING_API_PORT=8000
+Environment=PATH=/usr/bin:/bin
+EnvironmentFile=-/etc/xhblogs-manager.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+```
+
+内容引擎 `/etc/systemd/system/xhblogs-manager-api.service`：
+
+```ini
+[Unit]
+Description=XHBlogs manager FastAPI backend
+After=network.target
+
+[Service]
+Type=simple
+User=xhblogs
+Group=xhblogs
+WorkingDirectory=/opt/xinghui-blog/my-blog-manager
+Environment=PYTHONUNBUFFERED=1
+Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
+Environment=XHS_BRIEFING_API_PORT=8000
+ExecStart=/opt/xinghui-blog/my-blog-manager/.venv/bin/uvicorn cms_core.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
+```
+
+三个服务的分工：
+
+| 服务 | 作用 | 监听 |
+| --- | --- | --- |
+| `xhblogs` | 公开站，`next start` 运行预构建产物 | `0.0.0.0:8080` |
+| `xhblogs-manager-web` | 控制台前端 | `0.0.0.0:3001` |
+| `xhblogs-manager-api` | 内容引擎（FastAPI） | `127.0.0.1:8000`，只允许本机访问 |
+
+### 4. 构建与启动
+
+```bash
+cd /opt/xinghui-blog/XHBlogs && npm run build
+cd /opt/xinghui-blog/my-blog-manager && npm run build
+
+systemctl daemon-reload
+systemctl enable --now xhblogs xhblogs-manager-web xhblogs-manager-api
+```
+
+控制台前端使用 `output: 'standalone'` 构建，运行时还需要把静态资源拷进产物目录，并写入内容引擎端口：
+
+```bash
+cd /opt/xinghui-blog/my-blog-manager
+mkdir -p .next/standalone/.next/static .next/standalone/public
+cp -a .next/static/. .next/standalone/.next/static/
+printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
+```
+
+> **每次改过控制台代码，都要重新执行上面这段「构建与启动」**，因为 `next start` 跑的是预构建产物，源码改动不会自动生效。
+
+### 5. 公网访问与域名
+
+云服务器的安全组需要放行对应端口（阿里云 / 腾讯云在控制台的「安全组规则」里添加）：
+
+| 端口 | 用途 | 建议来源 |
+| --- | --- | --- |
+| 22 | SSH | 你的办公 IP |
+| 8080 | 公开站 | 全网 |
+| 3001 | 控制台 | **只放行你自己的公网 IP** |
+
+给公开站绑域名时，用 Nginx 反向代理到 8080 并配置证书即可：
+
+```nginx
+server {
+    listen 80;
+    server_name www.example.com;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+### 6. 控制台的密码登录
+
+控制台暴露在公网上时**必须开启密码登录**，否则任何人都能改你的文章和设置。开启方式是在服务器上准备一个环境变量文件：
 
 ```bash
 cd /opt/xinghui-blog/my-blog-manager
@@ -290,7 +260,7 @@ node scripts/manager-passwd.mjs "你的管理密码" --env-file /etc/xhblogs-man
 node scripts/manager-passwd.mjs --secret --env-file /etc/xhblogs-manager.env
 ```
 
-第一个命令写入密码的 scrypt 哈希，第二个生成随机会话密钥。两者都只落在服务器上，仓库里不会保存任何口令。写好之后让服务读取这个文件并重启：
+第一个命令写入密码的 scrypt 哈希，第二个生成随机会话密钥。两者都只落在服务器上（`chmod 600`），仓库里不会保存任何口令。写好之后让服务读取这个文件并重启：
 
 ```ini
 # /etc/systemd/system/xhblogs-manager-web.service 的 [Service] 段
@@ -300,17 +270,19 @@ Environment=HOSTNAME=0.0.0.0
 
 重启后访问控制台会先跳转到 `/login` 页面，输入刚才设置的密码即可进入，会话有效期 7 天，Cookie 为 HttpOnly。控制台右上角还有一个退出登录按钮。
 
-> **安全提醒**：用 IP + HTTP 访问时密码是明文传输的，务必在云厂商安全组里限制来源 IP（例如只放行你自己的公网 IP），或者接入域名后配置 HTTPS，再把 `MANAGER_COOKIE_SECURE` 改成 `1`。
+> **安全提醒**：用 IP + HTTP 访问时密码是明文传输的，务必在安全组里限制来源 IP；接入域名并配置 HTTPS 后，再把 `MANAGER_COOKIE_SECURE` 改成 `1`。
 
-> **为什么改完之后不用改代码**：控制台前端原先直接请求 `http://127.0.0.1:<引擎端口>`，这只在本机有效，一旦从别的电脑打开就会去连访问者自己的 127.0.0.1。现在所有引擎调用统一走同源的 `/api/proxy`，由服务端转发到本机引擎，因此局域网和公网访问都能正常工作。
+> **为什么远程访问不用改代码**：控制台前端原先直接请求 `http://127.0.0.1:<引擎端口>`，这只在本机有效，从别的电脑打开会去连访问者自己的 127.0.0.1。现在所有引擎调用统一走同源的 `/api/proxy`，由服务端转发到本机引擎，因此局域网和公网访问都能正常工作。
 
-> **服务器上的「同步 Blog」会自动重建**：公开站是 `next start` 运行预构建产物，`siteConfig.ts` 这类源码改动必须重新 `build` + 重启服务才会反映到线上。部署在服务器上时，控制台每次同步成功后会自动调用 `/usr/local/bin/xhblogs-async-rebuild` 异步触发重建（约 1-3 分钟生效），日志见 `/var/log/xhblogs-rebuild.log`。本地双击 `Start.bat` 的场景没有这个助手脚本，同步只改源码，发布仍需走下面的 Git / Vercel 流程。
+### 7. 本地开发（可选）
+
+如果你仍然想在 Windows 上本地调试，可以双击 `my-blog-manager/Start.bat`。本地环境没有发布助手脚本，发布按钮只会把内容镜像到本地网站源码目录，构建与上线需要你自己执行。
 
 ---
 
-## 二、更新设置及上传文件
+## 二、更新设置并发布上线
 
-为了保护数据安全，本控制台采用了**“操作暂存区”**机制。**请特别注意！！** 许多设置在修改后，必须主动执行“更新到本地”才能真正保存。需要执行此操作时，界面上方通常会有高亮提示。
+为了保护数据安全，本控制台采用了**“操作暂存区”**机制。**请特别注意！！** 许多设置在修改后，必须主动执行“更新本地”才能真正保存。需要执行此操作时，界面上方通常会有高亮提示。
 
 **操作示例：修改个人简介**
 
@@ -320,34 +292,32 @@ Environment=HOSTNAME=0.0.0.0
 
 ![暂存队列](picture/Pasted%20image%2020260427125430.png)
 
-此时上方工具箱会提示待办操作。你可以随时撤销（清空全部），或者点击 **[更新本地]**。
+此时上方工具箱会提示待办操作。你可以随时撤销（清空全部），或者点击 **[📥 更新本地]**。
 
-> ⚠️ 注意：点击“更新本地”后，数据仅仅保存在了你的本地控制台环境中。
+> ⚠️ 注意：点击“更新本地”后，数据仅仅保存在了你的控制台环境中。
 
-如果你希望让这些修改在前端博客页面生效，你必须继续点击 **[同步 Blog]**（前提是前端博客的物理路径已正确配置）：
+接下来点击右上角操作箱里的 **[🚀 发布上线]**（或「设置 → 线上发布」里的同名按钮），确认后系统会自动完成四件事：
 
-![同步Blog](picture/Pasted%20image%2020260427125800.png)
+1. **镜像内容**：把控制台里的文章、说说、动态与站点配置覆盖到网站源码目录；
+2. **提交仓库**：在服务器工作区提交这次改动并推送到裸仓库；
+3. **重新构建**：执行 `npm run build` 生成新的预构建产物；
+4. **重启服务**：重启 `xhblogs`，线上随即生效。
+
+整个过程约 1-3 分钟。构建日志见 `/var/log/xhblogs-publish.log`。
 
 博客文章、说说（碎碎念）、杂谈等所有内容的发布与修改，均遵循此流程。
 
-> **💡 黄金法则**：暂存队列 -> 更新本地 -> 同步Blog
+> **💡 黄金法则**：暂存队列 → 更新本地 → 发布上线
+
+### 线上状态面板
+
+「设置 → 线上发布」会实时显示公开站当前的状态：服务是否在运行、最近一次构建的时间与构建号、源码仓库的最新提交、以及上一轮发布的结果。只要构建时间晚于发布时间，就说明改动**已经生效**在公开站上了。
+
+> **为什么以前"同步 Blog"了线上却没变**：公开站是 `next start` 运行预构建产物，`siteConfig.ts` 这类源码改动必须重新 `build` + 重启服务才会反映到线上。现在「发布上线」把这一步也包进去了，不需要再手动跑构建。
 
 ---
 
-## 三、如何推送你的修改到线上网页？
-
-当你在本地完成了满意的创作或设置调整，想要将其发布到公网让所有人看到时：
-
-请牢记，在执行了任何实质性修改并点击 **[同步Blog]** 后，请打开控制台的同步部署页面：
-
-![打开同步](picture/Pasted%20image%2020260427130216.png)
-
-确认“B线”地址正确无误，点击 **[仅同步源码]**。
-等待 GitHub Actions 或 Vercel 自动捕获更新。稍作喝杯茶的功夫，你就能在线上页面看到最新鲜的内容了！
-
----
-
-## 四、图床配置
+## 三、图床配置
 
 为了优化写作体验，控制台深度整合了图床上传功能。本指南推荐使用“去不图床”（[https://7bu.top](https://7bu.top)）。
 如果你习惯使用纯外链，工具台也完美支持直接插入图片 URL。如果想接入其他支持标准 API 的图床，也欢迎极客们自行尝试。
@@ -358,9 +328,11 @@ Environment=HOSTNAME=0.0.0.0
 
 填入对应的 API Token 等信息后，你可以点击 **[发送探针测试Token]**，实时检验图床接口是否畅通。
 
+> 图床凭证只保存在控制台本机的 `siteConfig.ts` 中，发布到公开站时会自动剔除这些敏感字段。
+
 ---
 
-## 五、AI 猫猫助理设置
+## 四、AI 猫猫助理设置
 
 博客系统内置了一只聪明的 AI 猫猫助理（默认接入 Gemini 模型）。极客玩家也可以通过修改源码接入其他大语言模型。
 
@@ -368,34 +340,21 @@ Environment=HOSTNAME=0.0.0.0
 
 ![猫猫设置](picture/Pasted%20image%2020260427134211.png)
 
-在本地设定好猫猫的专属系统提示词（性格）后，我们需要让线上环境也拥有调用 AI 的能力。请登录 Vercel：
+在本地设定好猫猫的专属系统提示词（性格）后，我们需要让线上环境也拥有调用 AI 的能力。在服务器上把密钥写进环境变量文件：
 
-![Vercel环境](picture/Pasted%20image%2020260427134538.png)
+```bash
+echo 'GEMINI_API_KEY=你的真实 API 密钥' >> /etc/xhblogs.env
+chmod 600 /etc/xhblogs.env
+systemctl restart xhblogs
+```
 
-在项目设置中找到 `Environment Variables`（环境变量）：
+`/etc/systemd/system/xhblogs.service` 里已经声明了 `EnvironmentFile=-/etc/xhblogs.env`，因此公开站会读到这份密钥。控制台自己调用 AI 时，把同一份变量加进 `/etc/xhblogs-manager.env` 并重启 `xhblogs-manager-api` 即可。
 
-![搜索变量](picture/Pasted%20image%2020260427134633.png)
-
-进入你的博客工程详情：
-
-![项目工程](picture/Pasted%20image%2020260427134703.png)
-
-确保作用域（环境）包含线上环境，点击 **Add Environment Variables**：
-
-![添加变量](picture/Pasted%20image%2020260427135004.png)
-
-安全地注入你的密钥：
-
-- **Key** 输入：`GEMINI_API_KEY`
-- **Value** 输入：你的真实 API 密钥
-
-![输入API](picture/Pasted%20image%2020260427135044.png)
-
-点击保存。下一次重新部署时，猫猫助理就会在线上苏醒了。
+> **密钥不要写进代码、文档或仓库**，只放在服务器上权限为 600 的环境变量文件里。
 
 ---
 
-## 六、评论系统配置
+## 五、评论系统配置
 
 本博客的评论系统基于 GitHub Issues（Gitalk 等类似方案）。你需要在 GitHub 创建一个 **Public（公开）** 仓库来专门存储网友的留言。
 
@@ -415,7 +374,7 @@ Environment=HOSTNAME=0.0.0.0
 | 字段名称                       | 填写建议                                                                           |
 | ------------------------------ | ---------------------------------------------------------------------------------- |
 | **Application name**           | 自定义名称，例如：`My-Blog-Comments`                                               |
-| **Homepage URL**               | 你的博客**首页完整地址** (例如 `https://www.xinghuisama.top`)                      |
+| **Homepage URL**               | 你的博客**首页完整地址** (例如 `https://www.example.com`)                          |
 | **Application description**    | 可选填                                                                             |
 | **Authorization callback URL** | **核心参数**：必须填写你的博客域名。如果经常本地调试，可填 `http://localhost:3000` |
 
@@ -430,7 +389,7 @@ Environment=HOSTNAME=0.0.0.0
 
 ---
 
-## 七、网易云音乐挂件设置
+## 六、网易云音乐挂件设置
 
 ![歌单设置](picture/Pasted%20image%2020260427141049.png)
 
@@ -447,7 +406,7 @@ Environment=HOSTNAME=0.0.0.0
 
 ## 写在最后
 
-XHBLogs 还有诸多隐藏的细节功能，期待极客朋友们在实际使用中慢慢探索。本项目旨在提供一套开箱即用的前端静态展示与后台管理方案。如果你是资深开发者，觉得控制台操作仍有优化空间，完全可以基于 Next.js 源码进行二次开发，甚至手搓 Markdown 进行部署！
+XHBlogs 还有诸多隐藏的细节功能，期待极客朋友们在实际使用中慢慢探索。本项目旨在提供一套开箱即用的前端展示与后台管理方案。如果你是资深开发者，觉得控制台操作仍有优化空间，完全可以基于 Next.js 源码进行二次开发，甚至手搓 Markdown 进行部署！
 
 **如果你觉得这个项目对你有帮助，请务必在 GitHub 上为我点亮一颗 ⭐ Star！每一颗星都是博主持续维护更新的最大动力。谢谢大家！**
 

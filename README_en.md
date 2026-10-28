@@ -14,9 +14,11 @@ The updater preserves personal configuration, posts, existing briefing data, ima
 
 # 🌟 Welcome to XHBlogs!
 
-This is a personal blog system built with Next.js, featuring a Glassmorphism design. This project includes a frontend display and an independent local backend console. It supports Markdown writing, draft management, and image hosting configuration.
+This is a personal blog system built with Next.js, featuring a Glassmorphism design. This project includes a frontend display and an independent backend console. It supports Markdown writing, draft management, and image hosting configuration.
 
-This guide will take you from scratch to deploy and use XHBlogs.
+**The recommended deployment now is to run the public site and the console on your own Linux server** (systemd supervises the public site, the console frontend and the content engine; Git keeps every revision). After editing in the console, one click on **Publish** commits the sources, rebuilds the site and restarts the public service, so your changes show up online.
+
+This guide walks you through the server deployment and the day-to-day use of the console.
 
 ---
 
@@ -53,7 +55,7 @@ This guide will take you from scratch to deploy and use XHBlogs.
 
 > Implemented source code updating.
 
-## I. Quick Start Deployment
+## I. Deploy to Your Own Server
 
 ### 1. Environment Configuration
 
@@ -94,158 +96,196 @@ Double-click to run the startup script in the folder:
 `Start.bat`
 The script will automatically detect and install the required dependencies. Once the environment configuration is complete, the program will launch the backend console.
 
-#### ② Deploy Your Blog to Vercel
+#### ② Deploy to Your Own Server
 
-> **Tip**: This tutorial primarily demonstrates how to deploy the project to Vercel, as Vercel provides native support for the Next.js framework.
-> **Prerequisite**: Please ensure Git is installed and you have a GitHub account. **Be sure to follow the upcoming steps in order!**
+> **Note**: the deployment target is now your own Linux server, not Vercel or GitHub Pages. systemd supervises three services and Git tracks every revision.
 
-> **Please ensure you have completed the following operations**:
-> **Step 1: Local Global Configuration**
+**Layout**
 
-Set username
+```
+/opt/xinghui-blog/            # Git working tree
+├── XHBlogs/                  # public site sources
+└── my-blog-manager/          # console sources
+/srv/git/xinghui-blog.git     # bare repository holding every revision
+```
 
-`git config --global user.name "Your_GitHub_Username"`
+Prepare the sources:
 
-Set email (must be the email associated with your GitHub)
+```bash
+mkdir -p /opt/xinghui-blog && cd /opt/xinghui-blog
+git clone /srv/git/xinghui-blog.git .
 
-`git config --global user.email "your_email_linked_to_github@example.com"`
+cd XHBlogs && npm ci
+cd ../my-blog-manager && npm ci
+```
 
-> **Step 2: Initialize Local Repository**
-> Enter your project folder and execute the following CMD commands: (the frontend deployment folder, which is XHBlogs here)
+> Two files in the console differ on every machine and are therefore not tracked by Git:
+> `my-blog-manager/data/deploy_config.json` (blog source directory) and `my-blog-manager/public/backend_config.json` (content engine port).
 
-1. Initialize Git repository to generate the hidden .git folder
-`git init`
-2. Add all files to the staging area (note the period at the end)
-`git add .`
-3. Commit to the local repository and add a remark
-`git commit -m "first commit"`
+**Register the systemd services**
 
-**1. Configure Local Physical Path**
-Open the "Settings" page in the console.
-The pulled source code contains two core folders: `XHBlogs-manager` and `XHBlogs`. Please specify the local physical path of `XHBlogs` in the console.
+Public site `/etc/systemd/system/xhblogs.service`:
 
-![选择物理路径](picture/Pasted%20image%2020260427111646.png)
+```ini
+[Unit]
+Description=XHBlogs public Next.js site
+After=network-online.target
+Wants=network-online.target
 
-Example: `F:\Test2\XHBlogs`
+[Service]
+Type=simple
+User=xhblogs
+Group=xhblogs
+WorkingDirectory=/opt/xinghui-blog/XHBlogs
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PATH=/usr/bin:/bin
+EnvironmentFile=-/etc/xhblogs.env
+ExecStart=/opt/xinghui-blog/XHBlogs/node_modules/.bin/next start -H 0.0.0.0 -p 8080
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
 
-![填入本地BLOG物理路径](picture/Pasted%20image%2020260427112311.png)
+[Install]
+WantedBy=multi-user.target
+```
 
-> **Crucial Step**: After entering the path, you must click **[Test Path]** to verify connectivity! Once verified, click **[Save Dual-Track Configuration]** below.
+Console frontend `/etc/systemd/system/xhblogs-manager-web.service`:
 
-**2. Create a Private Repository on GitHub**
-Log in to GitHub and create a new repository to host your blog's source code (it is recommended to set it as a **Private repository** to protect data privacy).
+```ini
+[Unit]
+Description=XHBlogs manager Next.js console
+After=network.target xhblogs-manager-api.service
+Wants=xhblogs-manager-api.service
 
-![创建仓库](picture/Pasted%20image%2020260427112905.png)
+[Service]
+Type=simple
+User=xhblogs
+Group=xhblogs
+WorkingDirectory=/opt/xinghui-blog/my-blog-manager/.next/standalone
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+Environment=PORT=3001
+Environment=HOSTNAME=0.0.0.0
+Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
+Environment=XHS_BRIEFING_API_PORT=8000
+Environment=PATH=/usr/bin:/bin
+EnvironmentFile=-/etc/xhblogs-manager.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
 
-The repository name can be customized.
+[Install]
+WantedBy=multi-user.target
+```
 
-![仓库命名](picture/Pasted%20image%2020260427113030.png)
+Content engine `/etc/systemd/system/xhblogs-manager-api.service`:
 
-Obtain the SSH address of the repository and paste it into the "Line B" configuration in the console:
+```ini
+[Unit]
+Description=XHBlogs manager FastAPI backend
+After=network.target
 
-![复制SSH](picture/Pasted%20image%2020260427113120.png)
+[Service]
+Type=simple
+User=xhblogs
+Group=xhblogs
+WorkingDirectory=/opt/xinghui-blog/my-blog-manager
+Environment=PYTHONUNBUFFERED=1
+Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
+Environment=XHS_BRIEFING_API_PORT=8000
+ExecStart=/opt/xinghui-blog/my-blog-manager/.venv/bin/uvicorn cms_core.main:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
 
-Enter `main` for the source code branch. After confirming it is correct, click **[Save Dual-Track Configuration]** again.
+[Install]
+WantedBy=multi-user.target
+```
 
-**3. Obtain and Configure Deployment Key**
-Click the **[Get Line B Exclusive Key]** button in the console:
+| Service | Role | Listens on |
+| --- | --- | --- |
+| `xhblogs` | public site, `next start` serving the prebuilt output | `0.0.0.0:8080` |
+| `xhblogs-manager-web` | console frontend | `0.0.0.0:3001` |
+| `xhblogs-manager-api` | content engine (FastAPI) | `127.0.0.1:8000`, local access only |
 
-Go to your GitHub repository page and navigate to the `Settings` -> `Deploy keys` interface:
+**Build and start**
 
-![Deploy Keys](picture/Pasted%20image%2020260427113705.png)
+```bash
+cd /opt/xinghui-blog/XHBlogs && npm run build
+cd /opt/xinghui-blog/my-blog-manager && npm run build
 
-Paste the copied key into the `Key` box. The `Title` can be anything (e.g., `XHBlogs-Deploy-Key`).
+systemctl daemon-reload
+systemctl enable --now xhblogs xhblogs-manager-web xhblogs-manager-api
+```
 
-> **🚨 Critical Warning**: The **Allow write access** option below MUST be checked!
-> After setting it up, click **Add key** to save.
+The console frontend uses `output: 'standalone'`, so the static assets have to be copied into the standalone output and the engine port written next to them:
 
-**4. Initialize and Push Source Code**
-Return to the local console, click **[Smart Initialize Dual-Track Environment]**, and wait for the program to finish executing.
-Once completed, click the **[Sync Source Code Only]** button:
+```bash
+cd /opt/xinghui-blog/my-blog-manager
+mkdir -p .next/standalone/.next/static .next/standalone/public
+cp -a .next/static/. .next/standalone/.next/static/
+printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
+```
 
-![仅同步源码](picture/Pasted%20image%2020260427121539.png)
+> **Rebuild the console after every console code change**: `next start` serves the prebuilt output, source edits do not show up on their own.
 
-The program will begin pushing code to GitHub. **During this time, please do not switch pages or close the window:**
+**Public access and domains**
 
-![同步进度](picture/Pasted%20image%2020260427121702.png)
+Open the ports in the cloud provider's security group:
 
-Once the progress bar is complete, the frontend static page source code has been successfully hosted on GitHub.
+| Port | Purpose | Suggested source |
+| --- | --- | --- |
+| 22 | SSH | your office IP |
+| 8080 | public site | everyone |
+| 3001 | console | **your own public IP only** |
 
-> **A push failure bug may occur here**:
-> **Please try**:
-> Change the SSH repository address as shown below before initializing and syncing the source code.
-> 
+For a custom domain, let Nginx proxy to port 8080 and attach a certificate:
 
-**5. Deploy to the Vercel Platform**
-Visit the Vercel website, register an account, and bind your GitHub authorization.
+```nginx
+server {
+    listen 80;
+    server_name www.example.com;
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
 
-![绑定账号](picture/Pasted%20image%2020260427121844.png)
+**Password login for the console**
 
-Click `Add New...` to add a new Project, and select the repository you just pushed to GitHub from the Import list:
+Whenever the console is reachable from the internet you **must** enable the password login, otherwise anybody could rewrite your posts and settings. Prepare an environment file on the server:
 
-![导入项目](picture/Pasted%20image%2020260427121939.png)
+```bash
+cd /opt/xinghui-blog/my-blog-manager
+node scripts/manager-passwd.mjs "your-admin-password" --env-file /etc/xhblogs-manager.env
+node scripts/manager-passwd.mjs --secret --env-file /etc/xhblogs-manager.env
+```
 
-For example, I selected `XHBlogS2`:
+The first command stores the scrypt hash of the password, the second generates a random session secret. Both stay on the server (`chmod 600`); no credential is ever written to the repository. Then let the service read the file:
 
-![选择项目](picture/Pasted%20image%2020260427122034.png)
+```ini
+# [Service] section of /etc/systemd/system/xhblogs-manager-web.service
+EnvironmentFile=-/etc/xhblogs-manager.env
+Environment=HOSTNAME=0.0.0.0
+```
 
-Select **Next.js** in Framework Preset, then click the **Deploy** button to start deployment:
+After the restart the console redirects to `/login`; the session lasts 7 days and the cookie is HttpOnly. There is also a log-out button in the top right corner.
 
-![点击Deploy](picture/Pasted%20image%2020260427122141.png)
+> **Security note**: over plain HTTP the password travels unencrypted, so restrict the source IP in the security group. Once you serve HTTPS, set `MANAGER_COOKIE_SECURE=1`.
 
-Wait for the Vercel server to build your blog.
+> **Why remote access needs no code change**: the console used to call `http://127.0.0.1:<engine port>` straight from the browser, which only works on the machine running the engine. Every engine call now goes through the same-origin `/api/proxy`, which forwards to the local engine, so LAN and public access both work.
 
-![部署中](picture/Pasted%20image%2020260427122245.png)
+**Local development (optional)**
 
-Deployment successful! Click the preview image to visit your website directly.
-
-![部署成功](picture/Pasted%20image%2020260427122338.png)
-
-In the project Dashboard, you can check the deployment status and detailed logs at any time:
-
-![查看详情](picture/Pasted%20image%2020260427122453.png)
-
-Vercel will assign you a free subdomain by default:
-
-![分配域名](picture/Pasted%20image%2020260427122553.png)
+You can still double-click `my-blog-manager/Start.bat` to debug on Windows. The local machine has no publish helper, so publishing only mirrors the content into the blog source directory and you build and deploy it yourself.
 
 ---
 
-### Question 1: How do I bind my custom domain name?
-
-**Answer:** Here is an example using a domain purchased from "Alibaba Cloud" (the operation logic for other providers like Tencent Cloud, Cloudflare, etc., is similar).
-
-First, log in to the Alibaba Cloud console and enter the [Domain Name Management] page:
-
-![域名管理](picture/Pasted%20image%2020260427123636.png)
-
-Click the [DNS Resolution] button on the right side of the corresponding domain:
-
-![点击解析](picture/Pasted%20image%2020260427123737.png)
-
-Then return to Vercel, enter your project dashboard, and click **Settings** (or directly click the plus sign next to the domain name):
-
-![点击加号](picture/Pasted%20image%2020260427123156.png)
-
-![进入设置](picture/Pasted%20image%2020260427123838.png)
-
-In the Domains tab, enter the domain you purchased (for example, mine is `xinghuisama.top`), and click **Add** to save:
-
-After adding it, Vercel will provide the configuration parameters for the `A` record and `CNAME` record. Please add these parameters completely to your Alibaba Cloud DNS resolution settings:
-
-![添加记录](picture/Pasted%20image%2020260427124533.png)
-
-> **Note**: When adding records, be sure to carefully check the record type and Value!
-
-After configuration is complete, wait a few minutes (DNS propagation takes time), and click **Refresh** on the Vercel page to update the status.
-
-![Refresh](picture/Pasted%20image%2020260427124625.png)
-
-Once the status shows as normal, you can access the blog via your custom domain name! (For example: `www.xinghuisama.top`).
-
----
-
-## II. Update Settings and File Upload
+## II. Update Settings and Publish
 
 To protect data safety, this console uses an **"Operation Staging Area"** mechanism. **Please pay special attention!** Many settings must be actively "Updated to Local" after modification to be truly saved. When this operation is required, there is usually a highlighted prompt at the top of the interface.
 
@@ -259,32 +299,30 @@ After modifying the content, click **[Stage to Operation Queue]**:
 
 At this point, the top toolbox will prompt pending operations. You can undo at any time (clear all), or click **[Update Local]**.
 
-> ⚠️ Note: After clicking "Update Local," the data is only saved in your local console environment.
+> ⚠️ Note: After clicking "Update Local," the data is only saved in your console environment.
 
-If you want these modifications to take effect on the frontend blog page, you must continue by clicking **[Sync Blog]** (assuming the physical path of the frontend blog is configured correctly):
+Next, click **[🚀 Publish]** in the operation box at the top right (or the same button under **Settings → Publish**). After you confirm, the system does four things on its own:
 
-![同步Blog](picture/Pasted%20image%2020260427125800.png)
+1. **Mirror the content** — posts, moments, talks and the site configuration are copied over the blog source directory;
+2. **Commit the repository** — the change is committed in the server working tree and pushed to the bare repository;
+3. **Rebuild** — `npm run build` produces a fresh prebuilt output;
+4. **Restart the service** — `xhblogs` restarts and the change goes live.
+
+The whole cycle takes roughly 1-3 minutes. Build logs land in `/var/log/xhblogs-publish.log`.
 
 The publishing and modification of all content, such as blog posts, moments, and talks, follow this process.
 
-> **💡 Golden Rule**: Staging Queue -> Update Local -> Sync Blog
+> **💡 Golden Rule**: Staging Queue -> Update Local -> Publish
+
+### Online status panel
+
+**Settings → Publish** shows the live state of the public site in real time: whether the service is running, the time and build id of the last build, the newest commit in the source repository and the outcome of the previous publish. As soon as the build time is newer than the publish time, your change is **live**.
+
+> **Why "Sync Blog" used to change nothing online**: the public site is `next start` serving a prebuilt output, so edits to files such as `siteConfig.ts` only reach the site after a `build` and a service restart. "Publish" now performs that step as well.
 
 ---
 
-## III. How to Push Your Modifications to the Live Webpage?
-
-When you have completed satisfactory creations or settings adjustments locally and want to publish them to the public network for everyone to see:
-
-Please remember, after making any substantial modifications and clicking **[Sync Blog]**, open the synchronous deployment page in the console:
-
-![打开同步](picture/Pasted%20image%2020260427130216.png)
-
-Confirm that the "Line B" address is correct, and click **[Sync Source Code Only]**.
-Wait for GitHub Actions or Vercel to automatically capture the update. In a short time, you will see the latest content on the live page.
-
----
-
-## IV. Image Hosting Configuration
+## III. Image Hosting Configuration
 
 To optimize the writing experience, the console integrates image hosting upload functionality. This guide uses "7bu Image Hosting" ([https://7bu.top]()) as a reference.
 If you prefer using direct external links, the console also supports direct insertion of image URLs. If you want to connect other image hosting services that support standard APIs, you can attempt to do so.
@@ -297,7 +335,7 @@ After filling in the corresponding API Token and other information, you can clic
 
 ---
 
-## V. AI Cat Assistant Settings
+## IV. AI Cat Assistant Settings
 
 The blog system has a built-in AI Cat Assistant (connected to the Gemini model by default). Users can also modify the source code to connect other large language models.
 
@@ -305,34 +343,21 @@ First, you need to apply for a Gemini API Key. After obtaining the API Key, conf
 
 ![猫猫设置](picture/Pasted%20image%2020260427134211.png)
 
-After setting the exclusive system prompt (personality) for the cat locally, we need to give the online environment the ability to call the AI. Please log in to Vercel:
+After setting the exclusive system prompt (personality) for the cat locally, we need to give the online environment the ability to call the AI. Write the key into an environment file on the server:
 
-![Vercel环境](picture/Pasted%20image%2020260427134538.png)
+```bash
+echo 'GEMINI_API_KEY=your-real-api-key' >> /etc/xhblogs.env
+chmod 600 /etc/xhblogs.env
+systemctl restart xhblogs
+```
 
-Find `Environment Variables` in the project settings:
+`/etc/systemd/system/xhblogs.service` already declares `EnvironmentFile=-/etc/xhblogs.env`, so the public site picks the key up. When the console itself calls the AI, add the same variable to `/etc/xhblogs-manager.env` and restart `xhblogs-manager-api`.
 
-![搜索变量](picture/Pasted%20image%2020260427134633.png)
-
-Enter your blog project details:
-
-![项目工程](picture/Pasted%20image%2020260427134703.png)
-
-Ensure the scope (environment) includes the online environment, and click **Add Environment Variables**:
-
-![添加变量](picture/Pasted%20image%2020260427135004.png)
-
-Input your key:
-
-* **Key** input: `GEMINI_API_KEY`
-* **Value** input: Your actual API key
-
-![输入API](picture/Pasted%20image%2020260427135044.png)
-
-Click save. The next time you redeploy, the Cat Assistant will be active online.
+> **Never write secrets into code, documentation or the repository** — keep them in environment files with mode 600 on the server.
 
 ---
 
-## VI. Comment System Configuration
+## V. Comment System Configuration
 
 The comment system of this blog is based on GitHub Issues (Gitalk or similar solutions). You need to create a **Public** repository on GitHub specifically to store comments from visitors.
 
@@ -365,7 +390,7 @@ Accurately enter this `Client ID` and `Client Secret` into the corresponding fie
 
 ---
 
-## VII. NetEase Cloud Music Widget Settings
+## VI. NetEase Cloud Music Widget Settings
 
 ![歌单设置](picture/Pasted%20image%2020260427141049.png)
 
