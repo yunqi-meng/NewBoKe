@@ -1,3 +1,24 @@
+# Version 0.4.5 - Daily Quote Replaces the Daily Briefing
+
+**The Daily Briefing feature is gone; a daily AI-generated line of encouragement takes its place.**
+
+- **The briefing is removed**: the console panel, the Agent integration, the draft review flow, the
+  covers, the carousel and the archive are all deleted together with their code and data. The console
+  sidebar no longer has a "Daily Briefing" entry.
+- **One line a day**: on a fixed time each day the AI you already connected (煤球 by default) says a
+  short encouraging sentence, shown under the homepage content grid in the same glassmorphism style as
+  the rest of the site.
+- **Manageable in the console**: **Settings → 每日一句 ☀️** lets you toggle the homepage block, toggle
+  the daily generation, pick the generation time (Beijing time), rename the block and its subtitle,
+  change the signature, cap the sentence length, rewrite the prompt sent to the model, and browse the
+  archive.
+- **Write it yourself**: if today's line is not what you want, type your own and it replaces the
+  automatic one for today; tomorrow the AI speaks again.
+- **No code change to switch models**: the model, endpoint and personality come straight from
+  "AI Cat Config". The key still lives only in the server environment file, never in the repository.
+- **Nobody waits**: when a visitor arrives before today's line exists, the engine writes it in the
+  background and the page stays fast. Only "换一句" in the console waits for the model.
+
 # Version 0.4.4 - Local Image Upload, Photo Wall Fix
 
 **Image hosting is gone; pictures are uploaded straight from your own machine, and the photo wall can
@@ -44,7 +65,7 @@ finally delete a photo.**
 
 # Version 0.4.1 - Wallpaper and Editor Improvements
 
-Includes 0.4.0 Daily Briefing plus wallpaper groups (PR #25, original commit author Kai) and GFM table/code-block improvements (PR #15, original commit author ILoveFurina). Original commits and maintainer fixes are retained. Empty wallpaper groups, special-character configuration round trips, literal prose characters, strikethrough, code formatting and fenced-code table-of-contents handling have been corrected. See UpdateLog.md and the Chinese README for details.
+Includes the 0.4.0 Daily Briefing (removed in 0.4.5) plus wallpaper groups (PR #25, original commit author Kai) and GFM table/code-block improvements (PR #15, original commit author ILoveFurina). Original commits and maintainer fixes are retained. Empty wallpaper groups, special-character configuration round trips, literal prose characters, strikethrough, code formatting and fenced-code table-of-contents handling have been corrected. See UpdateLog.md and the Chinese README for details.
 
 # Version 0.4.0 - Daily Briefing Console
 
@@ -52,7 +73,7 @@ The optional Daily Briefing module is managed in Settings. New installations sta
 
 The briefing service starts with the original CMS and uses its actual port. Agent credentials are independent and revocable. Use the in-console JSON guide and downloadable Python client for a read-only connection test, then draft submission. Existing drafts and published dates are protected. Scheduling and online Git deployment are separate; the computer, backend and generating Agent must be running. DSH is deferred.
 
-The updater preserves personal configuration, posts, existing briefing data, images and private credentials/drafts; it backs up replaced program files and stops on unsaved program edits. Save and back up your content before upgrading. Node.js 20.9 or newer is required by the current Next.js version. See the Chinese README and UpdateLog.md for detailed instructions. Review PDFs are local-only.
+The updater preserves personal configuration, posts, the daily quote content, images and private credentials/drafts; it backs up replaced program files and stops on unsaved program edits. Save and back up your content before upgrading. Node.js 20.9 or newer is required by the current Next.js version. See the Chinese README and UpdateLog.md for detailed instructions. Review PDFs are local-only.
 
 ---
 
@@ -219,7 +240,7 @@ Environment=NEXT_TELEMETRY_DISABLED=1
 Environment=PORT=3001
 Environment=HOSTNAME=0.0.0.0
 Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
-Environment=XHS_BRIEFING_API_PORT=8000
+Environment=XHS_ENGINE_API_PORT=8000
 Environment=PATH=/usr/bin:/bin
 EnvironmentFile=-/etc/xhblogs-manager.env
 ExecStart=/usr/bin/node server.js
@@ -245,7 +266,9 @@ Group=xhblogs
 WorkingDirectory=/opt/xinghui-blog/my-blog-manager
 Environment=PYTHONUNBUFFERED=1
 Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
-Environment=XHS_BRIEFING_API_PORT=8000
+Environment=XHS_ENGINE_API_PORT=8000
+# The daily quote calls the AI; the key lives only in this environment file (mode 600)
+EnvironmentFile=-/etc/xhblogs-manager.env
 ExecStart=/opt/xinghui-blog/my-blog-manager/.venv/bin/uvicorn cms_core.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
@@ -432,6 +455,8 @@ systemctl restart xhblogs
 
 `/etc/systemd/system/xhblogs.service` already declares `EnvironmentFile=-/etc/xhblogs.env`, so the public site picks the key up. When the console itself calls the AI, add the same variable to `/etc/xhblogs-manager.env` and restart `xhblogs-manager-web`.
 
+> **The daily quote calls the AI from the engine too**, so `/etc/xhblogs-manager.env` needs the same key, and `xhblogs-manager-api.service` must declare `EnvironmentFile=-/etc/xhblogs-manager.env`.
+
 For the local desktop edition, put the key in each app's `.env.local` (already ignored by `.gitignore`, so it never reaches the repository).
 
 > **Never write secrets into code, documentation or the repository** — keep them in environment files with mode 600 on the server.
@@ -440,7 +465,22 @@ For the local desktop edition, put the key in each app's `.env.local` (already i
 
 ---
 
-## V. Comment System Configuration
+## V. Daily Quote
+
+Every day the cat says one encouraging sentence, shown under the homepage content grid.
+
+- **Where to manage it**: Console → **⚙️ Settings → ☀️ 每日一句**. Saving takes effect on the public site immediately — **no publish required**.
+- **What you can change**: whether the homepage block is shown, whether the daily generation runs, the generation time (Beijing time), the block title and subtitle, the signature, whether the date and the signature are shown, the maximum sentence length, and the prompt sent to the model (`{date}` is replaced with the current date).
+- **Regenerate or write it yourself**: "换一句" asks the AI for a new line; you can also type your own and it replaces today's automatic one. Tomorrow the AI speaks again.
+- **Archive**: the console keeps the last 30 lines.
+- **Model and persona**: taken straight from **AI Cat Config 🐾** — switching models needs no code change.
+- **Where the data lives**: settings in `my-blog-manager/data/dailyQuoteConfig.json`, content in `my-blog-manager/data/dailyQuote.json`. Neither enters Git.
+
+> The scheduled generation runs inside the content engine, so **the console page may be closed** — but `xhblogs-manager-api` has to stay up. If a visitor arrives before today's line exists, the engine writes it in the background and the page never waits.
+
+---
+
+## VI. Comment System Configuration
 
 The comment system is **self-hosted**: visitor comments live in a local SQLite database on the server (`my-blog-manager/data/comments.db`). The public site reads and writes through the content engine, and the console can moderate, reply to, hide or delete them. **No GitHub repository and no OAuth app required.**
 
@@ -480,7 +520,7 @@ Comments live only on the server's disk and **never enter Git** (`.gitignore` ex
 
 ---
 
-## VI. Local Music Widget Settings
+## VII. Local Music Widget Settings
 
 Want to add BGM to your blog? Upload the audio straight to the console — it hosts the files and syncs them to your blog on publish.
 

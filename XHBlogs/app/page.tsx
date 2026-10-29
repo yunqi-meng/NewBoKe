@@ -4,7 +4,7 @@ import matter from 'gray-matter';
 import Link from 'next/link';
 
 import Navbar from '../components/Navbar';
-import DailyBriefing from '../components/DailyBriefing';
+import DailyQuote from '../components/DailyQuote';
 import PageTransition from '../components/PageTransition';
 import SearchBar from '../components/SearchBar';
 import { siteConfig } from '../siteConfig';
@@ -149,8 +149,8 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 每日选刊：位于首页内容矩阵下方 */}
-              <DailyBriefing />
+              {/* 每日一句：位于首页内容矩阵下方 */}
+              <DailyQuote />
 
               {/* 底部数据面板 */}
               <div className="w-full mt-4"><SiteDashboard/></div>

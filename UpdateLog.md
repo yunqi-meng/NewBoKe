@@ -1,3 +1,16 @@
+## 0.4.5 - 2026-10-29
+
+- 每日选刊整套下线：删除公开站 `components/DailyBriefing.tsx` 与 `data/dailyBriefing*.{ts,json}`、`data/briefingConfig.json`、`data/terraReadingNotes.ts`、`lib/briefingWindow.ts`、`public/images/briefing-default.svg`，控制台 `components/settings/Briefing*.tsx`、`briefingApi.ts`、`app/briefing/`、`app/api/briefing/`，引擎 `cms_core/briefing_*.py` 与 `cms_core/public/briefing_agent.py`，以及仓库根目录四个只覆盖选刊的测试文件；控制台侧栏「每日选刊」入口一并移除。
+- 新增「每日一句」：每天定时让当前接入的 AI（默认是煤球）说一句话，显示在首页内容矩阵下方，与站点其它卡片同一套毛玻璃风格。
+- 引擎新增 `cms_core/api/dailyquote.py`：`GET /api/daily-quote` 取今天这句、`GET|PUT /api/daily-quote/config` 读写设置、`POST /api/daily-quote/generate` 立刻换一句、`POST /api/daily-quote/manual` 手写覆盖、`GET /api/daily-quote/history` 看往期。
+- 设置存 `my-blog-manager/data/dailyQuoteConfig.json`，内容存 `my-blog-manager/data/dailyQuote.json`（往期保留 30 条），两者均已加入 `.gitignore`，不入库。
+- 模型与人设直接复用 `siteConfig.aiConfig`（模型、接口地址、性格 Prompt、生成预算、发散度、思考强度），换模型不用改代码；AI 密钥仍只从 `DEEPSEEK_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY` 环境变量读，仓库内无任何口令。
+- 定时任务由引擎常驻线程承担（每 30 秒核对一次北京时间），不依赖有没有人打开控制台；引擎启动时随 FastAPI lifespan 拉起，退出时收尾。
+- 访客读接口不阻塞：今天还没有内容时丢到后台生成，首页不等人；控制台点「换一句」才同步等待。
+- 公开站新增 `/api/daily-quote` 网关与 `components/DailyQuote.tsx`；控制台新增 `components/settings/DailyQuoteSection.tsx`，可管理展示开关、每天自动生成开关、生成时间、栏目名称、副标题、署名、日期与署名显示、单句字数上限、给模型的话，并可查看往期。
+- 引擎端口环境变量更名为 `XHS_ENGINE_API_PORT`（旧的 `XHS_BRIEFING_API_PORT` 仍然识别），不再与已下线的选刊功能绑定。
+- 新增 `my-blog-manager/tests/daily_quote_engine_check.py`：50 项自检覆盖默认设置、设置保存与校验、手写覆盖、长度截断、AI 调用（含请求地址、鉴权头、模型、人设与 `{date}` 替换）、模型报错与无密钥的提示、历史排序与存储格式。
+
 ## 0.4.4 - 2026-10-29
 
 - 下线图床（第三方图片托管）整套功能：删除「设置 → 图库配置管理」面板、`components/settings/GallerySection.tsx`、引擎 `cms_core/api/picbed.py`，并清理 `config.py` 里的图床凭证独立通道、`sync.py` 里的敏感行过滤、`siteConfig.ts` 的 `picBedName/picBedUrl/picBedToken` 字段与 `scripts/checkConfig.mjs` 的图床配置模板。

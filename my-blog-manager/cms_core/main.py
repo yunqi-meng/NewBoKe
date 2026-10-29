@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -7,8 +9,20 @@ from cms_core.api import gallery, friends, projects
 from cms_core.api import sync, deploy
 from cms_core.api import comments
 from cms_core.api import media
+from cms_core.api import dailyquote
 
-app = FastAPI(title="XingHuiSama CMS Backend", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """引擎启动时拉起每日励志语的定时线程，退出时收尾。"""
+    dailyquote.start_scheduler()
+    try:
+        yield
+    finally:
+        dailyquote.stop_scheduler()
+
+
+app = FastAPI(title="XingHuiSama CMS Backend", version="1.0.0", lifespan=lifespan)
 
 # 🌟 核心修复：添加跨域中间件，彻底解决 Failed to fetch 报错
 app.add_middleware(
@@ -37,7 +51,5 @@ app.include_router(sync.router, prefix="/api/sync", tags=["Sync"])
 app.include_router(deploy.router, prefix="/api/deploy", tags=["Deploy"])
 # 🌟 自建评论系统：前台读写 + 后台审核（控制台「评论管理」页面用）
 app.include_router(comments.router, prefix="/api/comments", tags=["Comments"])
-
-# Fall-through service: existing routes remain first and retain their behavior.
-from cms_core.briefing_integration import BriefingIntegration
-app.mount("/", BriefingIntegration())
+# ☀️ 每日励志语：每天定时让当前接入的 AI 说一句话（控制台可管理）
+app.include_router(dailyquote.router, prefix="/api/daily-quote", tags=["DailyQuote"])

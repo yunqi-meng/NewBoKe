@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  *
  * 引擎端口按以下顺序解析：
  *   1. MANAGER_API_PORT（服务器部署时固定为 8000）
- *   2. XHS_BRIEFING_API_PORT
+ *   2. XHS_ENGINE_API_PORT（旧的 XHS_BRIEFING_API_PORT 仍认）
  *   3. public/backend_config.json 里的 api_port（本地桌面版由 launcher.py 写入）
  */
 
@@ -32,7 +32,7 @@ const SKIP_HEADERS = new Set([
 ]);
 
 async function resolvePort(): Promise<number> {
-  const fromEnv = process.env.MANAGER_API_PORT || process.env.XHS_BRIEFING_API_PORT;
+  const fromEnv = process.env.MANAGER_API_PORT || (process.env.XHS_ENGINE_API_PORT || process.env.XHS_BRIEFING_API_PORT);
   if (fromEnv) {
     const parsed = Number(fromEnv);
     if (Number.isInteger(parsed) && parsed > 0 && parsed < 65536) return parsed;

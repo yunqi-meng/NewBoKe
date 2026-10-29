@@ -9,7 +9,8 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-INITIAL_DATA = {'briefingConfig.json', 'dailyBriefing.json', 'dailyBriefingArchive.json', 'dailyBriefingCovers.json', 'dailyBriefing-history.json', 'dailyBriefing.ts', 'terraReadingNotes.ts'}
+# data/ 与 public/ 下的内容都是使用者自己的东西，更新时一律不覆盖。
+PRESERVED_DIRS = {'data', 'public'}
 
 
 def managed_path(name):
@@ -22,18 +23,18 @@ def managed_path(name):
         return False
     if parts[1] in ('posts', 'chatters', 'moments', 'manager_data') or parts[-1] in ('siteConfig.ts', 'deploy_config.json', 'backend_config.json', 'window_config.json'):
         return False
-    if parts[1] == 'data':
-        return parts[-1] in INITIAL_DATA
+    if parts[1] in PRESERVED_DIRS:
+        return False
     if parts[1] == 'app' and Path(name).suffix == '.md':
         return False
-    return parts[1] in {'app', 'components', 'context', 'lib', 'cms_core', 'public'} or len(parts)==2 and parts[1] in {'package.json', 'package-lock.json', 'postcss.config.mjs', 'tsconfig.json', 'next.config.ts', 'launcher.py', 'run_me.py', 'Start.bat', '.gitignore'}
+    return parts[1] in {'app', 'components', 'context', 'lib', 'cms_core'} or len(parts)==2 and parts[1] in {'package.json', 'package-lock.json', 'postcss.config.mjs', 'tsconfig.json', 'next.config.ts', 'launcher.py', 'run_me.py', 'Start.bat', '.gitignore'}
 
 
 def preserve_existing(name, exists):
     if not exists:
         return False
     parts = Path(name).parts
-    return len(parts)>2 and (parts[1]=='data' or parts[1]=='public' and parts[-1]!='briefing_agent.py')
+    return len(parts)>2 and parts[1] in PRESERVED_DIRS
 
 
 def git(*args):
@@ -92,7 +93,7 @@ def main():
     npm=shutil.which('npm')
     for app in ('XHBlogs','my-blog-manager'):
         subprocess.run([npm,'install'],cwd=ROOT/app,shell=os.name=='nt',check=True)
-    print('Updated program files. Personal configuration, posts, briefing data, images and private credentials were preserved.')
+    print('Updated program files. Personal configuration, posts, daily quote content, images and private credentials were preserved.')
     if applied: print('Backup:',backup)
     print('Start the console and check your settings before publishing.')
 

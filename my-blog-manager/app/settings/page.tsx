@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import BriefingSection from '../../components/settings/BriefingSection';
+import DailyQuoteSection from '../../components/settings/DailyQuoteSection';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOperations } from '../../context/OperationContext';
 import { siteConfig } from '../../siteConfig';
@@ -23,15 +23,15 @@ import AICatSection from '../../components/settings/AICatSection';
 function SettingsContent() {
   const { operations, addOperation } = useOperations();
   const [activeTab, setActiveTab] = useState('profile');
-  const [briefingVisited, setBriefingVisited] = useState(false);
+  const [quoteVisited, setQuoteVisited] = useState(false);
   const [backendMode, setBackendMode] = useState<'checking' | 'preview' | 'live' | 'offline'>('checking');
   const { showToast } = useToast();
   useEffect(() => {
     const readTab = () => {
       const tab = new URLSearchParams(window.location.search).get('tab');
-      if (tab && ['profile', 'display', 'background', 'music', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'briefing'].includes(tab)) {
+      if (tab && ['profile', 'display', 'background', 'music', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'quote'].includes(tab)) {
         setActiveTab(tab);
-        if (tab === 'briefing') setBriefingVisited(true);
+        if (tab === 'quote') setQuoteVisited(true);
       }
     };
     readTab();
@@ -40,7 +40,7 @@ function SettingsContent() {
   }, []);
   function selectTab(tab: string) {
     setActiveTab(tab);
-    if (tab === 'briefing') setBriefingVisited(true);
+    if (tab === 'quote') setQuoteVisited(true);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', tab);
     window.history.replaceState(null, '', url);
@@ -135,7 +135,7 @@ function SettingsContent() {
   // 👇 🌟 在菜单里增加 AI 猫咪入口
   const menuItems = [
     { id: 'profile', name: '个人名片设置', icon: '👤' },
-    { id: 'briefing', name: '每日选刊', icon: '📖' },
+    { id: 'quote', name: '每日一句', icon: '☀️' },
     { id: 'display', name: '视窗画面设置', icon: '🪟' },
     { id: 'background', name: '视觉背景配置', icon: '🌌' },
     { id: 'music', name: '音乐播放设置', icon: '🎵' },
@@ -169,9 +169,9 @@ function SettingsContent() {
           </div>
 
           <div className="min-w-0 flex-1 w-full">
-            {backendMode !== 'live' && <div role="status" className="mb-6 rounded-2xl border border-amber-200/60 bg-amber-50/80 px-5 py-4 text-xs leading-7 text-amber-800 dark:border-amber-400/20 dark:bg-amber-950/40 dark:text-amber-200">{backendMode === 'checking' ? '正在检查本机连接…' : backendMode === 'preview' ? '当前是统一控制台的本地预览：每日选刊可以保存；其他原有栏目可只读查看。网站同步、发布和现有每日任务保持原样。' : '网站通用设置后台尚未连接，暂时只读。每日选刊使用自己的本机连接，可在该栏目检查状态。'}{backendMode === 'offline' && <button className="ml-3 underline" onClick={() => window.location.reload()}>重新检测</button>}</div>}
-            {briefingVisited && <div hidden={activeTab !== 'briefing'}><BriefingSection /></div>}
-            <fieldset disabled={backendMode !== 'live'} hidden={activeTab === 'briefing'} className="min-w-0 w-full border-0 p-0">
+            {backendMode !== 'live' && <div role="status" className="mb-6 rounded-2xl border border-amber-200/60 bg-amber-50/80 px-5 py-4 text-xs leading-7 text-amber-800 dark:border-amber-400/20 dark:bg-amber-950/40 dark:text-amber-200">{backendMode === 'checking' ? '正在检查本机连接…' : backendMode === 'preview' ? '当前是统一控制台的本地预览：每日一句可以保存；其他原有栏目可只读查看。网站同步、发布和现有每日任务保持原样。' : '网站通用设置后台尚未连接，暂时只读。每日一句使用自己的本机连接，可在该栏目检查状态。'}{backendMode === 'offline' && <button className="ml-3 underline" onClick={() => window.location.reload()}>重新检测</button>}</div>}
+            {quoteVisited && <div hidden={activeTab !== 'quote'}><DailyQuoteSection /></div>}
+            <fieldset disabled={backendMode !== 'live'} hidden={activeTab === 'quote'} className="min-w-0 w-full border-0 p-0">
             <AnimatePresence mode="wait">
               {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'display' && <DisplaySection key="display" showToast={showToast} />}

@@ -37,8 +37,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Local briefing credentials, drafts and runtime data
-/manager_data/briefing/
+# Local drafts and runtime data
 *.connection.json
 __pycache__/
 *.py[cod]
