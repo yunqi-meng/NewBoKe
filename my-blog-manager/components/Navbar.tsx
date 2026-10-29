@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOperations } from '../context/OperationContext';
 import { useToast } from './ToastProvider';
+import { flushPendingOperations } from '../lib/pendingOperations';
 import { AlertTriangle, LogOut } from 'lucide-react';
 import { siteConfig } from '../siteConfig';
 
@@ -101,88 +102,18 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     window.location.href = '/login';
   };
 
-  // 🌟 监控增强版更新逻辑
-  const handleUpdateLocal = async () => {
-      if (operations.length === 0) {
-        showToast("队列中没有待处理的操作", "warning");
+  // 🌟 发布流程：先把待处理操作写回引擎，再触发发布（镜像 → 提交 → 构建 → 重启）
+  const publishEverything = async () => {
+    if (operations.length === 0) {
+      showToast("没有待处理的改动，直接发布当前内容", "info");
+    } else {
+      showToast(`🔍 正在写回 ${operations.length} 项改动…`, "info");
+      const flushed = await flushPendingOperations(operations);
+      if (!flushed.ok) {
+        showToast(`❌ 写入本地失败，已中止发布：${flushed.message}`, "error");
         return;
       }
-
-      try {
-        showToast(`🔍 正在准备发送 ${operations.length} 个任务...`, "info");
-
-        const apiBase = `/api/proxy`;
-
-        for (const op of operations) {
-          let apiUrl = '';
-          let body = {};
-
-          switch (op.type) {
-            case 'sync_photowall':
-              apiUrl = `${apiBase}/api/gallery/sync`;
-              body = { albums: op.value };
-              break;
-            case 'sync_friends':
-              apiUrl = `${apiBase}/api/friends/sync`;
-              body = { friends: op.value };
-              break;
-            case 'sync_projects':
-              apiUrl = `${apiBase}/api/projects/sync`;
-              body = { projects: op.value };
-              break;
-            case 'CONFIG':
-              apiUrl = `${apiBase}/api/config/update`;
-              body = { updates: op.payload };
-              break;
-            case 'create_moment':
-              apiUrl = `${apiBase}/api/moments/save`;
-              body = op.payload;
-              break;
-            default:
-              apiUrl = `${apiBase}/api/drafts/sync_local`;
-              body = { operations: [op] };
-              break;
-          }
-
-          showToast(`🚀 正在请求后端: ${apiUrl}`, "info");
-
-          const res = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-          });
-
-          const data = await res.json();
-          if (!data.success) {
-            showToast(`❌ 任务执行失败: ${data.message}`, "error");
-            return;
-          }
-        }
-
-        showToast("✅ 已写入控制台，点击「发布上线」即可生效！", "success");
-        clearOperations();
-        setIsOpBoxOpen(false);
-
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-
-      } catch (error: any) {
-        showToast(`后端连接异常: ${error.message}`, "error");
-      }
-    };
-
-  const handleSyncBlogClick = () => {
-    if (!targetBlogPath) {
-       const fallback = localStorage.getItem('targetBlogPath') || "";
-       setTargetBlogPath(fallback);
     }
-    setIsOpBoxOpen(false);
-    setSyncModalOpen(true);
-  };
-
-  const executeSyncBlog = async () => {
-    setSyncModalOpen(false);
 
     try {
       showToast("🚀 正在发布到公开站，请稍候...", "info");
@@ -195,6 +126,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
 
       const data = await res.json();
       if (data.success) {
+        clearOperations();
         showToast(data.message, "success");
       } else {
         showToast(`❌ 发布失败: ${data.message}`, "error");
@@ -202,6 +134,20 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     } catch (error) {
       showToast("无法连接到内容引擎进行发布", "error");
     }
+  };
+
+  const handleSyncBlogClick = () => {
+    if (!targetBlogPath) {
+       const fallback = localStorage.getItem('targetBlogPath') || "";
+       setTargetBlogPath(fallback);
+    }
+    setIsOpBoxOpen(false);
+    setSyncModalOpen(true);
+  };
+
+  const executeSyncBlog = async () => {
+    setSyncModalOpen(false);
+    await publishEverything();
   };
 
   return (
@@ -263,14 +209,15 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={handleSyncBlogClick} className="py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-black hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                        🚀 发布上线
-                      </button>
-                      <button onClick={handleUpdateLocal} className="py-2.5 rounded-xl bg-indigo-500 text-white text-xs font-black shadow-lg shadow-indigo-500/30 hover:bg-indigo-600 transition-colors">
-                        📥 更新本地
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleSyncBlogClick}
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-black shadow-lg shadow-indigo-500/30 hover:from-indigo-600 hover:to-purple-600 transition-all"
+                    >
+                      🚀 发布上线
+                    </button>
+                    <p className="mt-2 text-[10px] leading-5 text-slate-400 text-center">
+                      点一次即可：写回本地改动 → 同步到博客并重新构建。
+                    </p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -309,6 +256,11 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
               <p className="text-sm text-slate-500 mb-8 leading-relaxed text-balance">
                 确认把控制台的最新内容发布到公开站吗？<br />
                 <span className="font-bold text-amber-500 break-all">{targetBlogPath || '（未配置源码目录）'}</span>
+                {operations.length > 0 && (
+                  <span className="block mt-2">
+                    队列里的 <strong>{operations.length}</strong> 项改动会先写回本地，再一起发布。
+                  </span>
+                )}
                 <span className="text-xs opacity-80 text-red-400 font-bold mt-2 block">
                   发布会覆盖站点源码目录，并重新构建线上站点，约 1-3 分钟生效。
                 </span>

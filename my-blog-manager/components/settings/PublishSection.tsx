@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useToast } from '../ToastProvider';
+import { useOperations } from '../../context/OperationContext';
+import { flushPendingOperations } from '../../lib/pendingOperations';
 import {
   Rocket,
   Server,
@@ -14,7 +16,18 @@ import {
   AlertCircle,
   Loader2,
   FolderTree,
+  History,
+  Undo2,
 } from 'lucide-react';
+
+type PublishCommit = {
+  commit: string;
+  short: string;
+  date: string;
+  subject: string;
+  isPublish?: boolean;
+  isRollback?: boolean;
+};
 
 type PublishStatus = {
   success: boolean;
@@ -70,12 +83,16 @@ const STATE_TEXT: Record<string, string> = {
 
 export default function PublishSection() {
   const { showToast } = useToast();
+  const { operations, clearOperations } = useOperations();
   const [status, setStatus] = useState<PublishStatus>(EMPTY_STATUS);
   const [blogPath, setBlogPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [history, setHistory] = useState<PublishCommit[]>([]);
+  const [head, setHead] = useState('');
+  const [rollingBack, setRollingBack] = useState<string>('');
 
   const loadStatus = useCallback(async () => {
     try {
@@ -93,11 +110,24 @@ export default function PublishSection() {
     }
   }, [loaded]);
 
+  const loadHistory = useCallback(async () => {
+    try {
+      const res = await fetch('/api/proxy/api/deploy/history', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data?.commits)) setHistory(data.commits);
+      if (data?.head) setHead(data.head);
+    } catch {
+      /* 引擎暂时不可达时保留上一次历史 */
+    }
+  }, []);
+
   useEffect(() => {
     loadStatus();
+    loadHistory();
     const timer = setInterval(loadStatus, 5000);
     return () => clearInterval(timer);
-  }, [loadStatus]);
+  }, [loadStatus, loadHistory]);
 
   const handleSavePath = async () => {
     setIsSaving(true);
@@ -124,6 +154,17 @@ export default function PublishSection() {
   const handlePublish = async () => {
     setIsPublishing(true);
     try {
+      // 先把收件箱里攒着的改动写回引擎，再一起发布，博客随之更新
+      if (operations.length > 0) {
+        showToast(`🔍 正在写回 ${operations.length} 项改动…`, 'info');
+        const flushed = await flushPendingOperations(operations);
+        if (!flushed.ok) {
+          showToast(`❌ 写入本地失败，已中止发布：${flushed.message}`, 'error');
+          setIsPublishing(false);
+          return;
+        }
+      }
+
       const res = await fetch('/api/proxy/api/deploy/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -131,6 +172,7 @@ export default function PublishSection() {
       });
       const data = await res.json();
       if (data.success) {
+        clearOperations();
         showToast(data.message, 'success');
         setTimeout(loadStatus, 1500);
       } else {
@@ -140,6 +182,33 @@ export default function PublishSection() {
       showToast('发布失败：无法连接内容引擎', 'error');
     }
     setIsPublishing(false);
+  };
+
+  const handleRollback = async (commit: PublishCommit) => {
+    const confirmed = window.confirm(
+      `确认把内容回退到这一步吗？\n\n${commit.subject}\n${commit.short} · ${commit.date}\n\n` +
+      '回退会用这一步的内容覆盖当前版本，并重新构建线上站点（约 1-3 分钟）。'
+    );
+    if (!confirmed) return;
+
+    setRollingBack(commit.commit);
+    try {
+      const res = await fetch('/api/proxy/api/deploy/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commit: commit.commit }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message, 'success');
+        setTimeout(loadHistory, 1500);
+      } else {
+        showToast(`❌ 回退失败：${data.message}`, 'error');
+      }
+    } catch {
+      showToast('回退失败：无法连接内容引擎', 'error');
+    }
+    setRollingBack('');
   };
 
   const publishState = status.publish?.state || '';
@@ -286,12 +355,81 @@ export default function PublishSection() {
               </>
             ) : (
               <>
-                <Rocket size={18} /> 发布上线
+                <Rocket size={18} />
+                发布上线
+                {operations.length > 0 && (
+                  <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-black">
+                    含 {operations.length} 项待写入
+                  </span>
+                )}
               </>
             )}
           </button>
           <p className="mt-3 text-center text-[11px] leading-6 text-slate-400">
-            一次点击完成：镜像内容 → 提交源码仓库 → 重新构建公开站 → 重启服务，约 1-3 分钟生效。
+            一次点击完成：写回本地改动 → 镜像内容 → 提交源码仓库 → 重新构建公开站 → 重启服务，约 1-3 分钟生效。
+          </p>
+        </div>
+
+        {/* 4. 发布历史与回退 */}
+        <div className="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50">
+          <div className="mb-4 flex items-center justify-between">
+            <label className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase flex items-center gap-1">
+              <History size={14} className="text-indigo-500" /> 4. 发布历史与回退
+            </label>
+            <button
+              onClick={loadHistory}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-slate-500/10 text-slate-500 dark:text-slate-300 text-[10px] font-black hover:bg-slate-500/20 transition-colors"
+            >
+              <RefreshCw size={12} /> 刷新
+            </button>
+          </div>
+
+          {history.length === 0 ? (
+            <p className="py-6 text-center text-xs text-slate-400">还没有发布记录</p>
+          ) : (
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto custom-scrollbar">
+              {history.map(item => {
+                const isCurrent = item.commit === head;
+                const isRolling = rollingBack === item.commit;
+                return (
+                  <div
+                    key={item.commit}
+                    className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 transition-colors ${
+                      isCurrent
+                        ? 'border-emerald-300/60 bg-emerald-50/70 dark:border-emerald-500/20 dark:bg-emerald-950/20'
+                        : 'border-slate-100 dark:border-slate-700/60 bg-white dark:bg-slate-900/40'
+                    }`}
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-slate-700 dark:text-slate-200">
+                        {item.isRollback ? '↩️ ' : item.isPublish ? '🚀 ' : ''}
+                        {item.subject}
+                      </p>
+                      <p className="mt-1 text-[10px] font-mono text-slate-400">
+                        {item.short} · {new Date(item.date).toLocaleString('zh-CN', { hour12: false })}
+                      </p>
+                    </div>
+                    {isCurrent ? (
+                      <span className="shrink-0 rounded-full bg-emerald-500/15 px-3 py-1 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                        当前线上
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handleRollback(item)}
+                        disabled={rollingBack !== ''}
+                        className="shrink-0 flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-1.5 text-[10px] font-black text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 transition-colors disabled:opacity-50"
+                      >
+                        {isRolling ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />}
+                        {isRolling ? '回退中' : '回退到这里'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] leading-6 text-slate-400">
+            每一次发布与回退都会留下一个提交。点「回退到这里」会用那一步的内容覆盖当前版本，并重新构建上线，历史不会丢失。
           </p>
         </div>
       </div>
