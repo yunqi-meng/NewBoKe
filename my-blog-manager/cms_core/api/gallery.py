@@ -4,6 +4,8 @@ import time
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from ..tsdata import read_ts_array
+
 router = APIRouter()
 
 # 🌟 核心修复：动态获取项目根目录
@@ -74,32 +76,7 @@ def read_albums_from_disk():
     客户端 bundle 的静态导入，如果在控制台里直接 import 这个文件，
     页面拿到的永远是构建那一刻的快照，删掉的照片刷新后就会复活。
     """
-    try:
-        with open(ALBUMS_TS_PATH, "r", encoding="utf-8") as source:
-            content = source.read()
-    except OSError:
-        return []
-
-    marker = "export const albums"
-    marker_index = content.find(marker)
-    if marker_index == -1:
-        return []
-
-    # 类型标注里也有方括号（Album[]），必须先越过等号再找数组起点
-    assign_index = content.find("=", marker_index)
-    if assign_index == -1:
-        return []
-
-    bracket_index = content.find("[", assign_index)
-    if bracket_index == -1:
-        return []
-
-    try:
-        albums, _ = json.JSONDecoder().raw_decode(content[bracket_index:])
-    except ValueError:
-        return []
-
-    return albums if isinstance(albums, list) else []
+    return read_ts_array(ALBUMS_TS_PATH, "export const albums")
 
 
 @router.get("/list")

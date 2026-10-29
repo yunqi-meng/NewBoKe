@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
@@ -17,25 +18,17 @@ import 'highlight.js/styles/atom-one-dark.css';
 
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';
-import { siteConfig } from '../../../siteConfig';
+import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
 import ClientSocials from '../../../components/ClientSocials';
 import ClientTOC from '../../../components/ClientTOC';
 import BackButton from '../../../components/BackButton';
 import Comments from '../../../components/Comments';
 import SidebarLyric from '../../../components/SidebarLyric';
+import { managerPath } from '../../../lib/managerRoot';
 
-export async function generateStaticParams() {
-  const postsDirectory = path.join(process.cwd(), 'posts');
-  if (!fs.existsSync(postsDirectory)) return [];
-
-  const filenames = fs.readdirSync(postsDirectory);
-
-  return filenames
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => ({
-      slug: name.replace(/\.md$/, ''),
-    }));
-}
+// 文章正文要实时读工作副本：静态预渲染会把正文固化进构建产物，
+// 发布后不重建控制台，打开文章看到的还是旧版本。
+export const dynamic = 'force-dynamic';
 
 function extractToc(content: string) {
   const toc = [];
@@ -64,9 +57,14 @@ function extractToc(content: string) {
   return toc;
 }
 
-async function getPostData(slug: string) {
-  const fullPath = path.join(process.cwd(), 'posts', `${slug}.md`);
-  const fileContents = fs.readFileSync(fullPath, 'utf8');
+async function getPostData(slug: string, defaultCover: string) {
+  const fullPath = managerPath('posts', `${slug}.md`);
+  let fileContents: string;
+  try {
+    fileContents = fs.readFileSync(fullPath, 'utf8');
+  } catch {
+    notFound();
+  }
   let { data, content } = matter(fileContents);
 
   // ==========================================
@@ -120,12 +118,12 @@ async function getPostData(slug: string) {
     title: data.title,
     date: data.date,
     tags: data.tags && Array.isArray(data.tags) ? data.tags : [],
-    cover: data.cover || siteConfig.defaultPostCover
+    cover: data.cover || defaultCover
   };
 }
 
 function getRecentPosts(currentSlug: string) {
-  const postsDirectory = path.join(process.cwd(), 'posts');
+  const postsDirectory = managerPath('posts');
   let fileNames: string[] = [];
   try { fileNames = fs.readdirSync(postsDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
   if (!fileNames) return [];
@@ -139,7 +137,8 @@ function getRecentPosts(currentSlug: string) {
 
 export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const postData = await getPostData(resolvedParams.slug);
+  const config = await getLiveSiteConfig();
+  const postData = await getPostData(resolvedParams.slug, config.defaultPostCover);
   const recentPosts = getRecentPosts(resolvedParams.slug);
 
   return (
@@ -309,10 +308,10 @@ export default async function Post({ params }: { params: Promise<{ slug: string 
           <aside className="w-full lg:w-[320px] flex flex-col gap-6 flex-shrink-0">
             <div className="bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl p-6 border border-white/40 dark:border-white/10 shadow-xl text-center">
               <div className="w-20 h-20 mx-auto rounded-full p-1 bg-gradient-to-tr from-indigo-500 to-purple-500 shadow-md mb-4 transition-transform duration-500 hover:rotate-3">
-                <img src={siteConfig.avatarUrl} alt="avatar" className="w-full h-full rounded-full object-cover bg-white" />
+                <img src={config.avatarUrl} alt="avatar" className="w-full h-full rounded-full object-cover bg-white" />
               </div>
-              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{siteConfig.authorName}</h3>
-              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium mb-4">{siteConfig.bio}</p>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{config.authorName}</h3>
+              <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium mb-4">{config.bio}</p>
               <ClientSocials />
             </div>
 

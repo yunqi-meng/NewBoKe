@@ -1,6 +1,5 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { NextRequest } from 'next/server';
+import { resolveEnginePort } from '../../../../lib/enginePort';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,10 +7,8 @@ export const dynamic = 'force-dynamic';
 /**
  * 同源转发器：把 /api/proxy/<引擎路径> 转发到本机的 Python 内容引擎。
  *
- * 引擎端口按以下顺序解析：
- *   1. MANAGER_API_PORT（服务器部署时固定为 8000）
- *   2. XHS_ENGINE_API_PORT（旧的 XHS_BRIEFING_API_PORT 仍认）
- *   3. public/backend_config.json 里的 api_port（本地桌面版由 launcher.py 写入）
+ * 引擎端口的解析规则集中在 lib/enginePort.ts，
+ * 服务端读实时配置（lib/siteConfigRuntime.ts）走的是同一套规则。
  */
 
 const SKIP_HEADERS = new Set([
@@ -32,16 +29,7 @@ const SKIP_HEADERS = new Set([
 ]);
 
 async function resolvePort(): Promise<number> {
-  const fromEnv = process.env.MANAGER_API_PORT || (process.env.XHS_ENGINE_API_PORT || process.env.XHS_BRIEFING_API_PORT);
-  if (fromEnv) {
-    const parsed = Number(fromEnv);
-    if (Number.isInteger(parsed) && parsed > 0 && parsed < 65536) return parsed;
-  }
-  const root = process.env.XHS_MANAGER_ROOT ?? process.cwd();
-  const raw = await fs.readFile(path.join(root, 'public/backend_config.json'), 'utf8');
-  const parsed = Number(JSON.parse(raw).api_port);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 65535) throw new Error('Invalid local engine port');
-  return parsed;
+  return resolveEnginePort();
 }
 
 /**

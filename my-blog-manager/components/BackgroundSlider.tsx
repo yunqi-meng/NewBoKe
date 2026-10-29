@@ -1,8 +1,11 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 
 export default function BackgroundSlider() {
+  // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
+  const siteConfig = useSiteConfig();
+
   const [index, setIndex] = useState(0);
 
   // 🌟 壁纸分组系统：优先使用「激活分组」的图片轮播；无分组数据时回退到旧版 bgImages

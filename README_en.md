@@ -1,3 +1,26 @@
+# Version 0.4.7 - The Console Now Shows Live Content
+
+**After publishing, a refresh in the console shows exactly what is live.**
+
+- **The "site changed, console didn't" bug is fixed**: the console used to render build-time snapshots of
+  articles, moments, albums, friend links, projects, the about page and the site config, while publishing
+  only rebuilt the public site. The console now reads the working copy on every request, so the two always
+  agree.
+- **Content is read live**: articles, moments, the photo wall, friend links and the project grid you edit
+  in the console show up immediately. Changing the nickname, navigation title or avatar in
+  `siteConfig.ts` no longer needs a console rebuild either - just refresh.
+- **The engine can read the console's data files**: the new `cms_core/tsdata.py` parses the TypeScript data
+  files the console generates and strips TypeScript-style trailing commas, so friend links and projects
+  no longer come back empty.
+- **One place for config and port resolution**: site config loading and engine port detection are now
+  centralised (`lib/siteConfigRuntime.ts`, `lib/enginePort.ts`). If the engine is briefly unreachable the
+  console falls back gracefully instead of going blank.
+- **Two long-standing re-render traps fixed along the way**: the toast callback is now a stable reference
+  (it used to re-trigger every `useEffect` that depended on it), and the operation queue gained the
+  missing publish / friend / project sync operation types.
+
+---
+
 # Version 0.4.6 - One Button To Publish, And A Way Back
 
 **Publishing is now a single button, and every step can be undone.**

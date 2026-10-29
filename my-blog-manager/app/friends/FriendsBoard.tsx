@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
-import { friendsData as initialFriends, Friend } from '../../data/friends';
+import type { Friend } from '../../data/friends';
 import { Plus, Pencil, Trash2, AlertTriangle, Save, Edit3, X, CloudUpload, Sparkles } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
@@ -11,7 +11,7 @@ import FloatingImageTool from '../../components/editor/FloatingImageTool';
 
 // 🌟 新增：引入配置和评论组件
 import Comments from '../../components/Comments';
-import { siteConfig } from '../../siteConfig';
+import { useSiteConfig } from '../../components/SiteConfigProvider';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -26,8 +26,31 @@ const itemVariants = {
 export default function FriendsBoard() {
   const { addOperation } = useOperations();
   const { showToast } = useToast();
+  // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
+  const siteConfig = useSiteConfig();
 
-  const [editableFriends, setEditableFriends] = useState<Friend[]>(initialFriends);
+  const [editableFriends, setEditableFriends] = useState<Friend[]>([]);
+
+  // 实时读取磁盘上的友链：data/friends.ts 原本是构建时打进客户端 bundle 的静态导入，
+  // 拿到的是构建那一刻的快照，发布后刷新仍然显示旧友链。
+  // 现在只认引擎读回的工作副本数据，避免任何过期快照混进界面。
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/proxy/api/friends/list', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data?.success && Array.isArray(data.friends)) {
+          setEditableFriends(data.friends as Friend[]);
+        } else {
+          showToast("⚠️ 读取友链失败，请确认引擎服务在线", "warning");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) showToast("⚠️ 无法连接内容引擎，友链暂时无法读取", "warning");
+      });
+    return () => { cancelled = true; };
+  }, [showToast]);
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; name: string | null }>({ isOpen: false, id: null, name: null });
   const [friendModal, setFriendModal] = useState<{ isOpen: boolean; mode: 'add' | 'edit'; data: Partial<Friend> }>({ isOpen: false, mode: 'add', data: {} });

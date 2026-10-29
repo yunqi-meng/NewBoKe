@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 
 interface DanmakuItem {
   id: number;
@@ -12,6 +12,9 @@ interface DanmakuItem {
 }
 
 export default function DanmakuBackground() {
+  // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
+  const siteConfig = useSiteConfig();
+
   const [danmakus, setDanmakus] = useState<DanmakuItem[]>([]);
 
   useEffect(() => {

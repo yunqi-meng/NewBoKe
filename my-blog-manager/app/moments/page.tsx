@@ -4,21 +4,30 @@ import matter from 'gray-matter';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import MomentList from './MomentList';
-import { siteConfig } from '../../siteConfig';
+import { getLiveSiteConfig } from '../../lib/siteConfigRuntime';
+import { managerPath } from '../../lib/managerRoot';
 
-export const metadata = {
-  title: "说说 | " + siteConfig.authorName + " の 博客",
-  description: "生活动态与瞬间记录",
-};
+export async function generateMetadata() {
+  const config = await getLiveSiteConfig();
+  return {
+    title: "说说 | " + config.authorName + " の 博客",
+    description: "生活动态与瞬间记录",
+  };
+}
 
-export default function MomentsPage() {
+// 说说必须实时读工作副本：静态预渲染会把说说固化进构建产物，
+// 发布后不重建控制台，刷新看到的还是旧说说。
+export const dynamic = 'force-dynamic';
+
+export default async function MomentsPage() {
+  const config = await getLiveSiteConfig();
   let allMoments: any[] = [];
 
   try {
     // 🌟 终极防漏绝招：同时扫描两个可能的文件夹，把所有的说说都抓出来！
     const possibleDirs = [
-      path.join(process.cwd(), 'posts', 'moments'),
-      path.join(process.cwd(), 'moments')
+      managerPath('posts', 'moments'),
+      managerPath('moments')
     ];
 
     possibleDirs.forEach(dir => {
@@ -52,8 +61,8 @@ export default function MomentsPage() {
       <PageTransition className="flex-1 flex flex-col">
         <MomentList
           moments={allMoments}
-          authorName={siteConfig.authorName}
-          avatarUrl={siteConfig.avatarUrl}
+          authorName={config.authorName}
+          avatarUrl={config.avatarUrl}
         />
       </PageTransition>
     </div>

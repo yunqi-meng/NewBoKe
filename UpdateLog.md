@@ -1,3 +1,14 @@
+## 0.4.7 - 2026-10-29
+
+- 修复「发布后刷新控制台仍是旧内容」：此前控制台的文章、说说、相册、友链、项目、关于页与站点配置都是构建时打进 bundle 的静态快照，发布只重建公开站，控制台永远显示构建那一刻的内容。现在控制台改为运行时读取工作副本，刷新即最新，公开站与控制台内容始终一致。
+- 内容页面全部改为动态渲染（`export const dynamic = 'force-dynamic'`），逐次请求按 `XHS_MANAGER_ROOT` 指向的工作副本读盘，不再依赖构建产物里的过期副本（standalone 模式下 `process.cwd()` 是 `.next/standalone`，已通过 `my-blog-manager/lib/managerRoot.ts` 统一纠正）。
+- 友链、项目与照片墙三块看板改为运行时向引擎读盘：引擎新增 `GET /api/friends/list`、`GET /api/projects/list`，相册沿用 `GET /api/gallery/list`；控制台不再静态 `import data/*.ts`。
+- 新增 `my-blog-manager/cms_core/tsdata.py`：直接解析控制台生成的 TS 数据文件取回其中的 JSON 数组，并自动去掉 TS 风格的尾随逗号（`},\n];` 这类严格 JSON 无法解析的写法），引擎读回的友链 / 项目不再为空。
+- 站点配置改为运行时合并：新增 `my-blog-manager/lib/siteConfigRuntime.ts`（从引擎读配置并与默认值深合并）、`my-blog-manager/lib/siteConfigMerge.ts` 与 `my-blog-manager/components/SiteConfigProvider.tsx`。改 `siteConfig.ts` 里的昵称、导航标题、头像等无需重建控制台，页面刷新即生效；引擎暂时不可达时自动回落到编译期快照，控制台不会白屏。
+- 引擎端口解析抽到 `my-blog-manager/lib/enginePort.ts`：代理路由与配置读取共用同一套「环境变量 → `public/backend_config.json` → 8000」的顺序，不再两处各写一份。
+- 控制台组件（导航、个人名片、社交链接、仪表盘、关于页、启动页、弹幕背景、视觉背景、说说看板、设置页）统一改用 `useSiteConfig()` 取配置，不再各自静态引用快照。
+- 顺手修掉两处会反复触发的隐患：`ToastProvider` 的 `showToast` 改为 `useCallback` + `useMemo`（此前每次渲染都是新函数，会让依赖它的 `useEffect` 反复重跑），操作队列 `OperationContext` 的操作类型补齐发布、友链、项目同步与说说新增。
+
 ## 0.4.6 - 2026-10-29
 
 - 发布流程合并为单一按钮：控制台改完内容不必再先点「📥 更新本地」，收件箱与「设置 → 发布上线」都只保留一个「🚀 发布上线」。点击后自动依次完成「写回本地改动 → 镜像内容 → 提交源码仓库 → 重新构建公开站 → 重启服务」，博客随之更新，约 1-3 分钟生效。

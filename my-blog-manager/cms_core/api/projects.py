@@ -1,6 +1,9 @@
 import os
 import json
+import time
 from fastapi import APIRouter, Request
+
+from ..tsdata import read_ts_array
 
 router = APIRouter()
 
@@ -47,3 +50,23 @@ async def sync_projects(request: Request):
     except Exception as e:
         print(f"❌ 写入失败: {str(e)}")
         return {"success": False, "message": str(e)}
+
+
+@router.get("/list")
+async def list_projects():
+    """返回磁盘上当前的项目矩阵
+
+    控制台必须实时读盘：data/projects.ts 会被 Next.js 打包进客户端 bundle，
+    直接 import 拿到的是构建那一刻的快照，发布后刷新仍然显示旧项目。
+    """
+    try:
+        projects = read_ts_array(TARGET_FILE, "export const projectsData")
+        modified = os.path.getmtime(TARGET_FILE) if os.path.exists(TARGET_FILE) else 0
+        return {
+            "success": True,
+            "projects": projects,
+            "count": len(projects),
+            "updatedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(modified)) if modified else "",
+        }
+    except Exception as e:
+        return {"success": False, "message": f"读取项目矩阵失败: {str(e)}"}

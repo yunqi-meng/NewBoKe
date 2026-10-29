@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
-import { projectsData as initialProjects, Project } from '../../data/projects';
+import type { Project } from '../../data/projects';
 import { Plus, Pencil, Trash2, AlertTriangle, Save, Edit3, X, Sparkles, Code2 } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
@@ -13,8 +13,29 @@ export default function ProjectsBoard() {
   const { showToast } = useToast();
 
   // 1. 核心状态
-  const [editableProjects, setEditableProjects] = useState<Project[]>(initialProjects);
+  const [editableProjects, setEditableProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // 实时读取磁盘上的项目矩阵：data/projects.ts 原本是构建时打进客户端 bundle 的静态导入，
+  // 拿到的是构建那一刻的快照，发布后刷新仍然显示旧项目。
+  // 现在只认引擎读回的工作副本数据，避免任何过期快照混进界面。
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/proxy/api/projects/list', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(data => {
+        if (cancelled) return;
+        if (data?.success && Array.isArray(data.projects)) {
+          setEditableProjects(data.projects as Project[]);
+        } else {
+          showToast("⚠️ 读取项目数据失败，请确认引擎服务在线", "warning");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) showToast("⚠️ 无法连接内容引擎，项目数据暂时无法读取", "warning");
+      });
+    return () => { cancelled = true; };
+  }, [showToast]);
 
   // 2. 弹窗状态
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; name: string | null }>({ isOpen: false, id: null, name: null });

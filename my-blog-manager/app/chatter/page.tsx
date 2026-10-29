@@ -4,14 +4,18 @@ import matter from 'gray-matter';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import ChatterBoard from './ChatterBoard';
+import { managerPath } from '../../lib/managerRoot';
 
 export const metadata = {
   title: "杂谈 | XingHuiSama の 博客",
   description: "日常碎片与灵感记录",
 };
 
+// 杂谈列表要实时读工作副本：静态预渲染会把列表固化进构建产物。
+export const dynamic = 'force-dynamic';
+
 export default function ChatterPage() {
-  const chattersDirectory = path.join(process.cwd(), 'chatters');
+  const chattersDirectory = managerPath('chatters');
   let chatters: any[] = [];
 
   try {

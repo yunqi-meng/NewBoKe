@@ -6,18 +6,23 @@ import Link from 'next/link';
 import Navbar from '../components/Navbar';
 import PageTransition from '../components/PageTransition';
 import SearchBar from '../components/SearchBar';
-import { siteConfig } from '../siteConfig';
+import { getLiveSiteConfig } from '../lib/siteConfigRuntime';
 import CloudPlayer from '../components/CloudPlayer';
 import ThemeToggleBlock from '../components/ThemeToggleBlock';
 import ProfileCard from '../components/ProfileCard';
 import SiteDashboard from '../components/SiteDashboard';
-import { albums } from '../data/albums';
+import { readAlbumsFromDisk } from '../lib/albumsReader';
+import { managerPath } from '../lib/managerRoot';
 import LyricBar from '../components/LyricBar';
 import { ToastProvider } from '../components/ToastProvider';
 
 import LatestPostsCarousel from '../components/LatestPostsCarousel';
 import LatestChatterCarousel from '../components/LatestChatterCarousel';
 import DanmakuBackground from '../components/DanmakuBackground';
+
+// 控制台首页要显示的是「工作副本」里的最新内容：
+// 静态预渲染会把内容固化进构建产物，发布后不重建控制台就会一直显示旧文章。
+export const dynamic = 'force-dynamic';
 
 function formatUpdateTime(dateString: string) {
   if (!dateString || dateString === '1970-01-01') return '刚刚更新';
@@ -34,8 +39,9 @@ function formatUpdateTime(dateString: string) {
   } catch { return dateString; }
 }
 
-export default function Home() {
-  const postsDirectory = path.join(process.cwd(), 'posts');
+export default async function Home() {
+  const config = await getLiveSiteConfig();
+  const postsDirectory = managerPath('posts');
   let allPosts: any[] = [];
   try {
     if (fs.existsSync(postsDirectory)) {
@@ -61,9 +67,9 @@ export default function Home() {
       });
     }
   } catch (e) {}
-  const top5Posts = allPosts.length > 0 ? allPosts.slice(0, 5) : [{ slug: 'none', title: '暂无文章', description: '快去写第一篇吧！', cover: siteConfig.defaultPostCover, date: '', formattedDate: '' }];
+  const top5Posts = allPosts.length > 0 ? allPosts.slice(0, 5) : [{ slug: 'none', title: '暂无文章', description: '快去写第一篇吧！', cover: config.defaultPostCover, date: '', formattedDate: '' }];
 
-  const chattersDirectory = path.join(process.cwd(), 'chatters');
+  const chattersDirectory = managerPath('chatters');
   let allChatters: any[] = [];
   try {
     if (fs.existsSync(chattersDirectory)) {
@@ -85,8 +91,9 @@ export default function Home() {
   const top5Chatters = allChatters.length > 0 ? allChatters.slice(0, 5) : [{ slug: 'none', title: '暂无记录', description: '记录一段思绪...', cover: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop', date: '', formattedDate: '' }];
 
   const chatterCount = allChatters.length;
+  const albums = readAlbumsFromDisk();
   const realPhotoCount = albums.reduce((total, album) => total + album.photos.length, 0);
-  const latestAlbum = albums.length > 0 ? albums[0] : { id: '', title: '照片墙', description: '查看摄影', cover: siteConfig.photoWallImage, date: '' };
+  const latestAlbum = albums.length > 0 ? albums[0] : { id: '', title: '照片墙', description: '查看摄影', cover: config.photoWallImage, date: '' };
 
   return (
     <ToastProvider>

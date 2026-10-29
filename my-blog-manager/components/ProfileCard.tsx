@@ -1,10 +1,13 @@
 "use client";
 
 import { useRouter } from 'next/navigation';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 import { useToast } from './ToastProvider'; // 👈 引入我们写好的绝美提示钩子
 
 export default function ProfileCard({ postCount, chatterCount, photoCount }: { postCount: number, chatterCount: number, photoCount: number }) {
+  // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
+  const siteConfig = useSiteConfig();
+
   const router = useRouter();
   const { showToast } = useToast(); // 👈 激活魔法
 

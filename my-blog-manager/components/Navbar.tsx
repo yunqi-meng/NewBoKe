@@ -8,9 +8,12 @@ import { useOperations } from '../context/OperationContext';
 import { useToast } from './ToastProvider';
 import { flushPendingOperations } from '../lib/pendingOperations';
 import { AlertTriangle, LogOut } from 'lucide-react';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 
 export default function Navbar({ previewOnly = false, compact = false }: { previewOnly?: boolean; compact?: boolean }) {
+  // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
+  const siteConfig = useSiteConfig();
+
   const [showNav, setShowNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isOpBoxOpen, setIsOpBoxOpen] = useState(false);

@@ -6,7 +6,8 @@ import { ThemeProvider } from "../components/ThemeProvider";
 import BackgroundEffects from "../components/BackgroundEffects";
 import { MusicProvider } from "../components/MusicProvider";
 import FloatingPlayer from "../components/FloatingPlayer";
-import { siteConfig } from "../siteConfig";
+import { getLiveSiteConfig } from "../lib/siteConfigRuntime";
+import { SiteConfigProvider } from "../components/SiteConfigProvider";
 import ClickEffect from "../components/ClickEffect";
 import BackgroundSlider from "../components/BackgroundSlider";
 import GlobalToolbox from "../components/GlobalToolbox";
@@ -24,13 +25,22 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 const notoSerif = Noto_Serif_SC({ subsets: ["latin"], weight: ["400", "700", "900"], variable: "--font-serif", display: 'swap' });
 
-export const metadata: Metadata = {
-  title: siteConfig.title,
-  description: siteConfig.bio,
-  icons: { icon: siteConfig.faviconUrl, apple: siteConfig.faviconUrl },
-};
+export const dynamic = 'force-dynamic';
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await getLiveSiteConfig();
+  return {
+    title: config.title,
+    description: config.bio,
+    icons: { icon: config.faviconUrl, apple: config.faviconUrl },
+  };
+}
+
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  // 配置必须实时读：编译进产物的 siteConfig 只是快照，
+  // 发布后不重建控制台的话，昵称/头像/壁纸都会停在旧值。
+  const config = await getLiveSiteConfig();
+
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
@@ -59,6 +69,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
 
       <body className="w-screen overflow-x-hidden min-h-full flex flex-col relative transition-colors duration-1000 bg-slate-50 dark:bg-slate-950 font-serif">
+        <SiteConfigProvider initialConfig={config}>
         <ThemeProvider>
           <OperationProvider>
             <ToastProvider>
@@ -66,12 +77,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <MusicProvider>
                 <div id="app-mount-root" className="flex-1 flex flex-col transition-opacity duration-1000">
                   <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
-                    {!siteConfig.useGradient && <BackgroundSlider />}
+                    {!config.useGradient && <BackgroundSlider />}
                     <div className="absolute inset-0 z-[-9] bg-white/30 dark:bg-slate-900/40 backdrop-blur-md transition-colors duration-1000"></div>
                     <div
                       className="absolute inset-0 z-[-8] opacity-60 dark:opacity-20 mix-blend-color transition-opacity duration-1000 transform-gpu"
                       style={{
-                        background: `linear-gradient(-45deg, ${siteConfig.themeColors.join(', ')})`,
+                        background: `linear-gradient(-45deg, ${config.themeColors.join(', ')})`,
                         backgroundSize: '400% 400%',
                         animation: 'gradientMove 15s ease infinite'
                       }}
@@ -119,6 +130,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </OperationProvider>
         </ThemeProvider>
         <CyberCat />
+        </SiteConfigProvider>
       </body>
     </html>
   );

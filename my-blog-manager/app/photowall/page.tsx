@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import { albums as initialAlbums, Album, Photo } from '../../data/albums';
+import type { Album, Photo } from '../../data/albums';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, Save, AlertTriangle, Sparkles, Edit3, CloudUpload } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
@@ -28,7 +28,7 @@ export default function PhotoWallPage() {
 
   const { addOperation } = useOperations();
   const { showToast } = useToast();
-  const [editableAlbums, setEditableAlbums] = useState<Album[]>(initialAlbums);
+  const [editableAlbums, setEditableAlbums] = useState<Album[]>([]);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; type: 'album' | 'photo'; id?: string; photoIndex?: number; title: string }>({ isOpen: false, type: 'album', title: '' });
@@ -42,20 +42,22 @@ export default function PhotoWallPage() {
   //
   // data/albums.ts 会被 Next.js 打包进客户端 bundle，如果在这里直接 import，
   // 页面拿到的永远是「构建那一刻」的快照：删掉的照片点完「发布上线」刷新后又会复活。
-  // 所以相册列表必须实时向内容引擎读盘。
+  // 所以相册列表必须实时向内容引擎读盘，界面里不允许出现任何过期快照。
   const loadAlbums = useCallback(async () => {
     try {
       const response = await fetch('/api/proxy/api/gallery/list', { cache: 'no-store' });
       const data = await response.json();
       if (data?.success && Array.isArray(data.albums)) {
         setEditableAlbums(data.albums);
+      } else {
+        showToast("⚠️ 读取相册失败，请确认引擎服务在线", "warning");
       }
     } catch {
-      // 引擎没连上时保留构建期快照，页面依然可读（只是不能实时同步）
+      showToast("⚠️ 无法连接内容引擎，相册暂时无法读取", "warning");
     } finally {
       setIsLoadingAlbums(false);
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     loadAlbums();

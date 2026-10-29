@@ -1,6 +1,9 @@
 import os
 import json
+import time
 from fastapi import APIRouter, Request
+
+from ..tsdata import read_ts_array
 
 router = APIRouter()
 
@@ -34,3 +37,23 @@ async def sync_friends(request: Request):
         return {"success": True, "message": f"✨ 友链物理文件已更新！共同步 {len(friends_list)} 位好友。"}
     except Exception as e:
         return {"success": False, "message": f"后端同步崩溃: {str(e)}"}
+
+
+@router.get("/list")
+async def list_friends():
+    """返回磁盘上当前的友链数据
+
+    控制台必须实时读盘：data/friends.ts 会被 Next.js 打包进客户端 bundle，
+    直接 import 拿到的是构建那一刻的快照，发布后刷新仍然显示旧友链。
+    """
+    try:
+        friends = read_ts_array(FRIENDS_TS_PATH, "export const friendsData")
+        modified = os.path.getmtime(FRIENDS_TS_PATH) if os.path.exists(FRIENDS_TS_PATH) else 0
+        return {
+            "success": True,
+            "friends": friends,
+            "count": len(friends),
+            "updatedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(modified)) if modified else "",
+        }
+    except Exception as e:
+        return {"success": False, "message": f"读取友链失败: {str(e)}"}

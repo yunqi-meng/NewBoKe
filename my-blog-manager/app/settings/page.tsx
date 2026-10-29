@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import DailyQuoteSection from '../../components/settings/DailyQuoteSection';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOperations } from '../../context/OperationContext';
-import { siteConfig } from '../../siteConfig';
+import { useSiteConfig } from '../../components/SiteConfigProvider';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import { ToastProvider, useToast } from '../../components/ToastProvider';
@@ -21,6 +21,8 @@ import AICatSection from '../../components/settings/AICatSection';
 
 function SettingsContent() {
   const { operations, addOperation } = useOperations();
+  // 配置实时取自引擎：设置页填的永远是磁盘上的最新值
+  const siteConfig = useSiteConfig();
   const [activeTab, setActiveTab] = useState('profile');
   const [quoteVisited, setQuoteVisited] = useState(false);
   const [backendMode, setBackendMode] = useState<'checking' | 'preview' | 'live' | 'offline'>('checking');

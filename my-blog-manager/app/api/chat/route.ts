@@ -1,5 +1,5 @@
 // app/api/chat/route.ts
-import { siteConfig } from '../../../siteConfig';
+import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
 
 /**
  * AI 煤球的对话接口。
@@ -31,14 +31,16 @@ function readApiKey(): string {
 }
 
 /** 接口地址，末尾斜杠去掉，避免拼出双斜杠 */
-function readBaseUrl(): string {
-  const raw = process.env.AI_BASE_URL || siteConfig.aiConfig.baseUrl || 'https://api.deepseek.com';
+function readBaseUrl(configuredBaseUrl?: string): string {
+  const raw = process.env.AI_BASE_URL || configuredBaseUrl || 'https://api.deepseek.com';
   return raw.trim().replace(/\/+$/, '');
 }
 
 export async function POST(req: Request) {
   try {
     const { message } = await req.json();
+    // 配置实时读磁盘：控制台里改了模型/人设，发布后立刻生效，不必重建控制台
+    const siteConfig = await getLiveSiteConfig();
     const cfg = siteConfig.aiConfig;
 
     const apiKey = readApiKey();
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Key missing' }, { status: 500 });
     }
 
-    const baseUrl = readBaseUrl();
+    const baseUrl = readBaseUrl(cfg.baseUrl);
     const modelId = (cfg.modelId || 'deepseek-flash').trim();
     const payload = {
       model: modelId,
@@ -122,9 +124,10 @@ export async function POST(req: Request) {
 }
 
 export async function GET() {
+  const siteConfig = await getLiveSiteConfig();
   return Response.json({
     status: 'Ready',
     model: siteConfig.aiConfig.modelId,
-    provider: readBaseUrl(),
+    provider: readBaseUrl(siteConfig.aiConfig.baseUrl),
   });
 }

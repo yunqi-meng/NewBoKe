@@ -3,20 +3,35 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // 定义操作的类型
-export type OperationType = 'POST' | 'CHATTER' | 'CONFIG' | 'GALLERY' | 'FRIEND';
+export type OperationType =
+  | 'POST'
+  | 'CHATTER'
+  | 'CONFIG'
+  | 'GALLERY'
+  | 'FRIEND'
+  // 下面这几种是「点一次发布上线」之后由引擎负责写回磁盘的同步类操作
+  | 'publish_article'
+  | 'sync_photowall'
+  | 'sync_friends'
+  | 'sync_projects'
+  | 'create_moment';
 
 export interface Operation {
   id: string;
   type: OperationType;
   label: string;      // 显示在列表里的简短描述，如 "修改文章：GNN研究"
-  description: string; // 详细描述
+  description?: string; // 详细描述
   timestamp: string;
-  payload: any;       // 实际要修改的数据内容
+  payload?: any;      // 旧写法：实际要修改的数据内容
+  value?: any;        // 新写法：实际要修改的数据内容
 }
+
+// 调用方可以自带 id（方便排查），也可以只给 type/label/数据
+export type OperationInput = Omit<Operation, 'id' | 'timestamp'> & { id?: string; timestamp?: string; key?: string };
 
 interface OperationContextType {
   operations: Operation[];
-  addOperation: (op: Omit<Operation, 'id' | 'timestamp'>) => void;
+  addOperation: (op: OperationInput) => void;
   removeOperation: (id: string) => void;
   clearOperations: () => void;
 }
@@ -27,10 +42,10 @@ export function OperationProvider({ children }: { children: React.ReactNode }) {
   const [operations, setOperations] = useState<Operation[]>([]);
 
   // 添加操作（如果同类型的操作已存在，则覆盖，防止重复积攒）
-  const addOperation = (op: Omit<Operation, 'id' | 'timestamp'>) => {
+  const addOperation = (op: OperationInput) => {
     const newOp: Operation = {
       ...op,
-      id: Math.random().toString(36).substr(2, 9),
+      id: op.id ?? Math.random().toString(36).substr(2, 9),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 

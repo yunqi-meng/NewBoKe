@@ -3,11 +3,16 @@ import path from 'path';
 import matter from 'gray-matter';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import { siteConfig } from '../../siteConfig';
+import { getLiveSiteConfig } from '../../lib/siteConfigRuntime';
 import TimelineClient from '../../components/TimelineClient';
+import { managerPath } from '../../lib/managerRoot';
 
-export default function Timeline() {
-  const postsDirectory = path.join(process.cwd(), 'posts');
+// 时间轴要实时读工作副本：静态预渲染会把文章列表固化进构建产物。
+export const dynamic = 'force-dynamic';
+
+export default async function Timeline() {
+  const config = await getLiveSiteConfig();
+  const postsDirectory = managerPath('posts');
   let posts: any[] = [];
   let tagCounts: Record<string, number> = {};
 
@@ -35,7 +40,7 @@ export default function Timeline() {
           date: data.date || '1970-01-01',
           description: data.description || '',
           tags: postTags,
-          cover: data.cover || siteConfig.defaultPostCover,
+          cover: data.cover || config.defaultPostCover,
           // 删除了坑人的 mtime
         });
       });
