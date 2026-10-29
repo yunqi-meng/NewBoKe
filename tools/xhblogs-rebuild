@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# 公开站（XHBlogs）重建助手
+#
+# 公开站是 next start 运行预构建产物，页面与组件的改动
+# 必须重新 build + 重启服务才会生效。
+#
+# 内容（文章、说说、相册……）现在存在统一后端的数据库里，
+# 运行时读盘，**不需要**重新构建：只有代码变了才用得上这个脚本。
+#
+# 该脚本由发布助手 sudo 免密调用（见 /etc/sudoers.d/xhblogs-rebuild）。
+set -euo pipefail
+
+REPO="${XHBlogs_REPO:-/opt/xinghui-blog}"
+
+runuser -u xhblogs -- env HOME=/home/xhblogs PATH=/usr/bin:/bin NODE_OPTIONS=--max-old-space-size=1536 NEXT_TELEMETRY_DISABLED=1 \
+  bash -c "cd $REPO/XHBlogs && npm run build"
+
+systemctl restart xhblogs
+echo "XHBlogs rebuilt and restarted."

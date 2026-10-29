@@ -4,18 +4,33 @@
 # Next.js standalone 产物默认不包含 public/ 与 .next/static，
 # 必须手动拷进 .next/standalone 里，否则 /backend_config.json、
 # 封面占位图这些静态资源在服务器上会 404。
+#
+# 用法：
+#   xhblogs-manager-rebuild            重建控制台并重启控制台 + 统一后端
+#   xhblogs-manager-rebuild --skip-api 只重启控制台前端，不动统一后端
+#
+# 发布助手会带上 --skip-api：它自己就是统一后端 spawn 出来的，
+# 两者在同一条进程链上，后端的重启统一由发布助手排期，避免自己把自己重启掉。
 set -euo pipefail
 
+REPO="${XHBlogs_REPO:-/opt/xinghui-blog}"
+SKIP_API=0
+for arg in "$@"; do
+  case "$arg" in
+    --skip-api) SKIP_API=1 ;;
+  esac
+done
+
 runuser -u xhblogs -- env HOME=/home/xhblogs PATH=/usr/bin:/bin NODE_OPTIONS=--max-old-space-size=1536 NEXT_TELEMETRY_DISABLED=1 \
-  bash -c 'cd /opt/xinghui-blog/my-blog-manager && npm run build \
+  bash -c "cd $REPO/my-blog-manager && npm run build \
     && mkdir -p .next/standalone/.next/static .next/standalone/public \
     && cp -a .next/static/. .next/standalone/.next/static/ \
     && if [ -d public ]; then cp -a public/. .next/standalone/public/; fi \
-    && printf "%s\n" "{\"api_port\": 8000}" > .next/standalone/public/backend_config.json'
+    && printf '%s\n' '{\"api_port\": 8000}' > .next/standalone/public/backend_config.json"
 
 # 产物自检：standalone 少文件时 Next.js 会在运行期才报 ENOENT（500 页都渲染不出来），
 # 与其等到用户点页面才发现，不如在重启服务前直接失败。
-STANDALONE=/opt/xinghui-blog/my-blog-manager/.next/standalone
+STANDALONE="$REPO/my-blog-manager/.next/standalone"
 for required in \
   "$STANDALONE/server.js" \
   "$STANDALONE/.next/routes-manifest.json" \
@@ -30,5 +45,9 @@ do
   fi
 done
 
-systemctl restart xhblogs-manager-api xhblogs-manager-web
+if [ "$SKIP_API" = "1" ]; then
+  systemctl restart xhblogs-manager-web
+else
+  systemctl restart xhblogs-manager-api xhblogs-manager-web
+fi
 echo "Manager rebuilt and restarted."

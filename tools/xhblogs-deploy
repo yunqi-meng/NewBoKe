@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# 服务器手动更新：从裸仓库拉最新代码，按改动范围决定重建什么
+#
+# 与「发布上线」的区别：
+#   发布上线 —— 只提交内容快照，内容改动不需要重建；
+#   本脚本   —— 拉的是**代码**，所以要按改动范围重建前端 / 重启后端。
+#
+# 改动范围怎么判断：
+#   XHBlogs/*            → 重建公开站（next build + 重启 xhblogs）
+#   my-blog-manager/*    → 重建控制台（standalone 产物 + 重启两个服务）
+#   server/app/*         → 只需重启统一后端（xhblogs-manager-api）
+#   server/requirements.txt → 装依赖 + 重启统一后端
+#
+# 用法：sudo /usr/local/bin/xhblogs-deploy
+set -euo pipefail
+
+REPO="${1:-/opt/xinghui-blog}"
+
+as_app_user() {
+  runuser -u xhblogs -- bash -c "$*"
+}
+
+dirty=$(as_app_user "git -C '$REPO' status --porcelain --untracked-files=no" || true)
+if [ -n "$dirty" ]; then
+  echo "拒绝更新：服务器工作区有未提交的修改。" >&2
+  as_app_user "git -C '$REPO' status --short" >&2
+  echo "请先提交、暂存或还原这些修改，再运行 xhblogs-deploy。" >&2
+  exit 1
+fi
+
+before=$(as_app_user "git -C '$REPO' rev-parse HEAD")
+as_app_user "git -C '$REPO' pull --ff-only"
+after=$(as_app_user "git -C '$REPO' rev-parse HEAD")
+if [ "$before" = "$after" ]; then
+  echo "代码已是最新，无需更新。"
+  exit 0
+fi
+
+changed=$(as_app_user "git -C '$REPO' diff --name-only '$before' '$after'" || true)
+
+need_site=0
+need_console=0
+need_backend=0
+while IFS= read -r path; do
+  [ -z "$path" ] && continue
+  case "$path" in
+    snapshots/*) continue ;;
+    XHBlogs/*) need_site=1 ;;
+    my-blog-manager/*) need_console=1 ;;
+    server/app/*|server/requirements.txt) need_backend=1 ;;
+  esac
+done <<< "$changed"
+
+# 依赖变了要先装
+if printf '%s\n' "$changed" | grep -qE '(^|/)package(-lock)?\.json$'; then
+  if [ "$need_site" = "1" ]; then
+    as_app_user "cd '$REPO/XHBlogs' && npm ci --no-audit --no-fund"
+  fi
+  if [ "$need_console" = "1" ]; then
+    as_app_user "cd '$REPO/my-blog-manager' && npm ci --no-audit --no-fund"
+  fi
+fi
+
+if printf '%s\n' "$changed" | grep -q '^server/requirements.txt$'; then
+  echo "安装统一后端依赖…"
+  as_app_user "cd '$REPO/server' && python3.11 -m venv .venv && .venv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com -r requirements.txt"
+  need_backend=1
+fi
+
+if [ "$need_site" = "1" ]; then
+  echo "重建公开站…"
+  /usr/local/bin/xhblogs-rebuild
+fi
+
+if [ "$need_console" = "1" ]; then
+  echo "重建管理后台…"
+  /usr/local/bin/xhblogs-manager-rebuild
+fi
+
+if [ "$need_backend" = "1" ]; then
+  echo "重启统一后端…"
+  systemctl restart xhblogs-manager-api
+fi
+
+echo "更新完成：$before -> $after"

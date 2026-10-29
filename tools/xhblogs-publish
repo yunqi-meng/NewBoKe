@@ -267,7 +267,9 @@ if [ "$CONSOLE_CODE_CHANGED" = "1" ]; then
   if [ -x "$MANAGER_REBUILD" ]; then
     write_status running "正在重新构建管理后台" "$START_TS"
     log "开始重建管理后台"
-    if ! "$MANAGER_REBUILD" >> "$LOG" 2>&1; then
+    # --skip-api：统一后端的重启由本助手统一排期（见下面），
+    # 控制台重建不要顺手把后端也重启了，免得把本助手自己带走。
+    if ! "$MANAGER_REBUILD" --skip-api >> "$LOG" 2>&1; then
       log "管理后台重建失败"
       write_status failed "管理后台构建失败，请查看 $LOG" "$START_TS"
       exit 1
@@ -281,12 +283,21 @@ fi
 if [ "$BACKEND_CODE_CHANGED" = "1" ]; then
   write_status running "正在重启统一后端" "$START_TS"
   log "开始重启统一后端"
-  if ! $BACKEND_RESTART >> "$LOG" 2>&1; then
-    log "统一后端重启失败"
-    write_status failed "统一后端重启失败，请查看 $LOG" "$START_TS"
-    exit 1
+  # 🌟 用 systemd-run 另起一个瞬态单元来执行重启：
+  #    本助手是统一后端 spawn 出来的，和后端在同一条进程链上。
+  #    直接 systemctl restart 有可能把助手自己一起停掉，
+  #    状态文件就会永远停在「进行中」。交给 systemd 单独跑就没事了。
+  if command -v systemd-run >/dev/null 2>&1; then
+    if systemd-run --unit=xhblogs-manager-api-restart --on-active=3s --collect \
+         /bin/systemctl restart xhblogs-manager-api.service >> "$LOG" 2>&1; then
+      log "统一后端重启已排期（3 秒后执行）"
+    else
+      log "统一后端重启排期失败，改为直接重启"
+      $BACKEND_RESTART >> "$LOG" 2>&1 || true
+    fi
+  else
+    $BACKEND_RESTART >> "$LOG" 2>&1 || true
   fi
-  log "统一后端已重启"
 fi
 
 BUILD_ID=""
