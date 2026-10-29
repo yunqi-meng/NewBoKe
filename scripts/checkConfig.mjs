@@ -33,34 +33,24 @@ const commonConfigs = [
 ];
 
 // =================================================================
-// 🌟 第二部分：后台特有配置 (Manager Specific Configs)
-// =================================================================
-const managerSpecificConfigs = [
-  { key: 'picBedName', snippet: `\n  // 👇 【新增】：图床核心配置 (PicBed Configuration)\n  picBedName: "图床",` },
-  { key: 'picBedUrl', snippet: `\n  picBedUrl: "", // 默认的 Lsky Pro API 地址` },
-  { key: 'picBedToken', snippet: `\n  picBedToken: "", // 留空，等你能在后台填入并覆写` }
-];
-
-// =================================================================
-// 🌟 第三部分：组装扫描任务
+// 🌟 第二部分：组装扫描任务
 // =================================================================
 const tasks = [
   {
     name: '[后台]',
     filePath: path.resolve('./my-blog-manager/siteConfig.ts'),
-    // 后台需要：共用配置 + 专属图床配置
-    configs: [...commonConfigs, ...managerSpecificConfigs] 
+    configs: [...commonConfigs]
   },
   {
     name: '[前端]',
     filePath: path.resolve('./XHBlogs/siteConfig.ts'),
     // 前端需要：仅仅是共用配置
-    configs: [...commonConfigs] 
+    configs: [...commonConfigs]
   }
 ];
 
 // =================================================================
-// 🌟 第四部分：执行差异化扫描与修补
+// 🌟 第三部分：执行差异化扫描与修补
 // =================================================================
 tasks.forEach(task => {
   if (!fs.existsSync(task.filePath)) {
