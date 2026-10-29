@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../ToastProvider';
+import { uploadLocalImage } from '../../lib/media';
 
 // 🌟 壁纸分组的类型定义
 interface BgGroup {
@@ -100,45 +101,26 @@ export default function BackgroundSection({ formData, handleUpdate, pushToQueue 
     showToast("✅ 成功添加壁纸！", "success");
   };
 
-  // 【核心功能】：真实的图床上传逻辑
+  // 【核心功能】：从本机直接上传壁纸
   const handleFileUpload = async (file: File) => {
-    const picUrl = formData.picBedUrl || "https://pic.dusays.com";
-    const picToken = formData.picBedToken;
-
-    if (!picToken) {
-      showToast("⛔ 无法上传！请先在【图库配置管理】中填写图床 Token", "error");
-      return;
-    }
     if (!file.type.startsWith('image/')) {
       showToast("只能上传图片文件哦！", "warning");
       return;
     }
 
     setIsUploading(true);
-    showToast("正在将图片传送至图床引擎...", "info");
+    showToast("正在从本机上传图片...", "info");
 
     try {
-      // 构建 multipart/form-data
-      const uploadData = new FormData();
-      uploadData.append('file', file);
-      uploadData.append('url', picUrl);
-      uploadData.append('token', picToken);
+      const result = await uploadLocalImage(file);
 
-      const res = await fetch(`/api/proxy/api/picbed/upload`, {
-        method: 'POST',
-        body: uploadData,
-      });
-
-      const data = await res.json();
-      if (data.success && data.url) {
+      if (result.success && result.url) {
         showToast("🎉 图片上传成功！请确认是否加入分组", "success");
-        // 👈 上传成功，拿到真实 URL，触发确认面板
-        setPendingImageUrl(data.url);
+        // 👈 上传成功，拿到站内地址，触发确认面板
+        setPendingImageUrl(result.url);
       } else {
-        showToast(`上传失败: ${data.message}`, "error");
+        showToast(`上传失败: ${result.message || '未知错误'}`, "error");
       }
-    } catch (error) {
-      showToast("无法连接到 Python 引擎上传通道", "error");
     } finally {
       setIsUploading(false);
     }
@@ -154,8 +136,8 @@ export default function BackgroundSection({ formData, handleUpdate, pushToQueue 
   };
 
   const cancelPendingImage = () => {
+    showToast("已取消操作，图片仍保留在控制台的本机图片仓库里", "info");
     setPendingImageUrl(null);
-    showToast("已取消操作，但图片已保存在图床中", "info");
   };
 
   const onDragOver = (e: any) => { e.preventDefault(); setIsDragging(true); };
@@ -308,12 +290,12 @@ export default function BackgroundSection({ formData, handleUpdate, pushToQueue 
             <input type="file" ref={fileInputRef} onChange={e => e.target.files && handleFileUpload(e.target.files[0])} className="hidden" accept="image/*" />
 
             <div className={`w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-xl transition-all duration-300 ${isDragging ? 'bg-indigo-500 text-white rotate-12' : 'bg-white dark:bg-slate-800 text-slate-500'}`}>
-              {isUploading ? "⏳" : "☁️"}
+              {isUploading ? "⏳" : "📁"}
             </div>
 
             <div className="text-center z-10">
               <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                {isUploading ? "正在上传至图床..." : "点击或将图片拖拽至此"}
+                {isUploading ? "正在从本机上传..." : "点击或将图片拖拽至此"}
               </p>
             </div>
 
@@ -336,7 +318,7 @@ export default function BackgroundSection({ formData, handleUpdate, pushToQueue 
             className="absolute inset-0 z-50 bg-slate-900/40 backdrop-blur-md rounded-[40px] flex items-center justify-center p-6"
           >
             <div className="bg-white dark:bg-slate-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/20">
-              <h3 className="text-lg font-black text-slate-800 dark:text-white mb-4 text-center">✅ 图床返回成功！</h3>
+              <h3 className="text-lg font-black text-slate-800 dark:text-white mb-4 text-center">✅ 上传成功！</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 text-center">是否将此图片加入分组「{editingGroup?.name || '当前'}」？</p>
 
               <div className="w-full aspect-video rounded-xl overflow-hidden mb-6 shadow-inner border border-slate-200 dark:border-slate-700">

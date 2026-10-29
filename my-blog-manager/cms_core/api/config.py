@@ -12,17 +12,6 @@ router = APIRouter()
 CURRENT_API_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_API_DIR, "..", ".."))
 
-# ---------------------------------------------------------
-# 🔐 图床凭证独立存放（不进 Git）
-#
-# siteConfig.ts 是被 Git 跟踪的文件，一旦在里面保存图床 Token，
-# 提交源码时就会连同凭证一起推到远端仓库（公开仓库等于直接泄露）。
-# 所以图床的三个字段单独写进 data/picbed.json（已 gitignore），
-# siteConfig.ts 里只保留空占位，读取时再合并回给前端。
-# ---------------------------------------------------------
-PICBED_CREDENTIAL_FILE = os.path.join(PROJECT_ROOT, 'data', 'picbed.json')
-PICBED_KEYS = ('picBedName', 'picBedUrl', 'picBedToken')
-
 
 def get_config_path():
     possible_paths = [
@@ -40,53 +29,8 @@ def get_config_path():
 
 
 # ---------------------------------------------------------
-# 🔐 图床凭证读写
+# 🖼️ 配置文件读写工具
 # ---------------------------------------------------------
-def _parse_picbed_from_site_config(config_path):
-    """从 siteConfig.ts 里解析图床字段（兼容升级前的存量配置）"""
-    values = {key: '' for key in PICBED_KEYS}
-    try:
-        with open(config_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except Exception:
-        return values
-
-    for key in PICBED_KEYS:
-        match = re.search(rf'{key}\s*:\s*(["\'])([\s\S]*?)\1', content)
-        if match:
-            values[key] = match.group(2)
-    return values
-
-
-def read_picbed_credentials():
-    """读取图床凭证：优先用独立文件，其次回落到 siteConfig.ts 里的旧值"""
-    try:
-        with open(PICBED_CREDENTIAL_FILE, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        return {key: str(data.get(key, '')) for key in PICBED_KEYS}
-    except Exception:
-        config_path = get_config_path()
-        if not config_path:
-            return {key: '' for key in PICBED_KEYS}
-        return _parse_picbed_from_site_config(config_path)
-
-
-def write_picbed_credentials(values):
-    """把图床凭证写入独立文件（原子替换，避免写一半损坏）"""
-    os.makedirs(os.path.dirname(PICBED_CREDENTIAL_FILE), exist_ok=True)
-
-    current = read_picbed_credentials()
-    for key, value in values.items():
-        if key in PICBED_KEYS:
-            current[key] = '' if value is None else str(value)
-
-    tmp_path = PICBED_CREDENTIAL_FILE + '.tmp'
-    with open(tmp_path, 'w', encoding='utf-8') as f:
-        json.dump(current, f, ensure_ascii=False, indent=2)
-    os.replace(tmp_path, PICBED_CREDENTIAL_FILE)
-    return current
-
-
 def dict_to_ts_string(data, indent=2):
     """安全地将字典转为 TypeScript 格式，自动处理多行字符串转义"""
     if isinstance(data, dict):
@@ -246,9 +190,6 @@ def get_site_config():
             elif raw_val.isdigit():
                 parsed_config[key] = int(raw_val)
 
-        # 🔐 图床凭证来自独立文件（siteConfig.ts 里是空占位），合并后交给前端
-        parsed_config.update(read_picbed_credentials())
-
         return {"success": True, "data": parsed_config}
     except Exception as e:
         return {"success": False, "message": f"解析失败: {str(e)}"}
@@ -271,8 +212,8 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
     VALID_ROOT_KEYS = {
         "title", "authorName", "bio", "avatarUrl", "useGradient", "themeColors",
         "bgImages", "defaultPostCover", "photoWallImage", "social",
-        "counts", "chatterTitle", "chatterDescription", "picBedName", "picBedUrl",
-        "picBedToken", "danmakuList", "buildDate", "footerBadges",
+        "counts", "chatterTitle", "chatterDescription",
+        "danmakuList", "buildDate", "footerBadges",
         "icpConfig", "aiConfig", "geminiConfig",
         "faviconUrl",
         "navTitle",
@@ -290,7 +231,6 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
         print("\n" + "=" * 50)
         print(f"🔥 启动物理引擎，目标文件: {config_path}")
         updated_count = 0
-        picbed_updates = {}
 
         for key, value in updates.items():
 
@@ -298,12 +238,6 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
             if key not in VALID_ROOT_KEYS:
                 print(f"  🛑 拦截非根节点危险字段 -> [{key}]")
                 continue
-
-            # 🔐 图床字段走独立通道：真实值只落 data/picbed.json，
-            #    siteConfig.ts 里始终留空占位，避免凭证随源码提交泄露
-            if key in PICBED_KEYS:
-                picbed_updates[key] = value
-                value = ""
 
             # 专属通道 1：壁纸分组（数组内嵌 images 数组，非贪婪正则会截断，必须括号平衡替换）
             if key == "bgGroups":
@@ -346,11 +280,6 @@ def update_site_config(payload: Dict[str, Any] = Body(...)):
             elif key == 'activeBgGroup':
                 content = insert_config_field(content, key, val_str)
                 updated_count += 1
-
-        # 🔐 写入图床凭证独立文件（siteConfig.ts 里只留空占位）
-        if picbed_updates:
-            write_picbed_credentials(picbed_updates)
-            print(f"  🔐 图床凭证已安全写入 {os.path.basename(PICBED_CREDENTIAL_FILE)}")
 
         # 写入物理磁盘
         with open(config_path, 'w', encoding='utf-8') as f:

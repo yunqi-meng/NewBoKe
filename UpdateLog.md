@@ -1,3 +1,11 @@
+## 0.4.4 - 2026-10-29
+
+- 下线图床（第三方图片托管）整套功能：删除「设置 → 图库配置管理」面板、`components/settings/GallerySection.tsx`、引擎 `cms_core/api/picbed.py`，并清理 `config.py` 里的图床凭证独立通道、`sync.py` 里的敏感行过滤、`siteConfig.ts` 的 `picBedName/picBedUrl/picBedToken` 字段与 `scripts/checkConfig.mjs` 的图床配置模板。
+- 新增本地图片仓库：引擎 `cms_core/api/media.py` 提供 `POST /api/media/upload`（本机图片直传落盘到 `my-blog-manager/data/uploads/`）与 `GET /api/media/file/{name}`；控制台新增 `app/uploads/[...path]/route.ts` 以 `/uploads/<文件名>` 直接提供同一批图片，公开站由 `sync.py` 镜像到 `public/uploads/`，两端引用同一个地址。
+- 图片工作台、视觉背景配置、说说配图三处上传入口全部改走本机直传，不再需要任何 Token；控制台与公开站的图片引用地址保持一致，无需额外改写。
+- 修复照片墙删不掉照片的问题：`data/albums.ts` 会被 Next.js 打包进客户端 bundle，控制台此前渲染的是构建那一刻的快照，删除后刷新即"复活"。照片墙改为运行时经 `GET /api/gallery/list` 向引擎读盘，新增/编辑/删除全部改为不可变更新并同步刷新正在浏览的相册。
+- `data/uploads/` 二进制文件加入 `.gitignore`（与本地音乐一致），公开站 `public/uploads/` 同步忽略；图片不可再生时需自行备份该目录。
+
 ## 0.4.3 - 2026-10-28
 
 - AI 煤球改接 DeepSeek：`/api/chat` 由 Gemini 原生协议改为 OpenAI 兼容协议，默认模型 `deepseek-flash`（DeepSeek-V4.1-Flash），接口地址与思考强度均可在控制台配置。

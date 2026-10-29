@@ -23,7 +23,7 @@ export default function EditorClient({ historyPostTags, historyChatterTags, hist
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
 
-  // 💡 图床状态路由：区分当前打开的图床是给谁用的
+  // 💡 图片状态路由：区分当前打开的图片工具是给谁用的
   const [isImgToolOpen, setIsImgToolOpen] = useState(false);
   const [imgToolTarget, setImgToolTarget] = useState<'editor' | 'cover'>('editor');
 
@@ -149,7 +149,7 @@ export default function EditorClient({ historyPostTags, historyChatterTags, hist
         />
       </aside>
 
-      {/* 图床智能分发 */}
+      {/* 图片工具智能分发 */}
       <FloatingImageTool
         isOpen={isImgToolOpen}
         onClose={() => setIsImgToolOpen(false)}

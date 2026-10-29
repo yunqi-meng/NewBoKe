@@ -46,3 +46,6 @@ __pycache__/
 # 本地音乐 (音频二进制不入库，只有播放列表元数据入库)
 /public/audio/*
 !/public/audio/playlist.json
+
+# 本机上传的图片 (由控制台镜像过来，二进制不入库)
+/public/uploads/*

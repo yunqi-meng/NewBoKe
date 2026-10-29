@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from '../ToastProvider';
-import { siteConfig } from '../../siteConfig';
+import { uploadLocalImage } from '../../lib/media';
 
 interface FloatingImageToolProps {
   isOpen: boolean;
@@ -20,39 +20,20 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 处理文件上传逻辑 (保持不变)
+  // 处理文件上传逻辑：从本机直接上传到控制台自带的图片仓库
   const handleFileUpload = async (file: File) => {
-    const picUrl = (siteConfig as any).picBedUrl || "https://pic.dusays.com";
-    const picToken = (siteConfig as any).picBedToken;
-
-    if (!picToken) {
-      showToast("未配置图床 Token！", "error");
-      return;
-    }
-
     setIsUploading(true);
-    showToast("正在将图片传送至云端...", "success");
+    showToast("正在从本机上传图片...", "info");
 
     try {
-      const uploadData = new FormData();
-      uploadData.append('file', file);
-      uploadData.append('url', picUrl);
-      uploadData.append('token', picToken);
+      const result = await uploadLocalImage(file);
 
-      const res = await fetch(`/api/proxy/api/picbed/upload`, {
-        method: 'POST',
-        body: uploadData,
-      });
-
-      const data = await res.json();
-      if (data.success && data.url) {
-        setUploadedUrl(data.url);
+      if (result.success && result.url) {
+        setUploadedUrl(result.url);
         showToast("✅ 上传成功！", "success");
       } else {
-        showToast(`上传失败: ${data.message || '未知错误'}`, "error");
+        showToast(`上传失败: ${result.message || '未知错误'}`, "error");
       }
-    } catch (error: any) {
-      showToast(`连接异常: ${error.message}`, "error");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -101,7 +82,7 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
           {/* 标题栏 */}
           <div className="flex justify-between items-center p-5 border-b border-white/30 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50">
             <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
-              <span className="text-emerald-500 text-lg">☁️</span> 图床工作台
+              <span className="text-emerald-500 text-lg">📁</span> 图片工作台
             </h3>
             <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-700/50 flex items-center justify-center text-slate-500 hover:bg-red-500 hover:text-white transition-all cursor-pointer shadow-sm">✕</button>
           </div>
@@ -114,7 +95,7 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
                   onClick={() => setActiveTab('upload')}
                   className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'upload' ? 'bg-white dark:bg-slate-700 text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  云端上传
+                  本地上传
                 </button>
                 <button
                   onClick={() => setActiveTab('url')}
@@ -138,7 +119,7 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
                   <input type="file" ref={fileInputRef} onChange={e => e.target.files && handleFileUpload(e.target.files[0])} accept="image/*" className="hidden" />
                   <div className="text-4xl drop-shadow-sm">{isUploading ? '⏳' : '📥'}</div>
                   <div className="text-center">
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{isUploading ? '正在极速上传...' : '点击或拖拽图片'}</p>
+                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{isUploading ? '正在上传到本机...' : '点击或拖拽图片'}</p>
                   </div>
                 </div>
               ) : (

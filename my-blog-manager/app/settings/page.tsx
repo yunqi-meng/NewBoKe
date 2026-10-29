@@ -12,7 +12,6 @@ import { ToastProvider, useToast } from '../../components/ToastProvider';
 import ProfileSection from '../../components/settings/ProfileSection';
 import BackgroundSection from '../../components/settings/BackgroundSection';
 import MusicSection from '../../components/settings/MusicSection';
-import GallerySection from '../../components/settings/GallerySection';
 import PublishSection from '../../components/settings/PublishSection';
 import DisplaySection from '../../components/settings/DisplaySection';
 import CommentSection from '../../components/settings/CommentSection';
@@ -30,7 +29,7 @@ function SettingsContent() {
   useEffect(() => {
     const readTab = () => {
       const tab = new URLSearchParams(window.location.search).get('tab');
-      if (tab && ['profile', 'display', 'background', 'music', 'gallery', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'briefing'].includes(tab)) {
+      if (tab && ['profile', 'display', 'background', 'music', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'briefing'].includes(tab)) {
         setActiveTab(tab);
         if (tab === 'briefing') setBriefingVisited(true);
       }
@@ -140,7 +139,6 @@ function SettingsContent() {
     { id: 'display', name: '视窗画面设置', icon: '🪟' },
     { id: 'background', name: '视觉背景配置', icon: '🌌' },
     { id: 'music', name: '音乐播放设置', icon: '🎵' },
-    { id: 'gallery', name: '图库配置管理', icon: '🖼️' },
     { id: 'footer', name: '首页底部设置', icon: '🧩' },
     { id: 'danmaku', name: '全站弹幕设置', icon: '⚡' },
     { id: 'comment', name: '评论系统配置', icon: '💬' },
@@ -179,7 +177,6 @@ function SettingsContent() {
               {activeTab === 'display' && <DisplaySection key="display" showToast={showToast} />}
               {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'music' && <MusicSection key="music" showToast={showToast} />}
-              {activeTab === 'gallery' && <GallerySection key="gallery" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'danmaku' && <DanmakuSection key="danmaku" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'comment' && <CommentSection key="comment" />}

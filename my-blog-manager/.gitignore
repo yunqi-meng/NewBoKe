@@ -41,8 +41,9 @@ next-env.d.ts
 /data/deploy_config.json
 /public/backend_config.json
 
-# 图床凭证 (Token 绝不入库，只留在本机)
-/data/picbed.json
+# 本机上传的图片 (二进制不入库，发布时镜像到公开站 public/uploads)
+/data/uploads/*
+!/data/uploads/.gitkeep
 
 # 评论数据库 (访客留言只存在本机，绝不入库)
 /data/comments.db

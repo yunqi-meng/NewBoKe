@@ -1,6 +1,8 @@
 import os
 import json
+import time
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 router = APIRouter()
 
@@ -46,7 +48,9 @@ async def sync_gallery(request: Request):
 
         return {
             "success": True,
-            "message": f"📸 画廊物理文件已更新！已同步 {len(albums_data)} 个相册。"
+            "message": f"📸 画廊物理文件已更新！已同步 {len(albums_data)} 个相册。",
+            "albums": albums_data,
+            "count": len(albums_data),
         }
     except Exception as e:
         # 这里把具体的报错抛给前端方便排查
@@ -61,3 +65,54 @@ async def debug_path():
         "target_file": ALBUMS_TS_PATH,
         "exists": os.path.exists(ALBUMS_TS_PATH)
     }
+
+
+def read_albums_from_disk():
+    """解析 data/albums.ts 里的相册数组
+
+    控制台的相册列表必须实时读盘：data/albums.ts 是被 Next.js 打包进
+    客户端 bundle 的静态导入，如果在控制台里直接 import 这个文件，
+    页面拿到的永远是构建那一刻的快照，删掉的照片刷新后就会复活。
+    """
+    try:
+        with open(ALBUMS_TS_PATH, "r", encoding="utf-8") as source:
+            content = source.read()
+    except OSError:
+        return []
+
+    marker = "export const albums"
+    marker_index = content.find(marker)
+    if marker_index == -1:
+        return []
+
+    # 类型标注里也有方括号（Album[]），必须先越过等号再找数组起点
+    assign_index = content.find("=", marker_index)
+    if assign_index == -1:
+        return []
+
+    bracket_index = content.find("[", assign_index)
+    if bracket_index == -1:
+        return []
+
+    try:
+        albums, _ = json.JSONDecoder().raw_decode(content[bracket_index:])
+    except ValueError:
+        return []
+
+    return albums if isinstance(albums, list) else []
+
+
+@router.get("/list")
+async def list_gallery():
+    """返回磁盘上当前的相册数据（控制台照片墙实时读取用）"""
+    try:
+        albums = read_albums_from_disk()
+        modified = os.path.getmtime(ALBUMS_TS_PATH) if os.path.exists(ALBUMS_TS_PATH) else 0
+        return JSONResponse({
+            "success": True,
+            "albums": albums,
+            "count": len(albums),
+            "updatedAt": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(modified)) if modified else "",
+        })
+    except Exception as e:
+        return {"success": False, "message": "读取相册失败: {0}".format(e)}

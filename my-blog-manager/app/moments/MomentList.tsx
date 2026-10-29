@@ -5,7 +5,7 @@ import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost, Plus, Image as ImageIcon, X, Send, Link as LinkIcon, Zap, Trash2, AlertTriangle } from 'lucide-react';
 import MomentComments from '../../components/MomentComments';
 import { useToast } from '../../components/ToastProvider';
-import { siteConfig } from '../../siteConfig';
+import { uploadLocalImage } from '../../lib/media';
 import { useOperations } from '../../context/OperationContext';
 
 function timeAgo(dateStr: string) {
@@ -81,32 +81,19 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
   };
 
   const handleFileUpload = async (files: FileList | File[]) => {
-    const picUrl = (siteConfig as any).picBedUrl || "https://pic.dusays.com";
-    const picToken = (siteConfig as any).picBedToken;
-    if (!picToken) { showToast("未配置图床 Token！", "error"); return; }
     setIsUploading(true);
     showToast(`正在上传 ${files.length} 张图片...`, "info");
     try {
       const newUrls: string[] = [];
       for (let i = 0; i < files.length; i++) {
-        const uploadData = new FormData();
-        uploadData.append('file', files[i]);
-        uploadData.append('url', picUrl);
-        uploadData.append('token', picToken);
-        const res = await fetch(`/api/proxy/api/picbed/upload`, {
-          method: 'POST',
-          body: uploadData,
-        });
-        const data = await res.json();
-        if (data.success && data.url) newUrls.push(data.url);
-        else showToast(`第 ${i+1} 张上传失败`, "error");
+        const result = await uploadLocalImage(files[i]);
+        if (result.success && result.url) newUrls.push(result.url);
+        else showToast(`第 ${i + 1} 张上传失败`, "error");
       }
       if (newUrls.length > 0) {
         setNewMoment(prev => ({ ...prev, images: [...prev.images, ...newUrls] }));
         showToast(`✅ 成功添加 ${newUrls.length} 张图片`, "success");
       }
-    } catch (error: any) {
-      showToast(`连接异常: ${error.message}`, "error");
     } finally {
       setIsUploading(false);
       setIsDragging(false);

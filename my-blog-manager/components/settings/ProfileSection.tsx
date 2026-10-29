@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-// 🌟 引入你的图床工具组件 (请根据你实际的文件夹层级调整相对路径)
+// 🌟 引入本机图片工具组件 (可从本机直接上传图片)
 import FloatingImageTool from '../editor/FloatingImageTool';
 
 export default function ProfileSection({ formData, handleUpdate, pushToQueue }: any) {
@@ -10,17 +10,17 @@ export default function ProfileSection({ formData, handleUpdate, pushToQueue }: 
   const safeData = formData || {};
   const safeSocial = safeData.social || {};
 
-  // 🌟 控制图床工具的状态
+  // 🌟 控制图片工具的状态
   const [isImageToolOpen, setIsImageToolOpen] = useState(false);
   const [targetImageField, setTargetImageField] = useState<'avatarUrl' | 'faviconUrl' | null>(null);
 
-  // 打开图床工具，并记录是哪个输入框在请求图片
+  // 打开图片工具，并记录是哪个输入框在请求图片
   const openImageTool = (field: 'avatarUrl' | 'faviconUrl') => {
     setTargetImageField(field);
     setIsImageToolOpen(true);
   };
 
-  // 接收图床工具传回来的 URL，并更新对应的配置项
+  // 接收图片工具传回来的 URL，并更新对应的配置项
   const handleImageInsert = (url: string) => {
     if (targetImageField) {
       handleUpdate(targetImageField, url);
@@ -94,7 +94,7 @@ export default function ProfileSection({ formData, handleUpdate, pushToQueue }: 
                 <div className="flex gap-2 mt-1">
                   <input type="text" value={safeData.faviconUrl || ''} onChange={e => handleUpdate('faviconUrl', e.target.value)} className="flex-1 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                   <button onClick={() => openImageTool('faviconUrl')} className="px-4 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/40 text-indigo-600 dark:text-indigo-300 rounded-2xl font-black text-xs transition-colors whitespace-nowrap flex items-center gap-1 shadow-sm">
-                    ☁️ 图床
+                    📁 本地上传
                   </button>
                 </div>
               </div>
@@ -105,7 +105,7 @@ export default function ProfileSection({ formData, handleUpdate, pushToQueue }: 
                 <div className="flex gap-2 mt-1">
                   <input type="text" value={safeData.avatarUrl || ''} onChange={e => handleUpdate('avatarUrl', e.target.value)} className="flex-1 bg-white/50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-2xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
                   <button onClick={() => openImageTool('avatarUrl')} className="px-4 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-500/20 dark:hover:bg-indigo-500/40 text-indigo-600 dark:text-indigo-300 rounded-2xl font-black text-xs transition-colors whitespace-nowrap flex items-center gap-1 shadow-sm">
-                    ☁️ 图床
+                    📁 本地上传
                   </button>
                 </div>
               </div>
@@ -168,7 +168,7 @@ export default function ProfileSection({ formData, handleUpdate, pushToQueue }: 
         </div>
       </motion.section>
 
-      {/* 🌟 挂载全局图床工具 */}
+      {/* 🌟 挂载全局图片工具 */}
       <FloatingImageTool
         isOpen={isImageToolOpen}
         onClose={() => setIsImageToolOpen(false)}

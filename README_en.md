@@ -1,3 +1,20 @@
+# Version 0.4.4 - Local Image Upload, Photo Wall Fix
+
+**Image hosting is gone; pictures are uploaded straight from your own machine, and the photo wall can
+finally delete a photo.**
+
+- **No image host anymore**: the whole "Gallery Config" panel is removed from the console settings,
+  together with the token probe, credential storage and the image-hosting endpoints. The article
+  editor, the wallpaper drop zone and moment pictures now upload to your own console.
+- **Your pictures stay yours**: files land in the console's local image repository
+  (`my-blog-manager/data/uploads/`) and every site references them as `/uploads/<file name>`. A publish
+  mirrors the folder into the public site's `public/uploads/`, so both sides use the same address.
+- **Photo wall deletion fixed**: the wall used to render a snapshot baked into the client bundle, so a
+  deleted photo came back after a reload. It now reads the albums from the content engine at runtime
+  and every add/edit/delete takes effect immediately.
+
+---
+
 # Version 0.4.3 - AI Cat on DeepSeek
 
 **The AI cat now runs on DeepSeek through the OpenAI-compatible protocol.** The old Gemini setup could never work on this server: the machine cannot reach `generativelanguage.googleapis.com` and no key was ever configured, so the cat could only fall back to canned lines. Now it actually answers.
@@ -92,7 +109,7 @@ Before starting, please ensure your computer has the following runtime environme
 * **Package Manager** (npm)
 * **Git** (for pulling code and version control)
 * **Python** (v3.10 or above recommended; tested under v3.10)
-* *Optional: Cloud storage/Image hosting service (detailed configuration instructions provided later)*
+* *Optional: a place to store your own pictures (the console ships with a local image repository)*
 
 ### 2. Blog Source Code Update
 
@@ -371,23 +388,27 @@ The publishing and modification of all content, such as blog posts, moments, and
 
 ---
 
-## III. Image Hosting Configuration
+## III. Image Upload (Local Image Repository)
 
-To optimize the writing experience, the console integrates image hosting upload functionality. This guide uses "7bu Image Hosting" ([https://7bu.top]()) as a reference.
-If you prefer using direct external links, the console also supports direct insertion of image URLs. If you want to connect other image hosting services that support standard APIs, you can attempt to do so.
+The console no longer relies on any third-party image host. Pictures are uploaded straight from your
+own computer into the console's built-in **local image repository** (`my-blog-manager/data/uploads/`),
+and every site references them with the same in-site address: `/uploads/<file name>`.
 
-**Configuration Process:**
+**Upload flow:**
 
-![图床配置](picture/Pasted%20image%2020260427124930.png)
+1. Open the console: "Photo Wall -> album -> add fragment", or the wallpaper drop zone in
+   "Settings -> Visual Background", or the image workbench inside the article editor.
+2. Press **[Upload]** or simply drop the picture into the dashed box. The file travels from your
+   machine to the content engine and is written to disk.
+3. Once stored, the console previews it directly through `/uploads/<file name>`; pasting an external
+   image URL still works exactly as before.
+4. Press "Add to queue" -> "Update local" to write `data/albums.ts`, then "Publish". `sync.py`
+   mirrors `data/uploads/` into the public site's `public/uploads/`, so the public site serves the
+   very same addresses.
 
-After filling in the corresponding API Token and other information, you can click **[Send Probe to Test Token]** to verify in real-time whether the image hosting interface is functional.
-
-> Image hosting credentials live only in `my-blog-manager/data/picbed.json` on the console host.
-> That file is listed in `.gitignore`, so it never enters the repository and is never pushed to a
-> remote by a publish. `siteConfig.ts` keeps only empty placeholders and the sensitive fields are
-> stripped when mirroring to the public site, so the public site can never obtain your token.
-> If an older version stored the token inside `siteConfig.ts`, save the image hosting settings once
-> again in the console after upgrading: the value is moved to the new file and erased from the old one.
+> Images inside the local repository are binary files and are listed in `.gitignore`: they never enter
+> the repository and are never pushed to a remote by a publish. If your photos cannot be recreated,
+> back up the `my-blog-manager/data/uploads/` directory from time to time.
 
 ---
 

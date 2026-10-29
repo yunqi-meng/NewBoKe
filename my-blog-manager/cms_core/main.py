@@ -2,10 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # 引入所有 API 路由
-from cms_core.api import music, config, picbed, drafts, moments
+from cms_core.api import music, config, drafts, moments
 from cms_core.api import gallery, friends, projects
 from cms_core.api import sync, deploy
 from cms_core.api import comments
+from cms_core.api import media
 
 app = FastAPI(title="XingHuiSama CMS Backend", version="1.0.0")
 
@@ -25,9 +26,10 @@ def get_status():
 # 注册所有路由
 app.include_router(music.router, prefix="/api/music", tags=["Music"])
 app.include_router(config.router, prefix="/api/config", tags=["Config"])
-app.include_router(picbed.router, prefix="/api/picbed", tags=["PicBed"])
 app.include_router(drafts.router, prefix="/api/drafts", tags=["Drafts"])
 app.include_router(gallery.router, prefix="/api/gallery", tags=["Gallery"])
+# 📸 本地图片仓库：控制台从运营者电脑直接上传，落盘到 data/uploads/
+app.include_router(media.router, prefix="/api/media", tags=["Media"])
 app.include_router(friends.router, prefix="/api/friends", tags=["Friends"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(moments.router, prefix="/api/moments", tags=["Moments"])

@@ -22,16 +22,10 @@ SYNC_FILES = [
 
 # 增量镜像的目录对：(控制台源目录, 博客目标目录)
 # 本地音乐体积大，用增量方式避免每次发布都全量重拷一遍
+# 本机上传的图片同理：data/uploads -> 公开站 public/uploads
 SYNC_DIR_PAIRS = [
     ("music", os.path.join("public", "audio")),
-]
-
-# siteConfig.ts 里的敏感行，镜像时必须剔除（图床凭证只留在本机控制台）
-SENSITIVE_SITE_CONFIG_MARKERS = [
-    "picBedName:",
-    "picBedUrl:",
-    "picBedToken:",
-    "图床核心配置"
+    (os.path.join("data", "uploads"), os.path.join("public", "uploads")),
 ]
 
 
@@ -118,7 +112,7 @@ def mirror_content(target_path):
                 shutil.rmtree(dst_dir)
             shutil.copytree(src_dir, dst_dir)
 
-    music_note = ""
+    asset_notes = []
     for src_rel, dst_rel in SYNC_DIR_PAIRS:
         src_dir = os.path.join(PROJECT_ROOT, src_rel)
         dst_dir = os.path.join(target_path, dst_rel)
@@ -128,7 +122,8 @@ def mirror_content(target_path):
 
         copied, removed = sync_dir_incremental(src_dir, dst_dir)
         if copied or removed:
-            music_note = "；本地音乐同步 {0} 个新增 / {1} 个清理".format(copied, removed)
+            asset_notes.append("{0} 同步 {1} 个新增 / {2} 个清理".format(
+                os.path.basename(src_rel), copied, removed))
 
     for f in SYNC_FILES:
         src_file = os.path.join(PROJECT_ROOT, f.replace("/", os.sep))
@@ -139,19 +134,11 @@ def mirror_content(target_path):
 
         os.makedirs(os.path.dirname(dst_file), exist_ok=True)
 
-        if f == "siteConfig.ts":
-            with open(src_file, "r", encoding="utf-8") as file_in:
-                lines = file_in.readlines()
+        # siteConfig.ts 里不再存放任何凭证（密钥只存在于 git-ignored 的环境变量文件里），
+        # 因此这里可以整文件原样覆盖。
+        shutil.copy2(src_file, dst_file)
 
-            with open(dst_file, "w", encoding="utf-8") as file_out:
-                for line in lines:
-                    if any(marker in line for marker in SENSITIVE_SITE_CONFIG_MARKERS):
-                        continue
-                    file_out.write(line)
-        else:
-            shutil.copy2(src_file, dst_file)
-
-    return True, "内容已镜像覆盖至网站源码目录" + music_note
+    return True, "内容已镜像覆盖至网站源码目录" + ("；" + "；".join(asset_notes) if asset_notes else "")
 
 
 @router.post("/check")

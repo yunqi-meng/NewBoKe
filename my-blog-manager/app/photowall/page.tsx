@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import { albums as initialAlbums, Album, Photo } from '../../data/albums';
@@ -29,6 +29,7 @@ export default function PhotoWallPage() {
   const { addOperation } = useOperations();
   const { showToast } = useToast();
   const [editableAlbums, setEditableAlbums] = useState<Album[]>(initialAlbums);
+  const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
 
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; type: 'album' | 'photo'; id?: string; photoIndex?: number; title: string }>({ isOpen: false, type: 'album', title: '' });
   const [albumModal, setAlbumModal] = useState<{ isOpen: boolean; mode: 'add' | 'edit'; data: any }>({ isOpen: false, mode: 'add', data: {} });
@@ -36,6 +37,29 @@ export default function PhotoWallPage() {
 
   const [isImgToolOpen, setIsImgToolOpen] = useState(false);
   const [imgToolTarget, setImgToolTarget] = useState<'album' | 'photo'>('album');
+
+  // 🌟 实时读取磁盘上的相册数据
+  //
+  // data/albums.ts 会被 Next.js 打包进客户端 bundle，如果在这里直接 import，
+  // 页面拿到的永远是「构建那一刻」的快照：删掉的照片点完「更新本地」刷新后又会复活。
+  // 所以相册列表必须实时向内容引擎读盘。
+  const loadAlbums = useCallback(async () => {
+    try {
+      const response = await fetch('/api/proxy/api/gallery/list', { cache: 'no-store' });
+      const data = await response.json();
+      if (data?.success && Array.isArray(data.albums)) {
+        setEditableAlbums(data.albums);
+      }
+    } catch {
+      // 引擎没连上时保留构建期快照，页面依然可读（只是不能实时同步）
+    } finally {
+      setIsLoadingAlbums(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAlbums();
+  }, [loadAlbums]);
 
   const syncToQueue = (newAlbums: Album[]) => {
     addOperation({
@@ -45,6 +69,14 @@ export default function PhotoWallPage() {
       value: newAlbums
     });
     showToast("📍 变更已加入待处理队列，请在 Navbar 点击更新本地", "info");
+  };
+
+  // 🌟 所有变更统一走这里：用不可变更新写回 state，
+  // 同时让正在浏览的相册跟着刷新（否则删完照片界面不会变）。
+  const commitAlbums = (next: Album[]) => {
+    setEditableAlbums(next);
+    setCurrentAlbum(prev => (prev ? next.find(album => album.id === prev.id) || null : null));
+    syncToQueue(next);
   };
 
   const { matchedAlbums, matchedPhotos } = useMemo(() => {
@@ -85,17 +117,16 @@ export default function PhotoWallPage() {
               <div className="flex gap-3">
                 <button onClick={() => setDeleteModal({ ...deleteModal, isOpen: false })} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase">取消</button>
                 <button onClick={() => {
-                   let next;
-                   if(deleteModal.type === 'album') next = editableAlbums.filter(a => a.id !== deleteModal.id);
-                   else {
-                     const album = editableAlbums.find(a => a.id === currentAlbum?.id);
-                     if(album) {
-                        album.photos = album.photos.filter((_, i) => i !== deleteModal.photoIndex);
-                        next = [...editableAlbums];
-                        setCurrentAlbum({...album});
-                     }
+                   if (deleteModal.type === 'album') {
+                     commitAlbums(editableAlbums.filter(a => a.id !== deleteModal.id));
+                   } else {
+                     const albumId = currentAlbum?.id;
+                     if (!albumId) return;
+                     const next = editableAlbums.map(album => album.id === albumId
+                       ? { ...album, photos: album.photos.filter((_, i) => i !== deleteModal.photoIndex) }
+                       : album);
+                     commitAlbums(next);
                    }
-                   if(next) { setEditableAlbums(next); syncToQueue(next); }
                    setDeleteModal({ ...deleteModal, isOpen: false });
                 }} className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-xs font-black uppercase">确认抹除</button>
               </div>
@@ -116,7 +147,7 @@ export default function PhotoWallPage() {
 
                 <div className="relative group">
                    <input type="text" value={albumModal.data.cover || ''} onChange={e => setAlbumModal({...albumModal, data: {...albumModal.data, cover: e.target.value}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3.5 pr-14 dark:text-white outline-none border border-transparent focus:border-indigo-500" placeholder="封面图片 URL" />
-                   <button onClick={() => { setImgToolTarget('album'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="唤起图床">
+                   <button onClick={() => { setImgToolTarget('album'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="从本机上传封面">
                       <CloudUpload size={18} />
                    </button>
                 </div>
@@ -128,9 +159,10 @@ export default function PhotoWallPage() {
                   if(albumModal.mode === 'add') {
                     next = [{ ...albumModal.data, id: `album_${Date.now()}`, photos: [], date: new Date().toISOString().split('T')[0] }, ...editableAlbums];
                   } else {
-                    next = editableAlbums.map(a => a.id === albumModal.data.id ? albumModal.data : a);
+                    next = editableAlbums.map(a => a.id === albumModal.data.id ? { ...albumModal.data, photos: a.photos } : a);
                   }
-                  setEditableAlbums(next); syncToQueue(next); setAlbumModal({ ...albumModal, isOpen: false });
+                  commitAlbums(next);
+                  setAlbumModal({ ...albumModal, isOpen: false });
                 }} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 加入暂存</button>
               </div>
             </motion.div>
@@ -148,7 +180,7 @@ export default function PhotoWallPage() {
                 {photoModal.mode === 'add' && (
                   <div className="relative group">
                     <input type="text" value={photoModal.data.url || ''} onChange={e => setPhotoModal({...photoModal, data: {...photoModal.data, url: e.target.value}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3.5 pr-14 dark:text-white outline-none border border-transparent focus:border-indigo-500" placeholder="照片直链 URL" />
-                    <button onClick={() => { setImgToolTarget('photo'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md">
+                    <button onClick={() => { setImgToolTarget('photo'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="从本机上传照片">
                         <CloudUpload size={18} />
                     </button>
                   </div>
@@ -159,12 +191,15 @@ export default function PhotoWallPage() {
                 <button onClick={() => setPhotoModal({ ...photoModal, isOpen: false })} className="flex-1 py-3 text-slate-500 font-bold uppercase text-xs hover:text-slate-800 dark:hover:text-white transition-colors">取消</button>
                 <button onClick={() => {
                   if(!currentAlbum) return;
-                  const album = editableAlbums.find(a => a.id === currentAlbum.id);
-                  if(!album) return;
-                  if(photoModal.mode === 'add') album.photos = [{...photoModal.data}, ...album.photos];
-                  else album.photos[photoModal.index!] = { ...album.photos[photoModal.index!], caption: photoModal.data.caption };
-                  const next = [...editableAlbums];
-                  setEditableAlbums(next); setCurrentAlbum({...album}); syncToQueue(next);
+                  const albumId = currentAlbum.id;
+                  const next = editableAlbums.map(album => {
+                    if (album.id !== albumId) return album;
+                    const photos = photoModal.mode === 'add'
+                      ? [{ ...photoModal.data }, ...album.photos]
+                      : album.photos.map((photo, i) => (i === photoModal.index ? { ...photo, caption: photoModal.data.caption } : photo));
+                    return { ...album, photos };
+                  });
+                  commitAlbums(next);
                   setPhotoModal({ ...photoModal, isOpen: false });
                 }} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 加入暂存</button>
               </div>
@@ -193,6 +228,10 @@ export default function PhotoWallPage() {
                   />
                 </div>
               </div>
+
+              {isLoadingAlbums && (
+                <p className="mb-6 text-xs font-bold text-slate-400">正在读取本机相册数据…</p>
+              )}
 
               <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                 {activeQuery && matchedPhotos.length > 0 && (
@@ -270,7 +309,7 @@ export default function PhotoWallPage() {
                 </div>
 
                 {currentAlbum.photos.map((photo, index) => (
-                  <div key={index} className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-lg bg-white/20 dark:bg-slate-800/20 border border-white/30 dark:border-white/10 transition-all duration-500 hover:scale-[1.02] cursor-pointer">
+                  <div key={`${photo.url}-${index}`} className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-lg bg-white/20 dark:bg-slate-800/20 border border-white/30 dark:border-white/10 transition-all duration-500 hover:scale-[1.02] cursor-pointer">
 
                     <div className="absolute top-3 left-3 z-30 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
                       <button onClick={(e) => { e.stopPropagation(); setPhotoModal({ isOpen: true, mode: 'edit', index, data: photo }); }} className="w-7 h-7 rounded-lg bg-white/80 backdrop-blur-md text-slate-700 flex items-center justify-center shadow-sm hover:bg-indigo-500 hover:text-white transition-all"><Pencil size={12}/></button>
