@@ -21,7 +21,7 @@ def managed_path(name):
         return True
     if parts[0] not in ('XHBlogs', 'my-blog-manager') or len(parts) < 2:
         return False
-    if parts[1] in ('posts', 'chatters', 'moments', 'manager_data') or parts[-1] in ('siteConfig.ts', 'deploy_config.json', 'backend_config.json', 'window_config.json'):
+    if parts[1] in ('posts', 'chatters', 'moments', 'manager_data') or parts[-1] in ('siteConfig.ts', 'deploy_config.json', 'backend_config.json'):
         return False
     if parts[1] in PRESERVED_DIRS:
         return False

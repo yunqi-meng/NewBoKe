@@ -10,6 +10,7 @@
 - 公开站新增 `/api/daily-quote` 网关与 `components/DailyQuote.tsx`；控制台新增 `components/settings/DailyQuoteSection.tsx`，可管理展示开关、每天自动生成开关、生成时间、栏目名称、副标题、署名、日期与署名显示、单句字数上限、给模型的话，并可查看往期。
 - 引擎端口环境变量更名为 `XHS_ENGINE_API_PORT`（旧的 `XHS_BRIEFING_API_PORT` 仍然识别），不再与已下线的选刊功能绑定。
 - 新增 `my-blog-manager/tests/daily_quote_engine_check.py`：50 项自检覆盖默认设置、设置保存与校验、手写覆盖、长度截断、AI 调用（含请求地址、鉴权头、模型、人设与 `{date}` 替换）、模型报错与无密钥的提示、历史排序与存储格式。
+- 下线「设置 → 视窗画面设置」：删除 `components/settings/DisplaySection.tsx` 与设置页对应菜单、路由与面板；桌面版窗口尺寸不再可调也不再持久化，`launcher.py` 移除 `resize_window` 接口与 `window_config.json` 的读写，窗口固定以 1440×900 启动（最小尺寸 1024×768 的约束保留）。标题栏的最小化/全屏/关闭按钮不受影响。
 
 ## 0.4.4 - 2026-10-29
 

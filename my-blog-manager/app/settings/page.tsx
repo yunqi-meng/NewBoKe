@@ -13,7 +13,6 @@ import ProfileSection from '../../components/settings/ProfileSection';
 import BackgroundSection from '../../components/settings/BackgroundSection';
 import MusicSection from '../../components/settings/MusicSection';
 import PublishSection from '../../components/settings/PublishSection';
-import DisplaySection from '../../components/settings/DisplaySection';
 import CommentSection from '../../components/settings/CommentSection';
 import DanmakuSection from '../../components/settings/DanmakuSection';
 import FooterSection from '../../components/settings/FooterSection';
@@ -29,7 +28,7 @@ function SettingsContent() {
   useEffect(() => {
     const readTab = () => {
       const tab = new URLSearchParams(window.location.search).get('tab');
-      if (tab && ['profile', 'display', 'background', 'music', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'quote'].includes(tab)) {
+      if (tab && ['profile', 'background', 'music', 'footer', 'danmaku', 'comment', 'aicat', 'publish', 'quote'].includes(tab)) {
         setActiveTab(tab);
         if (tab === 'quote') setQuoteVisited(true);
       }
@@ -136,7 +135,6 @@ function SettingsContent() {
   const menuItems = [
     { id: 'profile', name: '个人名片设置', icon: '👤' },
     { id: 'quote', name: '每日一句', icon: '☀️' },
-    { id: 'display', name: '视窗画面设置', icon: '🪟' },
     { id: 'background', name: '视觉背景配置', icon: '🌌' },
     { id: 'music', name: '音乐播放设置', icon: '🎵' },
     { id: 'footer', name: '首页底部设置', icon: '🧩' },
@@ -174,7 +172,6 @@ function SettingsContent() {
             <fieldset disabled={backendMode !== 'live'} hidden={activeTab === 'quote'} className="min-w-0 w-full border-0 p-0">
             <AnimatePresence mode="wait">
               {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
-              {activeTab === 'display' && <DisplaySection key="display" showToast={showToast} />}
               {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
               {activeTab === 'music' && <MusicSection key="music" showToast={showToast} />}
               {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}

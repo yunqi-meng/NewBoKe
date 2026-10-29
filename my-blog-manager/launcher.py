@@ -21,7 +21,6 @@ os.environ.setdefault("XHS_MANAGER_ROOT", EXE_DIR)
 from cms_core.main import app
 
 frontend_process = None
-WINDOW_CONFIG_FILE = os.path.join(EXE_DIR, 'window_config.json')
 
 def release_port(port):
     try:
@@ -34,22 +33,6 @@ def release_port(port):
                 pid = parts[-1]
                 subprocess.run(f'taskkill /PID {pid} /F /T', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 time.sleep(0.5)
-    except:
-        pass
-
-def load_window_size():
-    try:
-        if os.path.exists(WINDOW_CONFIG_FILE):
-            with open(WINDOW_CONFIG_FILE, 'r') as f:
-                return json.load(f)
-    except:
-        pass
-    return {"width": 1440, "height": 900}
-
-def save_window_size(width, height):
-    try:
-        with open(WINDOW_CONFIG_FILE, 'w') as f:
-            json.dump({"width": int(width), "height": int(height)}, f)
     except:
         pass
 
@@ -82,10 +65,6 @@ def wait_for_port(port, timeout=60):
     return False
 
 class WindowAPI:
-    def resize_window(self, width, height):
-        save_window_size(width, height)
-        webview.windows[0].resize(int(width), int(height))
-        return True
     def minimize_window(self): webview.windows[0].minimize()
     def maximize_window(self): webview.windows[0].toggle_fullscreen()
     def close_window(self): on_closed()
@@ -106,10 +85,6 @@ def on_closed():
     release_port(frontend_port)
     release_port(backend_port)
     os._exit(0)
-
-def on_shown():
-    win_size = load_window_size()
-    webview.windows[0].resize(int(win_size["width"]), int(win_size["height"]))
 
 if __name__ == "__main__":
     frontend_port = get_free_port()
@@ -152,7 +127,6 @@ if __name__ == "__main__":
         background_color='#0f172a', resizable=True, frameless=True, easy_drag=False, js_api=api
     )
 
-    window.events.shown += on_shown
     window.events.closed += on_closed
 
     try:
