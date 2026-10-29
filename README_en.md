@@ -15,6 +15,9 @@
 - **One place for config and port resolution**: site config loading and engine port detection are now
   centralised (`lib/siteConfigRuntime.ts`, `lib/enginePort.ts`). If the engine is briefly unreachable the
   console falls back gracefully instead of going blank.
+- **Publishes no longer trip over each other**: a second click on "发布上线" while the first one is still
+  running is rejected with a clear notice, and the server-side publish helper serialises itself with a
+  file lock, so two builds never write the same directory at once.
 - **Two long-standing re-render traps fixed along the way**: the toast callback is now a stable reference
   (it used to re-trigger every `useEffect` that depended on it), and the operation queue gained the
   missing publish / friend / project sync operation types.

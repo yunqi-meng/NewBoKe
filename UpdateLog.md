@@ -1,5 +1,6 @@
 ## 0.4.7 - 2026-10-29
 
+- 加固发布流程，避免连点两下把站点搞成半新半旧：引擎新增并发判定，发布与回退在有任务进行中时直接拒绝并提示「上一次发布还在进行中」；服务器助手脚本改用 `flock` 串行化，两次发布不会同时提交、推送和构建。
 - 修复「发布后刷新控制台仍是旧内容」：此前控制台的文章、说说、相册、友链、项目、关于页与站点配置都是构建时打进 bundle 的静态快照，发布只重建公开站，控制台永远显示构建那一刻的内容。现在控制台改为运行时读取工作副本，刷新即最新，公开站与控制台内容始终一致。
 - 内容页面全部改为动态渲染（`export const dynamic = 'force-dynamic'`），逐次请求按 `XHS_MANAGER_ROOT` 指向的工作副本读盘，不再依赖构建产物里的过期副本（standalone 模式下 `process.cwd()` 是 `.next/standalone`，已通过 `my-blog-manager/lib/managerRoot.ts` 统一纠正）。
 - 友链、项目与照片墙三块看板改为运行时向引擎读盘：引擎新增 `GET /api/friends/list`、`GET /api/projects/list`，相册沿用 `GET /api/gallery/list`；控制台不再静态 `import data/*.ts`。
