@@ -1,3 +1,28 @@
+# Version 0.5.0 - One Backend, One Database, Two Frontends
+
+**The blog and the admin console are now two frontends on top of one backend and one database.**
+
+- **One backend, two frontends**: the console used to ship its own FastAPI (`my-blog-manager/cms_core`) while the
+  blog read markdown / TypeScript files. The backend now lives in a top-level `server/`, and both frontends reach it
+  through their own same-origin proxy. All content lives in a single SQLite database.
+- **Content no longer scattered across files**: articles, talks, moments, albums, friend links, projects, the about
+  page and the site config all live in the database. The public site reads it at request time, so a refresh shows the
+  latest; the console shows exactly what it just wrote.
+- **Publish = export a snapshot and commit it**: the database is the single source of truth, and Git stores *content
+  snapshots* (`snapshots/content-*.json`). One click on **Publish** exports the current content as JSON and commits
+  it - a traceable, rollback-able version.
+- **Rollback = load a historical snapshot back into the database**: pick any step in the publish history and the
+  content is back to that state. A rollback is a new commit too, so the history never breaks and you can keep
+  stepping backwards.
+- **Images, music, the daily quote and comments are unified too**: uploaded images live in the backend's data
+  directory and both frontends reference them with the same `/uploads/<file name>` address; local music is hosted by
+  the backend and the public player reads it through the same API; comments and daily quotes live in the same
+  database.
+- **One place for secrets**: the DeepSeek key and the session secret are read from environment variables only; the
+  repository keeps nothing but a `server/.env.example` template.
+
+---
+
 # Version 0.4.9 - Measured End to End
 
 **Measured on the server: the front end changes half a second after you click publish.**
@@ -177,9 +202,9 @@ The updater preserves personal configuration, posts, the daily quote content, im
 
 # 🌟 Welcome to XHBlogs!
 
-This is a personal blog system built with Next.js, featuring a Glassmorphism design. This project includes a frontend display and an independent backend console. It supports Markdown writing, draft management, and image hosting configuration.
+This is a personal blog system built with Next.js, featuring a Glassmorphism design. This project includes a frontend display and an admin console, both talking to one shared backend and one shared database. It supports Markdown writing, draft management, and image hosting configuration.
 
-**The recommended deployment now is to run the public site and the console on your own Linux server** (systemd supervises the public site, the console frontend and the content engine; Git keeps every revision). After editing in the console, one click on **Publish** commits the sources, rebuilds the site and restarts the public service, so your changes show up online.
+**The recommended deployment now is to run the public site and the console on your own Linux server** (systemd supervises the public site, the console frontend and the unified backend; Git keeps every revision). After editing in the console, one click on **Publish** exports the current content as a snapshot and commits it, so your changes show up online and can be rolled back later.
 
 This guide walks you through the server deployment and the day-to-day use of the console.
 
@@ -190,7 +215,54 @@ This guide walks you through the server deployment and the day-to-day use of the
 [![English](https://img.shields.io/badge/Language-English-blue.svg)](README_en.md)
 [![中文](https://img.shields.io/badge/语言-中文-red.svg)](README.md)
 
+## Project Structure
+
+XHBlogs is now a complete frontend + backend + database project. The blog and the console are two frontends that share one backend and one database:
+
+```
+XHBlogs/                 # Frontend 1: the public site (Next.js App Router)
+my-blog-manager/         # Frontend 2: the admin console (Next.js App Router)
+server/                  # Backend: the unified API (FastAPI + SQLAlchemy + SQLite)
+    ├── app/             #   routes, ORM models, auth, snapshots, configuration
+    ├── scripts/         #   table creation / legacy content import / API smoke test
+    └── requirements.txt
+snapshots/               # Content snapshots: one JSON per publish, committed to Git
+tools/                   # The publish and rebuild helper scripts used on the server
+```
+
+There is only one direction for the data to flow:
+
+```
+   public site (XHBlogs)  ─┐
+                            ├─→  unified backend (server/app/main.py)  ─→  SQLite database
+   console (manager)      ─┘
+```
+
+The console writes into the database, the public site reads from the same database, so the two sides always agree -
+the "I changed it in the console but the site did not move" class of bugs is gone.
+
 ## Preface
+
+### Current Version: 0.5.0 (2026-10-29)
+
+**The blog and the admin console are now two frontends on top of one backend and one database.**
+
+- **One backend, two frontends**: the console used to ship its own FastAPI (`my-blog-manager/cms_core`), and the blog
+  read a different set of markdown / TypeScript files. The backend now lives in a top-level `server/`, and both
+  frontends reach it through their own same-origin proxy. The content lives in a single SQLite database.
+- **Content no longer scattered across files**: articles, talks, moments, albums, friend links, projects, the about
+  page and the site config all live in the database. The public site reads it at request time, so a refresh shows the
+  latest; the console shows exactly what it just wrote.
+- **Publish = export a snapshot and commit it**: the database is the single source of truth, and Git stores *content
+  snapshots* (`snapshots/content-*.json`). One click on **Publish** exports the current content as JSON and commits
+  it - a traceable, rollback-able version.
+- **Rollback = load a historical snapshot back into the database**: pick any step in the publish history and the
+  content is back to that state. A rollback is a new commit too, so the history never breaks.
+- **Images, music, the daily quote and comments are unified too**: uploaded images live in the backend's data
+  directory and both frontends reference them with the same `/uploads/<file name>` address; local music is hosted by
+  the backend; comments and the daily quote live in the same database.
+- **One place for secrets**: the DeepSeek key and the session secret are read from environment variables only; the
+  repository keeps nothing but a `server/.env.example` template.
 
 ### Update Summary (Versions 0.2.1~0.2.3)
 
@@ -222,54 +294,25 @@ This guide walks you through the server deployment and the day-to-day use of the
 
 ### 1. Environment Configuration
 
-Before starting, please ensure your computer has the following runtime environments installed; otherwise, the program will not start properly:
+A Linux server is recommended (CentOS / Alibaba Cloud Linux / Ubuntu all work). You need:
 
-* **Node.js** (v18.x or above recommended)
-* **Package Manager** (npm)
-* **Git** (for pulling code and version control)
-* **Python** (v3.10 or above recommended; tested under v3.10)
-* *Optional: a place to store your own pictures (the console ships with a local image repository)*
+- **Node.js** (20.9.0 or newer, for the current Next.js 16)
+- **npm**
+- **Git**
+- **Python** (3.10 or newer; tested under 3.11)
+- *Optional: a domain and Nginx (for HTTPS and a custom domain)*
 
-### 2. Blog Source Code Update
+### 2. Directory and Repository
 
-To easily keep up with the latest features, please use the updater to update the source code!
-By using the updater, you no longer need to manually compare code, worry about pull conflicts, or fear that your articles and configuration files will be overwritten.
-
-🛠️ Update Steps:
-
-Step 1: Obtain the lossless updater (only required for the first time)
-
-#### 1. Download the update.bat and update.py files from the project's root directory.
-
-#### 2. Move the downloaded update.bat and update.py to the outermost root directory of your local blog project (i.e., alongside the my-blog-manager and XHBlogs folders).
-
-As shown below:
-
-
-#### 3. Double-click the update.bat file to update. If it crashes, please run the update.py file using CMD.
-
-### 3. Quick Start
-
-#### ① Startup Script
-
-Once you have completed the environment configuration above, the basic preparation is done.
-First, enter the `my-blog-manager` folder (**⚠️ Note: Do not rename this folder under any circumstances, or environment path resolution will fail!**)
-
-Double-click to run the startup script in the folder:
-`Start.bat`
-The script will automatically detect and install the required dependencies. Once the environment configuration is complete, the program will launch the backend console.
-
-#### ② Deploy to Your Own Server
-
-> **Note**: the deployment target is now your own Linux server, not Vercel or GitHub Pages. systemd supervises three services and Git tracks every revision.
-
-**Layout**
+The whole system runs inside one Git working tree, and a bare repository keeps every revision of the sources:
 
 ```
 /opt/xinghui-blog/            # Git working tree
-├── XHBlogs/                  # public site sources
-└── my-blog-manager/          # console sources
-/srv/git/xinghui-blog.git     # bare repository holding every revision
+├── XHBlogs/                  # Frontend 1: public site sources
+├── my-blog-manager/          # Frontend 2: console sources
+├── server/                   # Backend: the unified API
+└── snapshots/                # Content snapshots (one JSON per publish)
+/srv/git/xinghui-blog.git     # Bare repository, holding every revision of the sources
 ```
 
 Prepare the sources:
@@ -280,10 +323,38 @@ git clone /srv/git/xinghui-blog.git .
 
 cd XHBlogs && npm ci
 cd ../my-blog-manager && npm ci
+
+# The unified backend gets its own virtual environment and dependencies
+cd ../server && python3.11 -m venv .venv
+.venv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 ```
 
-> Two files in the console differ on every machine and are therefore not tracked by Git:
-> `my-blog-manager/data/deploy_config.json` (blog source directory) and `my-blog-manager/public/backend_config.json` (content engine port).
+> **Keep the database outside the repository**: `server/data/` is excluded by `.gitignore`, but everything in it is
+> lost if the repository is rebuilt. Point the database at a system directory on a live server:
+>
+> ```bash
+> mkdir -p /var/lib/xhblogs && chown xhblogs:xhblogs /var/lib/xhblogs
+> ```
+>
+> ```ini
+> # /etc/xhblogs-manager.env
+> XHS_REPO_ROOT=/opt/xinghui-blog
+> XHS_DATA_DIR=/var/lib/xhblogs
+> XHS_CONTENT_DIR=/var/lib/xhblogs
+> XHS_DATABASE_URL=sqlite:////var/lib/xhblogs/blog.db
+> XHS_SNAPSHOT_DIR=/opt/xinghui-blog/snapshots
+> ```
+>
+> **Upgrading from an older version**: while the old content still lives in markdown / TypeScript files, create the
+> database and import it once:
+>
+> ```bash
+> cd /opt/xinghui-blog/server
+> XHS_DATABASE_URL=sqlite:////var/lib/xhblogs/blog.db \
+>   .venv/bin/python scripts/import_content.py --source /opt/xinghui-blog/my-blog-manager
+> ```
+>
+> The import overwrites, and the script prints how many records of each kind were imported.
 
 > **Off-site backup**: the working tree also carries a `github` remote pointing at your own
 > backup repository (this project uses `yunqi-meng/NewBoKe`). Every publish pushes the same
@@ -292,7 +363,9 @@ cd ../my-blog-manager && npm ci
 > stays in `/home/xhblogs/.ssh/` on the server and is never committed, scripted or documented.
 > A failing backup is only recorded in `/var/log/xhblogs-publish.log` and never blocks a publish.
 
-**Register the systemd services**
+### 3. Register the systemd services
+
+> **Note**: the deployment target is now your own Linux server, not Vercel or GitHub Pages. systemd supervises three services and Git tracks every revision.
 
 Public site `/etc/systemd/system/xhblogs.service`:
 
@@ -350,24 +423,25 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 ```
 
-Content engine `/etc/systemd/system/xhblogs-manager-api.service`:
+Unified backend `/etc/systemd/system/xhblogs-manager-api.service`:
 
 ```ini
 [Unit]
-Description=XHBlogs manager FastAPI backend
+Description=XHBlogs unified backend (FastAPI)
 After=network.target
 
 [Service]
 Type=simple
 User=xhblogs
 Group=xhblogs
-WorkingDirectory=/opt/xinghui-blog/my-blog-manager
+WorkingDirectory=/opt/xinghui-blog/server
 Environment=PYTHONUNBUFFERED=1
-Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
+Environment=PYTHONIOENCODING=utf-8
+Environment=XHS_REPO_ROOT=/opt/xinghui-blog
 Environment=XHS_ENGINE_API_PORT=8000
 # The daily quote calls the AI; the key lives only in this environment file (mode 600)
 EnvironmentFile=-/etc/xhblogs-manager.env
-ExecStart=/opt/xinghui-blog/my-blog-manager/.venv/bin/uvicorn cms_core.main:app --host 127.0.0.1 --port 8000
+ExecStart=/opt/xinghui-blog/server/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
@@ -380,9 +454,13 @@ WantedBy=multi-user.target
 | --- | --- | --- |
 | `xhblogs` | public site, `next start` serving the prebuilt output | `0.0.0.0:8080` |
 | `xhblogs-manager-web` | console frontend | `0.0.0.0:3001` |
-| `xhblogs-manager-api` | content engine (FastAPI) | `127.0.0.1:8000`, local access only |
+| `xhblogs-manager-api` | **unified backend** (FastAPI), shared by the blog and the console | `127.0.0.1:8000`, local access only |
 
-**Build and start**
+> The backend only listens on `127.0.0.1`, so the browser cannot reach it directly. Every API call from the public
+> site and the console goes through that app's own same-origin proxy (the public site's `/api/*`, the console's
+> `/api/proxy/*`), and the server forwards it to the local backend. That is why LAN and public access both work.
+
+### 4. Build and start
 
 ```bash
 cd /opt/xinghui-blog/XHBlogs && npm run build
@@ -392,7 +470,7 @@ systemctl daemon-reload
 systemctl enable --now xhblogs xhblogs-manager-web xhblogs-manager-api
 ```
 
-The console frontend uses `output: 'standalone'`, so the static assets have to be copied into the standalone output and the engine port written next to them:
+The console frontend uses `output: 'standalone'`, so the static assets have to be copied into the standalone output and the backend port written next to them:
 
 ```bash
 cd /opt/xinghui-blog/my-blog-manager
@@ -403,7 +481,20 @@ printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
 
 > **Rebuild the console after every console code change**: `next start` serves the prebuilt output, source edits do not show up on their own.
 
-**Public access and domains**
+> The repository already turns these steps into scripts, so on the server you can just use them:
+>
+> ```bash
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-rebuild        /usr/local/bin/
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-manager-rebuild /usr/local/bin/
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-publish         /usr/local/bin/
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-deploy          /usr/local/bin/
+> ```
+>
+> `xhblogs-deploy` is the manual update path: it pulls the latest code and then decides, from the changed paths,
+> whether to rebuild the public site, rebuild the console or only restart the backend. The publish helper calls the
+> first two when it needs them.
+
+### 5. Public access and domains
 
 Open the ports in the cloud provider's security group:
 
@@ -427,7 +518,7 @@ server {
 }
 ```
 
-**Password login for the console**
+### 6. Password login for the console
 
 Whenever the console is reachable from the internet you **must** enable the password login, otherwise anybody could rewrite your posts and settings. Prepare an environment file on the server:
 
@@ -445,17 +536,35 @@ EnvironmentFile=-/etc/xhblogs-manager.env
 Environment=HOSTNAME=0.0.0.0
 ```
 
+The unified backend uses the same `MANAGER_SESSION_SECRET`, so the console and the backend recognise each other's session cookie.
+
 After the restart the console redirects to `/login`; the session lasts 7 days and the cookie is HttpOnly. There is also a log-out button in the top right corner.
 
 > **Security note**: over plain HTTP the password travels unencrypted, so restrict the source IP in the security group. Once you serve HTTPS, set `MANAGER_COOKIE_SECURE=1`.
 
-> **Why remote access needs no code change**: the console used to call `http://127.0.0.1:<engine port>` straight from the browser, which only works on the machine running the engine. Every engine call now goes through the same-origin `/api/proxy`, which forwards to the local engine, so LAN and public access both work.
+> **Why remote access needs no code change**: the console used to call `http://127.0.0.1:<engine port>` straight from the browser, which only works on the machine running the engine. Every backend call now goes through the same-origin `/api/proxy`, which forwards to the local backend, so LAN and public access both work.
 
-**Local development (optional)**
+### 7. Local development (optional)
 
-You can still double-click `my-blog-manager/Start.bat` to debug on Windows. The local machine has no publish helper, so publishing only mirrors the content into the blog source directory and you build and deploy it yourself.
+You can still double-click `my-blog-manager/Start.bat` to debug on Windows. The local backend configuration lives in `server/.env` (excluded by `.gitignore`; the repository only keeps a `.env.example` template):
 
-**Working together with the server**
+```ini
+# server/.env
+XHS_DATABASE_URL=sqlite:///server/data/blog.db
+DEEPSEEK_API_KEY=your-local-development-key
+```
+
+Run the backend locally:
+
+```bash
+cd server
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+The local machine has no publish helper (`/usr/local/bin/xhblogs-publish` only exists on the server), so clicking
+**Publish** only exports the current content into `snapshots/`; building and deploying is up to you.
+
+### 8. Working together with the server
 
 Publishing from the console on the server creates commits in `/opt/xinghui-blog`, and the development
 machine pushes code to the same branch. Two writers on one branch collide easily, so keep to this:
@@ -469,6 +578,97 @@ machine pushes code to the same branch. Two writers on one branch collide easily
 > the `xhblogs` user. Pushing as root leaves root-owned objects in the bare repository, and the
 > server's own publish push is then rejected for lack of permissions. Nothing has to be changed in
 > the console itself.
+
+---
+
+## Appendix: The Unified Backend and the Database
+
+Starting point for changing the content structure, adding a field or wiring up a new endpoint.
+
+### Layout
+
+```
+server/app/
+├── main.py          # application entry: registers all routes, middleware, startup tasks
+├── config.py        # runtime configuration: read entirely from environment variables
+├── db.py            # database connection and sessions
+├── models.py        # ORM models (every table is here)
+├── security.py      # password hashing, session tokens, admin check
+├── snapshot.py      # exporting and importing content snapshots
+├── helpers.py       # small shared helpers
+├── markdown.py      # Markdown parsing
+├── siteconfig.py    # reading and writing the site config
+├── tsdata.py        # parses the legacy TS data files (used when importing old content)
+└── api/
+    ├── content.py       # articles / talks / about page / moments
+    ├── collections.py   # albums / friend links / projects
+    ├── config.py        # site config
+    ├── drafts.py        # drafts
+    ├── media.py         # image upload and reading
+    ├── music.py         # local music
+    ├── comments.py      # comments
+    ├── dailyquote.py    # daily quote
+    ├── chat.py          # the AI cat
+    ├── auth.py          # login / logout
+    └── deploy.py        # publish / rollback / live status
+```
+
+### Data tables
+
+| Table | What it holds |
+| --- | --- |
+| `articles` | articles, talks and the about page (`type` distinguishes them, `slug` is unique) |
+| `moments` | moments |
+| `albums` / `album_photos` | albums and the photos inside them |
+| `friends` / `projects` | friend links and the project grid |
+| `site_config` | the site config (the whole JSON in one row) |
+| `drafts` | the drafts box |
+| `music_tracks` | local music (metadata; the audio files stay on disk) |
+| `daily_quotes` | the daily quote (`date` is the primary key, one per day) |
+| `media_assets` | metadata of the uploaded images |
+| `settings` | other scattered settings (the daily quote config and friends) |
+| `comments` / `comment_likes` | comments and likes (**not** in the snapshots, back the database file up separately) |
+
+### Adding a table or changing a field
+
+1. Change the ORM model in `server/app/models.py`;
+2. Creating tables is automatic — `init_db()` fills in the missing tables on every start;
+3. If the new table should also be part of a content snapshot, register it in the `TABLES` list in
+   `server/app/snapshot.py`. Mind the order: **parent tables come before child tables** (inserts run forwards, deletes
+   run backwards, otherwise the foreign keys stop you);
+4. Write the route under `server/app/api/`; the frontends reach it through `/api/...`.
+
+### How the content reaches the front end
+
+```
+console saves      ─→ POST /api/articles ─→ written into the database
+public site renders ─→ GET  /api/articles ─→ read from the database
+```
+
+Both sides go through a same-origin proxy:
+
+| Frontend | Proxy route | Forwarded to |
+| --- | --- | --- |
+| Public site | `/api/comments`, `/api/config`, `/api/daily-quote`, `/api/chat`, `/api/music/*` | `http://127.0.0.1:8000` |
+| Console | `/api/proxy/<backend path>` | `http://127.0.0.1:8000` |
+
+The public site's proxy is an **allowlist**: only the prefixes above get through, so no other backend endpoint is
+exposed to the internet. The console's `/api/proxy` sits behind the admin authentication.
+
+### How to verify a change
+
+```bash
+# Locally: start the backend and walk through the main endpoints
+cd server
+.venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv/Scripts/python scripts/smoke_test.py --base http://127.0.0.1:8000
+
+# On the server: the smoke test runs there too, with the session secret it can write
+cd /opt/xinghui-blog/server
+MANAGER_SESSION_SECRET=… .venv/bin/python scripts/smoke_test.py --base http://127.0.0.1:8000
+```
+
+The smoke test goes through the main read and write endpoints and cleans up its own test data afterwards.
 
 ---
 
@@ -488,55 +688,101 @@ At this point, the top toolbox will prompt pending operations. You can undo at a
 
 > ⚠️ Note: the write-back happens as the first step of the publish. If it fails, the publish stops right there and tells you why — a half-written set of changes never ships.
 
-After you confirm, the system does five things on its own:
+After you confirm, the system does four things on its own:
 
-1. **Write back to local** — every staged change (albums / friend links / projects / site config / moments / articles) is written back into the content engine;
-2. **Mirror the content** — posts, moments, talks and the site configuration are copied over the blog source directory;
-3. **Commit the repository** — the change is committed in the server working tree and pushed to the bare repository;
-4. **Rebuild** — `npm run build` produces a fresh prebuilt output;
-5. **Restart the service** — `xhblogs` restarts and the change goes live.
+1. **Write back to the database** — every staged change (albums / friend links / projects / site config / moments / articles) is written into the unified backend's database;
+2. **Export a content snapshot** — the current content of the database is exported as one JSON file (`snapshots/content-<timestamp>.json`);
+3. **Commit the repository** — the snapshot is committed in the server working tree, pushed to the bare repository and backed up to GitHub;
+4. **Rebuild only when the code changed** — changed public site code rebuilds the public site, changed console code rebuilds the console, changed backend code restarts the backend. A content-only change skips this step entirely.
 
-The whole cycle takes roughly 1-3 minutes. Build logs land in `/var/log/xhblogs-publish.log`.
+> **🌟 Content changes take effect immediately**: the public site reads the database at request time, so the front end
+> is already new the moment you press **Save** in the console - there is nothing to wait for. **Publish** is what
+> leaves a traceable, rollback-able version of your content.
+
+The whole cycle usually takes a few seconds. Build logs land in `/var/log/xhblogs-publish.log`.
+
+> If you edited the sources directly on the server, `sudo /usr/local/bin/xhblogs-deploy` pulls the latest code and
+> rebuilds according to the changed paths; `sudo /usr/local/bin/xhblogs-rebuild` rebuilds just the public site.
 
 The publishing and modification of all content, such as blog posts, moments, and talks, follow this process.
 
 > **💡 Golden Rule**: Staging Queue -> 🚀 Publish
 
+### What a content snapshot looks like
+
+A snapshot is a full export of the content: articles, talks, moments, albums and their photos, friend links,
+projects, the site config, drafts, local music, the daily quotes and the image metadata (comments are **not** in a
+snapshot - they are visitor data, so back up the database file separately):
+
+```json
+{
+  "version": 1,
+  "createdAt": "2026-10-29 19:47:35",
+  "tables": {
+    "articles": [ { "slug": "first", "title": "…", "content": "…", "date": "…" } ],
+    "moments": [],
+    "albums": [],
+    "album_photos": [],
+    "friends": [],
+    "projects": [],
+    "site_config": [ { "id": 1, "payload": "{…}" } ],
+    "drafts": [],
+    "music_tracks": [],
+    "daily_quotes": [],
+    "media_assets": [],
+    "settings": []
+  }
+}
+```
+
 ### Publish history and rollback
 
-The "4. 发布历史与回退" card under **Settings → Publish** lists the last 20 steps with commit id, subject and time; the version currently live is marked "当前线上". Clicking **"回退到这里"** on any step restores articles, moments, album / friend / project data, the about page, site config, local music and uploaded images to the content state of that step, then commits, pushes and rebuilds — about 1-3 minutes.
+The "4. 发布历史与回退" card under **Settings → Publish** lists the last 20 steps with commit id, subject and time;
+publishes are `chore(publish)` and rollbacks are `chore(rollback)`, so the two are easy to tell apart.
 
-A rollback is a **new commit**, so the history is never broken and you can keep stepping backwards; the source code itself is untouched. Rollback logs land in `/var/log/xhblogs-publish.log` as well.
+Clicking **"回退到这里"** on any step loads the snapshot from that commit back into the database, so articles,
+moments, album / friend / project data, the about page, the site config, local music and the image metadata are back
+to that state right away, and a fresh snapshot is committed.
+
+A rollback is a **new commit**, so the history is never broken and you can keep stepping backwards; the source code
+itself is untouched. Rollback logs land in `/var/log/xhblogs-publish.log` as well.
+
+> The snapshots live in Git, so a rollback does not depend on a database backup - as long as the repository is still
+> there, every step can be restored.
 
 ### Online status panel
 
-**Settings → Publish** shows the live state of the public site in real time: whether the service is running, the time and build id of the last build, the newest commit in the source repository and the outcome of the previous publish. As soon as the build time is newer than the publish time, your change is **live**.
+**Settings → Publish** shows the live state of the public site in real time: whether the service is running, the time
+and build id of the last build, the newest commit in the source repository and the outcome of the previous publish.
+Content changes need no rebuild, so what decides whether a change is live is the **effective timestamp** in the
+publish status, not the build time.
 
-> **Why "Sync Blog" used to change nothing online**: the public site is `next start` serving a prebuilt output, so edits to files such as `siteConfig.ts` only reach the site after a `build` and a service restart. "Publish" now performs that step as well.
+> **Why "Sync Blog" used to change nothing online**: the public site is `next start` serving a prebuilt output, so
+> edits to files such as `siteConfig.ts` only reach the site after a `build` and a service restart. Now the site reads
+> the database at request time, so it is live as soon as the data is saved.
 
 ---
 
 ## III. Image Upload (Local Image Repository)
 
-The console no longer relies on any third-party image host. Pictures are uploaded straight from your
-own computer into the console's built-in **local image repository** (`my-blog-manager/data/uploads/`),
-and every site references them with the same in-site address: `/uploads/<file name>`.
+The console no longer relies on any third-party image host. Pictures are uploaded straight from your own computer
+into the **local image repository of the unified backend**, and both sites reference them with the same in-site
+address: `/uploads/<file name>`.
 
 **Upload flow:**
 
 1. Open the console: "Photo Wall -> album -> add fragment", or the wallpaper drop zone in
    "Settings -> Visual Background", or the image workbench inside the article editor.
 2. Press **[Upload]** or simply drop the picture into the dashed box. The file travels from your
-   machine to the content engine and is written to disk.
+   machine to the backend and is written to disk.
 3. Once stored, the console previews it directly through `/uploads/<file name>`; pasting an external
    image URL still works exactly as before.
-4. Press "Add to queue" -> "🚀 Publish": the publish writes `data/albums.ts` and then `sync.py`
-   mirrors `data/uploads/` into the public site's `public/uploads/`, so the public site serves the
-   very same addresses.
+4. The public site and the console use the **same address** for these photos: the public site's
+   `/uploads/<file name>` is forwarded by the server to the backend, which serves the file.
 
-> Images inside the local repository are binary files and are listed in `.gitignore`: they never enter
-> the repository and are never pushed to a remote by a publish. If your photos cannot be recreated,
-> back up the `my-blog-manager/data/uploads/` directory from time to time.
+> The images in the local repository are binary files: they never enter Git and are never pushed to a remote by a
+> publish. If your photos cannot be recreated, back up the `uploads/` subdirectory of the backend's data directory
+> from time to time (on a live server that is `/var/lib/xhblogs/uploads/`).
 
 ---
 
@@ -550,19 +796,21 @@ First, you need to apply for a DeepSeek API Key. After obtaining the API Key, co
 
 In **Settings → AI Cat Config 🐾** you can adjust: model id (default `deepseek-flash`, i.e. DeepSeek-V4.1-Flash), endpoint (default `https://api.deepseek.com`), personality prompt, generation budget, temperature and reasoning effort.
 
-After setting the exclusive system prompt (personality) for the cat locally, we need to give the online environment the ability to call the AI. Write the key into an environment file on the server:
+After setting the exclusive system prompt (personality) for the cat locally, we need to give the online environment the ability to call the AI. **Only the unified backend calls the AI now**, so the key only has to go into the backend's environment file:
 
 ```bash
-echo 'DEEPSEEK_API_KEY=your-real-api-key' >> /etc/xhblogs.env
-chmod 600 /etc/xhblogs.env
-systemctl restart xhblogs
+echo 'DEEPSEEK_API_KEY=your-real-api-key' >> /etc/xhblogs-manager.env
+chmod 600 /etc/xhblogs-manager.env
+systemctl restart xhblogs-manager-api
 ```
 
-`/etc/systemd/system/xhblogs.service` already declares `EnvironmentFile=-/etc/xhblogs.env`, so the public site picks the key up. When the console itself calls the AI, add the same variable to `/etc/xhblogs-manager.env` and restart `xhblogs-manager-web`.
+`/etc/systemd/system/xhblogs-manager-api.service` already declares `EnvironmentFile=-/etc/xhblogs-manager.env`,
+so the unified backend picks the key up. The public site and the console both call the AI through it, so neither of
+them needs its own copy.
 
-> **The daily quote calls the AI from the engine too**, so `/etc/xhblogs-manager.env` needs the same key, and `xhblogs-manager-api.service` must declare `EnvironmentFile=-/etc/xhblogs-manager.env`.
+For local development, put the key in `server/.env` (already ignored by `.gitignore`, so it never reaches the repository).
 
-For the local desktop edition, put the key in each app's `.env.local` (already ignored by `.gitignore`, so it never reaches the repository).
+> **The daily quote calls the AI from the backend too**, using the same key.
 
 > **Never write secrets into code, documentation or the repository** — keep them in environment files with mode 600 on the server.
 
@@ -579,15 +827,15 @@ Every day the cat says one encouraging sentence, shown under the homepage conten
 - **Regenerate or write it yourself**: "换一句" asks the AI for a new line; you can also type your own and it replaces today's automatic one. Tomorrow the AI speaks again.
 - **Archive**: the console keeps the last 30 lines.
 - **Model and persona**: taken straight from **AI Cat Config 🐾** — switching models needs no code change.
-- **Where the data lives**: settings in `my-blog-manager/data/dailyQuoteConfig.json`, content in `my-blog-manager/data/dailyQuote.json`. Neither enters Git.
+- **Where the data lives**: the settings and the archive live in the unified backend's database (the `settings` and `daily_quotes` tables), together with everything else.
 
-> The scheduled generation runs inside the content engine, so **the console page may be closed** — but `xhblogs-manager-api` has to stay up. If a visitor arrives before today's line exists, the engine writes it in the background and the page never waits.
+> The scheduled generation runs inside the unified backend, so **the console page may be closed** — but `xhblogs-manager-api` has to stay up. If a visitor arrives before today's line exists, the backend writes it in the background and the page never waits.
 
 ---
 
 ## VI. Comment System Configuration
 
-The comment system is **self-hosted**: visitor comments live in a local SQLite database on the server (`my-blog-manager/data/comments.db`). The public site reads and writes through the content engine, and the console can moderate, reply to, hide or delete them. **No GitHub repository and no OAuth app required.**
+The comment system is **self-hosted**: visitor comments live in the unified backend's SQLite database (the `comments` and `comment_likes` tables). The public site reads and writes through the same backend, and the console can moderate, reply to, hide or delete them. **No GitHub repository and no OAuth app required.**
 
 > The old Gitalk setup (comments living in GitHub Issues) has been removed entirely — it left the owner unable to see or manage a single comment. The console's **💬 评论管理** (Comment Management) page now lists every comment on the site.
 
@@ -621,13 +869,16 @@ Console → **⚙️ 设置 → 💬 评论系统配置** (Comment Settings). Ch
 
 ### Data and backups
 
-Comments live only on the server's disk and **never enter Git** (`.gitignore` excludes `data/comments.db`). To back them up, copy `my-blog-manager/data/comments.db` along with the rest of the site; drop it back in place after a migration and every comment returns.
+Comments live only on the server's disk and **never enter Git** (a content snapshot does not contain them either). To
+back them up, copy the backend's database file along with the rest of the site (on a live server that is
+`/var/lib/xhblogs/blog.db`); drop it back in place after a migration and every comment returns.
 
 ---
 
 ## VII. Local Music Widget Settings
 
-Want to add BGM to your blog? Upload the audio straight to the console — it hosts the files and syncs them to your blog on publish.
+Want to add BGM to your blog? Upload the audio straight to the console — the **unified backend** hosts the files and
+the public site reads the same playlist.
 
 Open the console → **音乐播放设置** (Music Settings):
 
@@ -635,13 +886,15 @@ Open the console → **音乐播放设置** (Music Settings):
 2. Fill in the title (the filename is used if you skip it); the artist is optional. A cover image and a `.lrc` lyric file are optional too.
 3. Click **上传并加入歌单**. The track shows up in the list right away, where you can preview it, replace the cover, add lyrics, or delete it.
 
-Then go to **线上发布** (Publish) and publish once: the console incrementally syncs `my-blog-manager/music/` into the blog's `XHBlogs/public/audio/`, and the public player reads that local playlist.
-
 Worth knowing:
 
-- **The audio itself never enters Git.** Only the `playlist.json` metadata is tracked; the audio files stay on the server's disk — a public backup repo is no place for copyrighted music, and it keeps the repo small. The sync compares size and mtime, so only new or changed files are copied.
-- **Next.js snapshots `public/` at startup**, so freshly uploaded audio only becomes publicly visible after a publish (rebuild + restart).
-- The console previews tracks through the engine API, while the public site plays the static files under `public/audio/` — both playlists only match after a publish.
+- **The audio itself never enters Git.** Only the track metadata in the content snapshot is tracked; the audio files
+  stay on the server's disk — a public backup repo is no place for copyrighted music, and it keeps the repo small.
+- **No publish needed to hear it.** The backend keeps the audio in its own data directory, and the public site's
+  player fetches it through the `/api/music/*` proxy, so the audio, the cover and the lyrics all travel through the
+  same API.
+- **The public site's proxy is restricted**: only `local / file / cover / lyrics` are let through, so no other
+  backend endpoint is exposed to the public.
 
 ---
 

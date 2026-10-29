@@ -1,8 +1,8 @@
 # 🌟 欢迎使用 XHBlogs！
 
-这是一个采用 Next.js 构建的高颜值、毛玻璃（Glassmorphism）风格个人博客系统。本项目自带完善的前端展示与独立的后台控制台，支持 Markdown 沉浸式写作、草稿管理以及从本机直接上传图片。
+这是一个采用 Next.js 构建的高颜值、毛玻璃（Glassmorphism）风格个人博客系统。本项目自带完善的前端展示与后台控制台，两个前端共享同一个后端与同一份数据库，支持 Markdown 沉浸式写作、草稿管理以及从本机直接上传图片。
 
-**当前推荐的部署形态：把公开站与控制台一起部署在你自己的 Linux 服务器上**（systemd 托管公开站、控制台前端与内容引擎，Git 管理每一版源码）。控制台里改完内容，点一次「发布上线」就会自动提交源码并同步到线上，内容改动刷新页面即可见（只有代码改动才需要重新构建站点）。
+**当前推荐的部署形态：把公开站与控制台一起部署在你自己的 Linux 服务器上**（systemd 托管公开站、控制台前端与统一后端，Git 管理每一版源码）。控制台里改完内容，点一次「发布上线」就会把当前内容导成一份快照提交进仓库，内容改动刷新页面即可见（只有代码改动才需要重新构建）。
 
 本指南将带你完成服务器部署，并说明控制台的日常使用。
 
@@ -12,9 +12,45 @@
 [![English](https://img.shields.io/badge/Language-English-blue.svg)](README_en.md)
 [![中文](https://img.shields.io/badge/语言-中文-red.svg)](README.md)
 
+## 项目结构
+
+现在的 XHBlogs 是一套完整的前端 + 后端 + 数据库工程，博客和控制台是两个前端，共享同一个后端与同一份数据库：
+
+```
+XHBlogs/                 # 前端一：公开站（Next.js App Router）
+my-blog-manager/         # 前端二：管理控制台（Next.js App Router）
+server/                  # 后端：统一 API（FastAPI + SQLAlchemy + SQLite）
+    ├── app/             #   路由、ORM 模型、鉴权、快照、配置
+    ├── scripts/         #   建表 / 导入旧内容 / 接口冒烟测试
+    └── requirements.txt
+snapshots/               # 内容快照：每次发布导出一份 JSON，提交进 Git
+tools/                   # 服务器上的发布与重建脚本
+```
+
+数据流向只有一条：
+
+```
+   公开站 (XHBlogs)  ─┐
+                      ├─→  统一后端 (server/app/main.py)  ─→  SQLite 数据库
+   控制台 (manager)  ─┘
+```
+
+控制台写进数据库，公开站从同一个数据库读；两边看到的内容永远一致，不会再出现「控制台改了、公开站没变」。
+
 ## 写在前面
 
-### 当前版本：0.4.9（2026-10-29）
+### 当前版本：0.5.0（2026-10-29）
+
+**博客和管理后台现在是同一套后端、同一份数据库的两个前端。**
+
+- **一个后端，两套前端**：原来控制台自带一套 FastAPI（`my-blog-manager/cms_core`），博客读的是另一份 markdown / TS 文件。现在后端抽到顶层 `server/`，博客与控制台都通过同源代理访问它，内容只存一份 SQLite 数据库。
+- **内容不再散落在文件里**：文章、杂谈、说说、相册、友链、项目、关于页、站点配置全部落在数据库里。公开站改为运行时读库，刷新即最新；控制台改完刷新就能看到自己刚写的内容。
+- **发布 = 导出快照并提交**：数据库是唯一真相，Git 里存的是「内容快照」（`snapshots/content-*.json`）。点一次「发布上线」就把当前内容导成一份 JSON 提交进仓库——留一份可追溯、可回退的版本。
+- **回退 = 把历史快照灌回数据库**：「发布历史与回退」里点任意一步，内容立刻回到那一步的样子。回退同样是一次新提交，历史不断，可以继续往前退。
+- **图片、音乐、每日一句、评论全部统一**：上传的图片存在后端的数据目录，公开站和控制台用同一个 `/uploads/<文件名>` 地址引用；本地音乐由后端托管，公开站的播放器直接走后端接口；评论与每日一句也都在同一份数据库里。
+- **密钥只有一处**：DeepSeek 密钥与会话密钥只从环境变量读，仓库里只留 `server/.env.example` 模板。
+
+### 0.4.9 更新（2026-10-29）
 
 **实测：点完「发布上线」，前台 0.5 秒后就变了。**
 
@@ -130,9 +166,9 @@
 3. 想改说话时间、栏目名称、署名或给模型的话，改完点 **保存设置**，公开站立刻可见，不需要重新发布。
 4. 今天这句不满意，点 **换一句** 让 AI 重新说；想自己写就直接在「手写一句」里写，点 **保存这句** 顶掉今天的自动结果。
 5. 不想在首页出现这一栏时，关掉「在首页显示每日一句」即可，已经说过的话仍然保留。
-6. 定时生成由服务器上的内容引擎常驻执行，**控制台网页可以关着**；但引擎必须保持运行。
+6. 定时生成由服务器上的统一后端常驻执行，**控制台网页可以关着**；但后端必须保持运行。
 
-> 引擎需要读到 AI 密钥才能自动生成。请确认 `xhblogs-manager-api.service` 加载了 `/etc/xhblogs-manager.env`（含 `DEEPSEEK_API_KEY`），并且该文件权限为 600。
+> 后端需要读到 AI 密钥才能自动生成。请确认 `xhblogs-manager-api.service` 加载了 `/etc/xhblogs-manager.env`（含 `DEEPSEEK_API_KEY`），并且该文件权限为 600。
 
 ### 更新时会保留什么
 
@@ -180,8 +216,10 @@
 
 ```
 /opt/xinghui-blog/            # Git 工作区
-├── XHBlogs/                  # 公开站源码
-└── my-blog-manager/          # 控制台源码
+├── XHBlogs/                  # 前端一：公开站源码
+├── my-blog-manager/          # 前端二：控制台源码
+├── server/                   # 后端：统一 API
+└── snapshots/                # 内容快照（每次发布导出一份 JSON）
 /srv/git/xinghui-blog.git     # 裸仓库，保存每一版源码
 ```
 
@@ -193,10 +231,37 @@ git clone /srv/git/xinghui-blog.git .
 
 cd XHBlogs && npm ci
 cd ../my-blog-manager && npm ci
+
+# 统一后端：单独建虚拟环境并装依赖
+cd ../server && python3.11 -m venv .venv
+.venv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 ```
 
-> 控制台源码里有两个**每台机器都不一样**的文件，它们不入库，请自行维护：
-> `my-blog-manager/data/deploy_config.json`（网站源码目录）和 `my-blog-manager/public/backend_config.json`（内容引擎端口）。
+> **数据库放在仓库外**：`server/data/` 已被 `.gitignore` 排除，但仓库一旦被重建，里面的东西就没了。
+> 线上请用环境变量把数据库指到 `/var/lib/xhblogs/` 这样的系统目录：
+>
+> ```bash
+> mkdir -p /var/lib/xhblogs && chown xhblogs:xhblogs /var/lib/xhblogs
+> ```
+>
+> ```ini
+> # /etc/xhblogs-manager.env
+> XHS_REPO_ROOT=/opt/xinghui-blog
+> XHS_DATA_DIR=/var/lib/xhblogs
+> XHS_CONTENT_DIR=/var/lib/xhblogs
+> XHS_DATABASE_URL=sqlite:////var/lib/xhblogs/blog.db
+> XHS_SNAPSHOT_DIR=/opt/xinghui-blog/snapshots
+> ```
+
+> **从旧版本升级**：老的内容还在 markdown / TS 文件里时，先建库再导入一次：
+>
+> ```bash
+> cd /opt/xinghui-blog/server
+> XHS_DATABASE_URL=sqlite:////var/lib/xhblogs/blog.db \
+>   .venv/bin/python scripts/import_content.py --source /opt/xinghui-blog/my-blog-manager
+> ```
+>
+> 导入是覆盖式的，脚本会打印每类内容导入了多少条。
 
 > **异地备份**：工作区还挂了一个 `github` 远端，指向你自己的备份仓库（本项目用的是
 > `yunqi-meng/NewBoKe`）。发布助手每次发布会把同一提交再推一份到这个远端，于是线上内容
@@ -262,24 +327,25 @@ LimitNOFILE=65535
 WantedBy=multi-user.target
 ```
 
-内容引擎 `/etc/systemd/system/xhblogs-manager-api.service`：
+统一后端 `/etc/systemd/system/xhblogs-manager-api.service`：
 
 ```ini
 [Unit]
-Description=XHBlogs manager FastAPI backend
+Description=XHBlogs unified backend (FastAPI)
 After=network.target
 
 [Service]
 Type=simple
 User=xhblogs
 Group=xhblogs
-WorkingDirectory=/opt/xinghui-blog/my-blog-manager
+WorkingDirectory=/opt/xinghui-blog/server
 Environment=PYTHONUNBUFFERED=1
-Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
+Environment=PYTHONIOENCODING=utf-8
+Environment=XHS_REPO_ROOT=/opt/xinghui-blog
 Environment=XHS_ENGINE_API_PORT=8000
 # 每日一句要调 AI，密钥只放这个环境文件里（权限 600），仓库不存任何口令
 EnvironmentFile=-/etc/xhblogs-manager.env
-ExecStart=/opt/xinghui-blog/my-blog-manager/.venv/bin/uvicorn cms_core.main:app --host 127.0.0.1 --port 8000
+ExecStart=/opt/xinghui-blog/server/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
 LimitNOFILE=65535
@@ -294,7 +360,11 @@ WantedBy=multi-user.target
 | --- | --- | --- |
 | `xhblogs` | 公开站，`next start` 运行预构建产物 | `0.0.0.0:8080` |
 | `xhblogs-manager-web` | 控制台前端 | `0.0.0.0:3001` |
-| `xhblogs-manager-api` | 内容引擎（FastAPI） | `127.0.0.1:8000`，只允许本机访问 |
+| `xhblogs-manager-api` | **统一后端**（FastAPI），博客与控制台共用 | `127.0.0.1:8000`，只允许本机访问 |
+
+> 后端只监听 `127.0.0.1`，浏览器直连不了它。公开站与控制台的每个 API 调用都走各自的
+> 同源代理（公开站 `/api/*`，控制台 `/api/proxy/*`），由服务端转发到本机后端，
+> 因此局域网和公网访问都能正常工作。
 
 ### 4. 构建与启动
 
@@ -306,7 +376,7 @@ systemctl daemon-reload
 systemctl enable --now xhblogs xhblogs-manager-web xhblogs-manager-api
 ```
 
-控制台前端使用 `output: 'standalone'` 构建，运行时还需要把静态资源拷进产物目录，并写入内容引擎端口：
+控制台前端使用 `output: 'standalone'` 构建，运行时还需要把静态资源拷进产物目录，并写入后端端口：
 
 ```bash
 cd /opt/xinghui-blog/my-blog-manager
@@ -316,6 +386,18 @@ printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
 ```
 
 > **每次改过控制台代码，都要重新执行上面这段「构建与启动」**，因为 `next start` 跑的是预构建产物，源码改动不会自动生效。
+
+> 仓库里已经把这几步固化成脚本，服务器上直接用就行：
+>
+> ```bash
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-rebuild        /usr/local/bin/
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-manager-rebuild /usr/local/bin/
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-publish         /usr/local/bin/
+> sudo install -m 755 /opt/xinghui-blog/tools/xhblogs-deploy          /usr/local/bin/
+> ```
+>
+> `xhblogs-deploy` 是手动更新用的：拉最新代码后按改动范围决定重建公开站、
+> 重建控制台还是只重启后端。发布助手则只在需要时调用前两个。
 
 ### 5. 公网访问与域名
 
@@ -359,15 +441,34 @@ EnvironmentFile=-/etc/xhblogs-manager.env
 Environment=HOSTNAME=0.0.0.0
 ```
 
+统一后端用的是同一个 `MANAGER_SESSION_SECRET`，所以控制台与后端互相认得对方的会话 Cookie。
+
 重启后访问控制台会先跳转到 `/login` 页面，输入刚才设置的密码即可进入，会话有效期 7 天，Cookie 为 HttpOnly。控制台右上角还有一个退出登录按钮。
 
 > **安全提醒**：用 IP + HTTP 访问时密码是明文传输的，务必在安全组里限制来源 IP；接入域名并配置 HTTPS 后，再把 `MANAGER_COOKIE_SECURE` 改成 `1`。
 
-> **为什么远程访问不用改代码**：控制台前端原先直接请求 `http://127.0.0.1:<引擎端口>`，这只在本机有效，从别的电脑打开会去连访问者自己的 127.0.0.1。现在所有引擎调用统一走同源的 `/api/proxy`，由服务端转发到本机引擎，因此局域网和公网访问都能正常工作。
+> **为什么远程访问不用改代码**：控制台前端原先直接请求 `http://127.0.0.1:<引擎端口>`，这只在本机有效，从别的电脑打开会去连访问者自己的 127.0.0.1。现在所有引擎调用统一走同源的 `/api/proxy`，由服务端转发到本机后端，因此局域网和公网访问都能正常工作。
 
 ### 7. 本地开发（可选）
 
-如果你仍然想在 Windows 上本地调试，可以双击 `my-blog-manager/Start.bat`。本地环境没有发布助手脚本，发布按钮只会把内容镜像到本地网站源码目录，构建与上线需要你自己执行。
+如果你仍然想在 Windows 上本地调试，可以双击 `my-blog-manager/Start.bat`。
+
+后端的本地配置放在 `server/.env`（已被 `.gitignore` 忽略，仓库里只留 `.env.example` 模板）：
+
+```ini
+# server/.env
+XHS_DATABASE_URL=sqlite:///server/data/blog.db
+DEEPSEEK_API_KEY=你的本地开发密钥
+```
+
+本地直接起后端：
+
+```bash
+cd server
+.venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+本地没有发布助手脚本（`/usr/local/bin/xhblogs-publish` 只在服务器上有），点「发布上线」只会把当前内容导成一份快照放到 `snapshots/`，构建与上线需要你自己执行。
 
 ### 8. 开发机与服务器的协作
 
@@ -382,6 +483,96 @@ Environment=HOSTNAME=0.0.0.0
 > 推送源码请用 `xhblogs-git` 这条 SSH 主机别名（以 `xhblogs` 用户身份写入裸仓库）。
 > 如果用 root 身份推送，裸仓库里会留下 root 属主的对象，服务器上的发布推送就会因
 > 权限不足被拒。控制台那边不用改任何配置。
+
+---
+
+## 附录：统一后端与数据库
+
+想改内容结构、加字段、接新的接口，从这里入手。
+
+### 目录
+
+```
+server/app/
+├── main.py          # 应用入口：注册全部路由、中间件、启动任务
+├── config.py        # 运行配置：全部从环境变量读
+├── db.py            # 数据库连接与会话
+├── models.py        # ORM 模型（所有表都在这里）
+├── security.py      # 口令哈希、会话令牌、管理员校验
+├── snapshot.py      # 内容快照的导出与导入
+├── helpers.py       # 通用小工具
+├── markdown.py      # Markdown 解析
+├── siteconfig.py    # 站点配置的读取与写入
+├── tsdata.py        # 解析旧的 TS 数据文件（导入老内容时用）
+└── api/
+    ├── content.py       # 文章 / 杂谈 / 关于页 / 说说
+    ├── collections.py   # 相册 / 友链 / 项目
+    ├── config.py        # 站点配置
+    ├── drafts.py        # 草稿箱
+    ├── media.py         # 图片上传与读取
+    ├── music.py         # 本地音乐
+    ├── comments.py      # 评论
+    ├── dailyquote.py    # 每日一句
+    ├── chat.py          # AI 煤球
+    ├── auth.py          # 登录 / 登出
+    └── deploy.py        # 发布 / 回退 / 线上状态
+```
+
+### 数据表
+
+| 表 | 装什么 |
+| --- | --- |
+| `articles` | 文章、杂谈、关于页（`type` 区分，`slug` 唯一） |
+| `moments` | 说说 |
+| `albums` / `album_photos` | 相册与相册里的照片 |
+| `friends` / `projects` | 友链、项目矩阵 |
+| `site_config` | 站点配置（整份 JSON 存一行） |
+| `drafts` | 草稿箱 |
+| `music_tracks` | 本地音乐（元数据，音频本体在磁盘上） |
+| `daily_quotes` | 每日一句（`date` 为主键，一天一条） |
+| `media_assets` | 上传图片的元数据 |
+| `settings` | 其它零散设置（每日一句配置等） |
+| `comments` / `comment_likes` | 评论与点赞（**不进快照**，单独备份数据库文件） |
+
+### 加一张新表、改一个字段
+
+1. 在 `server/app/models.py` 里改 ORM 模型；
+2. 建表是自动的——`init_db()` 每次启动都会按模型补齐缺失的表；
+3. 如果新表也要进内容快照，在 `server/app/snapshot.py` 的 `TABLES` 里登记它；
+   注意**父表要排在子表前面**（插入按正序、删除按倒序，否则外键约束会拦下来）；
+4. 在 `server/app/api/` 下写路由，前端通过 `/api/...` 访问。
+
+### 内容是怎么到前台的
+
+```
+控制台保存 ─→ POST /api/articles ─→ 写进数据库
+公开站渲染 ─→ GET  /api/articles ─→ 从数据库读
+```
+
+两端都走同源代理：
+
+| 前端 | 代理路由 | 转发到 |
+| --- | --- | --- |
+| 公开站 | `/api/comments`、`/api/config`、`/api/daily-quote`、`/api/chat`、`/api/music/*` | `http://127.0.0.1:8000` |
+| 控制台 | `/api/proxy/<后端路径>` | `http://127.0.0.1:8000` |
+
+公开站的代理是**白名单**的：只放行上面那几个前缀，其余后端接口不会从公网暴露。
+控制台的 `/api/proxy` 走管理员鉴权。
+
+### 改完怎么验证
+
+```bash
+# 本地：起后端，跑一遍接口冒烟测试
+cd server
+.venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+.venv/Scripts/python scripts/smoke_test.py --base http://127.0.0.1:8000
+
+# 服务器上：冒烟测试也能跑，带上会话密钥即可写
+cd /opt/xinghui-blog/server
+MANAGER_SESSION_SECRET=… .venv/bin/python scripts/smoke_test.py --base http://127.0.0.1:8000
+```
+
+冒烟测试会走一遍主要接口的读写，跑完自动清理测试数据。
 
 ---
 
@@ -401,49 +592,84 @@ Environment=HOSTNAME=0.0.0.0
 
 > ⚠️ 注意：写回发生在发布过程的第一步；只要写回失败，发布会当场中止并说明原因，不会带着半套改动上线。
 
-确认后系统会自动完成五件事：
+确认后系统会自动完成四件事：
 
-1. **写回本地**：把暂存区里的每一项改动（相册 / 友链 / 项目 / 站点配置 / 说说 / 文章）写回内容引擎；
-2. **镜像内容**：把控制台里的文章、说说、动态与站点配置覆盖到网站源码目录；
-3. **提交仓库**：在服务器工作区提交这次改动并推送到裸仓库；
-4. **重新构建**：执行 `npm run build` 生成新的预构建产物；
-5. **重启服务**：重启 `xhblogs`，线上随即生效。
+1. **写回数据库**：把暂存区里的每一项改动（相册 / 友链 / 项目 / 站点配置 / 说说 / 文章）写进统一后端的数据库；
+2. **导出内容快照**：把当前数据库里的内容整体导出成一份 JSON（`snapshots/content-<时间戳>.json`）；
+3. **提交仓库**：在服务器工作区提交这份快照并推送到裸仓库，同时备份一份到 GitHub；
+4. **按需重建**：**只有代码变了才重建**——改了公开站代码就重建公开站，改了控制台代码就重建控制台，改了后端代码就重启后端。只改了内容的话，这一步直接跳过。
 
-整个过程约 1-3 分钟。构建日志见 `/var/log/xhblogs-publish.log`。
+> **🌟 内容改动是实时生效的**：公开站在请求时读数据库，所以在控制台点「保存」的那一刻，
+> 前台刷新就是新的，根本不需要等发布。「发布上线」做的是**留一份可追溯、可回退的版本**。
 
-> 如果你直接在服务器上改了源码，可以用 `sudo -u xhblogs sudo -n /usr/local/bin/xhblogs-async-rebuild` 只触发一次重建（跳过镜像与提交步骤）。
+整个过程通常几秒钟。构建日志见 `/var/log/xhblogs-publish.log`。
+
+> 如果你直接在服务器上改了源码，可以用 `sudo /usr/local/bin/xhblogs-deploy` 拉最新代码并按改动范围重建；
+> 只想要一次公开站重建的话，用 `sudo /usr/local/bin/xhblogs-rebuild`。
 
 博客文章、说说（碎碎念）、杂谈等所有内容的发布与修改，均遵循此流程。
 
 > **💡 黄金法则**：暂存队列 → 🚀 发布上线
 
+### 内容快照长什么样
+
+一份快照就是一份完整的内容导出，包含文章、杂谈、说说、相册与照片、友链、项目、站点配置、
+草稿、本地音乐、每日一句与图片元数据（评论不进快照，它是访客数据，单独备份数据库文件即可）：
+
+```json
+{
+  "version": 1,
+  "createdAt": "2026-10-29 19:47:35",
+  "tables": {
+    "articles": [ { "slug": "first", "title": "…", "content": "…", "date": "…" } ],
+    "moments": [],
+    "albums": [],
+    "album_photos": [],
+    "friends": [],
+    "projects": [],
+    "site_config": [ { "id": 1, "payload": "{…}" } ],
+    "drafts": [],
+    "music_tracks": [],
+    "daily_quotes": [],
+    "media_assets": [],
+    "settings": []
+  }
+}
+```
+
 ### 发布历史与回退
 
-「设置 → 线上发布」里的「4. 发布历史与回退」列出最近 20 步，每一步显示提交号、说明与时间；当前线上版本标注「当前线上」。点任意一步的 **「回退到这里」**，系统会把文章、说说、相册 / 友链 / 项目数据、关于页、站点配置、本地音乐与上传图片恢复到那一步的内容状态，重新提交、推送并构建，约 1-3 分钟生效。
+「设置 → 线上发布」里的「4. 发布历史与回退」列出最近 20 步，每一步显示提交号、说明与时间；
+发布是 `chore(publish)`，回退是 `chore(rollback)`，一眼能分清。
 
-回退是一次**新的提交**，历史不会因此断掉，可以继续往前回退；源码本身不受影响。回退日志同样写在 `/var/log/xhblogs-publish.log`。
+点任意一步的 **「回退到这里」**，系统会把那次提交里的快照灌回数据库，文章、说说、相册 / 友链 / 项目数据、
+关于页、站点配置、本地音乐与图片元数据立刻回到那一步的样子，并再提交一份新的快照。
+回退是一次**新的提交**，历史不会因此断掉，可以继续往前回退。回退日志同样写在 `/var/log/xhblogs-publish.log`。
+
+> 快照本身存在 Git 里，所以回退不依赖数据库备份——只要仓库还在，任何一步都能退回去。
 
 ### 线上状态面板
 
-「设置 → 线上发布」会实时显示公开站当前的状态：服务是否在运行、最近一次构建的时间与构建号、源码仓库的最新提交、以及上一轮发布的结果。只要构建时间晚于发布时间，就说明改动**已经生效**在公开站上了。
-
-> **为什么以前"同步 Blog"了线上却没变**：公开站是 `next start` 运行预构建产物，`siteConfig.ts` 这类源码改动必须重新 `build` + 重启服务才会反映到线上。现在「发布上线」把这一步也包进去了，不需要再手动跑构建。
+「设置 → 线上发布」会实时显示公开站当前的状态：服务是否在运行、最近一次构建的时间与构建号、
+源码仓库的最新提交、以及上一轮发布的结果。内容改动不需要重新构建，所以判断是否生效看的是
+发布状态里的**生效时间戳**，而不是构建时间。
 
 ---
 
 ## 三、图片上传（本地图片仓库）
 
-控制台不再依赖任何第三方图床。图片直接从你的电脑上传，落进控制台自带的**本地图片仓库**（`my-blog-manager/data/uploads/`），站点内统一以 `/uploads/<文件名>` 引用。
+控制台不再依赖任何第三方图床。图片直接从你的电脑上传，落进**统一后端的数据目录**里的本地图片仓库，站点内统一以 `/uploads/<文件名>` 引用。
 
 **上传流程：**
 
 1. 打开控制台「照片墙 → 相册 → 添加碎片」，或「设置 → 视觉背景配置」里的壁纸上传区，也可以是写文章时的图片工作台。
-2. 点 **[上传]** 或直接把图片拖进虚线框，图片会从本机传到内容引擎并落盘。
+2. 点 **[上传]** 或直接把图片拖进虚线框，图片会从本机传到后端并落盘。
 3. 落盘成功后，控制台直接用 `/uploads/<文件名>` 预览，粘贴外链的方式同样保留。
-4. 点「加入暂存」→「🚀 发布上线」，`sync.py` 会把 `data/uploads/` 镜像到公开站的 `public/uploads/`，公开站随即用同一个地址引用这些照片。
+4. 公开站与控制台用**同一个地址**引用这些照片，公开站的 `/uploads/<文件名>` 由服务端转发到后端取文件。
 
-> 本地图片仓库里的图片是二进制文件，已加入 `.gitignore`，不会进仓库、不会随发布推送到远端。
-> 如果你的照片不可再生，记得定期备份 `my-blog-manager/data/uploads/` 这个目录。
+> 本地图片仓库里的图片是二进制文件，不进 Git、不会随发布推送到远端。
+> 如果你的照片不可再生，记得定期备份后端数据目录里的 `uploads/` 子目录
+> （线上默认是 `/var/lib/xhblogs/uploads/`）。
 
 ---
 
@@ -457,19 +683,20 @@ Environment=HOSTNAME=0.0.0.0
 
 控制台「设置 → AI 煤球配置 🐾」里可调：模型 ID（默认 `deepseek-flash`，即 DeepSeek-V4.1-Flash）、接口地址（默认 `https://api.deepseek.com`）、性格 Prompt、生成预算、发散度和思考强度。
 
-在本地设定好猫猫的专属系统提示词（性格）后，我们需要让线上环境也拥有调用 AI 的能力。在服务器上把密钥写进环境变量文件：
+在本地设定好猫猫的专属系统提示词（性格）后，我们需要让线上环境也拥有调用 AI 的能力。**AI 现在只有统一后端会调**，所以密钥只需要写进后端的环境变量文件：
 
 ```bash
-echo 'DEEPSEEK_API_KEY=你的真实 API 密钥' >> /etc/xhblogs.env
-chmod 600 /etc/xhblogs.env
-systemctl restart xhblogs
+echo 'DEEPSEEK_API_KEY=你的真实 API 密钥' >> /etc/xhblogs-manager.env
+chmod 600 /etc/xhblogs-manager.env
+systemctl restart xhblogs-manager-api
 ```
 
-`/etc/systemd/system/xhblogs.service` 里已经声明了 `EnvironmentFile=-/etc/xhblogs.env`，因此公开站会读到这份密钥。控制台自己调用 AI 时，把同一份变量加进 `/etc/xhblogs-manager.env` 并重启 `xhblogs-manager-web` 即可。
+`/etc/systemd/system/xhblogs-manager-api.service` 里已经声明了 `EnvironmentFile=-/etc/xhblogs-manager.env`，
+因此统一后端会读到这份密钥；公开站与控制台都通过它调用 AI，不需要各自再放一份。
 
-> **每日一句也由引擎调用 AI**，所以 `/etc/xhblogs-manager.env` 里同样要放这份密钥，并且 `xhblogs-manager-api.service` 需要声明 `EnvironmentFile=-/etc/xhblogs-manager.env`。
+本地开发把密钥写进 `server/.env`（已被 `.gitignore` 忽略，不会进仓库）。
 
-本地桌面版把密钥写进各应用的 `.env.local`（已被 `.gitignore` 忽略，不会进仓库）。
+> **每日一句也由后端调用 AI**，用的是同一份密钥。
 
 > **密钥不要写进代码、文档或仓库**，只放在服务器上权限为 600 的环境变量文件里。
 
@@ -486,15 +713,15 @@ systemctl restart xhblogs
 - **换一句 / 手写一句**：今天这句不满意就点「换一句」让 AI 重新说；也可以直接手写一句顶掉今天的自动结果，第二天仍按时重新生成。
 - **往期**：控制台底部保留最近 30 条，说过什么一目了然。
 - **模型与人设**：完全复用「AI 煤球配置 🐾」里的模型、接口地址与性格 Prompt，换模型不用改代码。
-- **数据位置**：设置在 `my-blog-manager/data/dailyQuoteConfig.json`，内容在 `my-blog-manager/data/dailyQuote.json`，两者都不入库。
+- **数据位置**：设置与往期都存在统一后端的数据库里（`settings` 与 `daily_quotes` 两张表），跟其它内容在一起。
 
-> 定时生成由内容引擎常驻执行，**控制台网页可以关着**，但 `xhblogs-manager-api` 必须保持运行。访客打开首页时如果今天还没生成，引擎在后台悄悄写，页面不等人。
+> 定时生成由统一后端常驻执行，**控制台网页可以关着**，但 `xhblogs-manager-api` 必须保持运行。访客打开首页时如果今天还没生成，后端在后台悄悄写，页面不等人。
 
 ---
 
 ## 六、评论系统配置
 
-评论系统是**自建**的：留言存在服务器本机的 SQLite 数据库里（`my-blog-manager/data/comments.db`），前台读写走内容引擎，控制台可以直接审核、回复、隐藏、删除。**不需要 GitHub 仓库，也不需要 OAuth 授权。**
+评论系统是**自建**的：留言存在统一后端的 SQLite 数据库里（`comments` 与 `comment_likes` 两张表），前台读写走同一个后端，控制台可以直接审核、回复、隐藏、删除。**不需要 GitHub 仓库，也不需要 OAuth 授权。**
 
 > 旧的 Gitalk 方案（把评论塞进 GitHub Issues）已经整体下线：它让站长在后台看不到、也管不了任何一条留言。现在控制台的 **💬 评论管理** 页面能看到全站每一条评论。
 
@@ -528,13 +755,14 @@ systemctl restart xhblogs
 
 ### 数据与备份
 
-评论数据只存在服务器磁盘上，**不会进 Git**（`.gitignore` 已排除 `data/comments.db`）。备份时把 `my-blog-manager/data/comments.db` 一起拷走即可；换服务器或重建服务后，把这个文件放回原位，留言就回来了。
+评论数据只存在服务器磁盘上，**不进 Git**（内容快照里也不含评论）。备份时把后端的数据库文件一起拷走即可
+（线上默认是 `/var/lib/xhblogs/blog.db`）；换服务器或重建服务后，把这个文件放回原位，留言就回来了。
 
 ---
 
 ## 七、本地音乐挂件设置
 
-想给博客配上 BGM 吗？音频直接传到控制台，由控制台统一托管，发布时同步到博客。
+想给博客配上 BGM 吗？音频直接传到控制台，由**统一后端**托管，公开站与控制台读同一份歌单。
 
 进入控制台 → **音乐播放设置**：
 
@@ -542,13 +770,11 @@ systemctl restart xhblogs
 2. 填上歌曲名（不填就用文件名），歌手可选。封面图片和 `.lrc` 歌词同样可选。
 3. 点 **上传并加入歌单**，曲目会立刻出现在下方列表里，可以就地试听、换封面、补歌词或删除。
 
-上传完成后去 **线上发布** 点一次发布，控制台会把 `my-blog-manager/music/` 增量同步到博客的 `XHBlogs/public/audio/`，公开站的播放器直接读这份本地歌单。
-
 几个需要知道的细节：
 
-- **音频本体不进 Git**。仓库里只跟踪 `playlist.json` 这份元数据，音频文件留在服务器磁盘上——公开的备份仓库不适合塞版权音乐，仓库体积也不会被撑爆。同步走的是增量比对，只传新增和变更的文件。
-- **Next.js 会在启动时快照 `public/` 目录**，所以新上传的音频需要发布（重建 + 重启）之后才会对外可见。
-- 控制台里可以试听，但试听走的是引擎的接口；网站上的播放走的是 `public/audio/` 下的静态文件，发布之后两边的歌单才会一致。
+- **音频本体不进 Git**。仓库里只跟踪内容快照里的曲目元数据，音频文件留在服务器磁盘上——公开的备份仓库不适合塞版权音乐，仓库体积也不会被撑爆。
+- **上传即可听，不必发布**。后端把音频存在自己的数据目录里，公开站的播放器通过 `/api/music/*` 转发取流，音频、封面、歌词走的是同一套接口。
+- **公开站的转发是受限的**：只放行 `local / file / cover / lyrics` 四类路径，其余后端接口不会从公开站暴露出去。
 
 ---
 

@@ -1,3 +1,19 @@
+## 0.5.0 - 2026-10-29
+
+- **项目改造成完整的前端 + 后端 + 数据库工程**：后端从 `my-blog-manager/cms_core` 抽到顶层 `server/`，博客（`XHBlogs/`）与管理后台（`my-blog-manager/`）成为共享同一套后端与同一份数据库的两个前端。目录名保持不变，`server/` 是新增的顶层目录。
+- **数据库成为唯一真相**：新增 SQLite 存储层（SQLAlchemy 2.x ORM + WAL），文章、杂谈、说说、相册 / 照片、友链、项目、关于页、站点配置、草稿、本地音乐、每日一句、评论与设置全部落库。公开站与控制台不再各自读 markdown / TS 文件，两边内容永远一致。
+- **公开站改为运行时读库**：`XHBlogs/lib/backend.ts` 统一解析后端地址（`XHS_API_BASE_URL` → `MANAGER_API_PORT` → `XHS_ENGINE_API_PORT` → `public/backend_config.json` → 8000），页面在请求时读取后端内容；写操作（评论、每日一句、AI 煤球、音乐）统一走同源代理转发到 `http://127.0.0.1:8000`，音乐转发是白名单（只放行 `local / file / cover / lyrics`）。
+- **控制台改为写入统一后端**：`my-blog-manager/lib/backendPort.ts` 与公开站同一套端口解析规则，控制台的所有写操作经 `/api/proxy/<后端路径>` 落到同一个后端；站点配置、相册、友链、项目、说说、文章不再回写 TS 文件。
+- **发布机制改为「数据库为准 + git 存快照」**：点一次「发布上线」把当前数据库内容整体导出成 `snapshots/content-<时间戳>.json` 并提交进仓库（提交信息 `chore(publish)`）；回退改为把历史快照灌回数据库（`chore(rollback)`），仍是一次新提交，历史不断。快照结构与内容表清单见 `server/app/snapshot.py`。
+- **新增内容导入脚本** `server/scripts/import_content.py`：老版本的内容还在 markdown / TS 文件里时，一次性导入数据库（文章 3、杂谈 1、关于页 1、相册 2、照片 5、友链 1、站点配置 21 项、每日一句 1、图片 1），导入是覆盖式的。
+- **新增接口冒烟测试** `server/scripts/smoke_test.py`：走一遍主要接口的读写，跑完自动清理测试数据；管理员身份支持 `X-Admin-Token` 请求头（值即会话密钥），服务器上带 `MANAGER_SESSION_SECRET` 即可跑。服务器实测 **27 通过 / 0 失败**，无残留。
+- **服务器部署切换到统一后端**：systemd 单元 `xhblogs-manager-api.service` 改为 `WorkingDirectory=/opt/xinghui-blog/server`、`ExecStart=.../server/.venv/bin/uvicorn app.main:app`；数据库放在仓库外的 `/var/lib/xhblogs/blog.db`（通过 `XHS_DATABASE_URL` 指定），仓库重建不会丢数据。
+- **发布助手按改动范围分派**：`tools/xhblogs-publish` 抽出 `classify_path()` 判定路径属于内容 / 公开站 / 控制台 / 后端；只有代码变了才重建对应服务，纯内容发布跳过构建。判定规则由 `tools/test-publish-paths.sh` 固化（23 条用例全部通过）。
+- **后端改动重启不再自杀**：发布助手由后端进程派生，直接 `systemctl restart` 会把它自己所在的 cgroup 一起停掉，导致状态文件永远停在「进行中」。改为用 `systemd-run --on-active=3s` 派一个瞬态单元去执行重启。
+- **新增运维脚本**：`tools/xhblogs-rebuild`（重建公开站）、`tools/xhblogs-deploy`（手动更新，按改动范围决定重建公开站 / 控制台 / 只重启后端）、`tools/xhblogs-manager-rebuild`（新增 `--skip-api`，避免连带重启后端）。旧的 `tools/xhblogs-async-rebuild` 已删除。
+- **密钥仍然只有一处**：DeepSeek 密钥与会话密钥只从环境变量读（服务器上 `/etc/xhblogs-manager.env`，权限 600；本地 `server/.env`），仓库里只留 `server/.env.example` 模板，没有任何口令进代码、文档或脚本。
+- **文档同步更新**：`README.md` 与 `README_en.md` 补上项目结构、`server/` 目录说明、新的 systemd 单元、数据库放在仓库外的做法与导入脚本、快照式发布与回退流程，以及「统一后端与数据库」附录（目录树、数据表清单、加表改字段的步骤、代理白名单、验证命令）。
+
 ## 0.4.9 - 2026-10-29
 
 - 控制台与引擎的提示文案跟上了新的发布节奏：发布按钮不再承诺「约 1-3 分钟生效」，改成「内容改动刷新即生效」；发布状态里的「构建中」改为「同步中」，「最近构建」下面补了一句「仅代码改动才会重建站点」；回退提示保持原样（回退助手确实仍会重建站点）。
