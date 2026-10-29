@@ -100,16 +100,13 @@ def is_authenticated(request: Request) -> bool:
 
 
 def require_admin(request: Request) -> None:
-    """写操作都要过这一关。没有配置口令时直接放行。"""
-    if not config.auth_enabled():
-        return
-    if verify_session_token(request_session(request)):
-        return
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未授权，请先登录管理后台")
+    """写操作都要过这一关。没有配置口令时直接放行。
 
-
-def require_admin_or_token(request: Request) -> None:
-    """同上，但额外接受 X-Admin-Token 头（供脚本化调用）。"""
+    两种身份都认：
+      1. 浏览器带来的会话 Cookie（控制台正常登录走这条）
+      2. X-Admin-Token 请求头（脚本化调用走这条，例如冒烟测试、
+         运维脚本；它的值就是会话密钥，能拿到它的人本来也能伪造会话）
+    """
     if not config.auth_enabled():
         return
     if verify_session_token(request_session(request)):
@@ -118,6 +115,10 @@ def require_admin_or_token(request: Request) -> None:
     if token and hmac.compare_digest(token, config.session_secret()):
         return
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未授权，请先登录管理后台")
+
+
+# 兼容旧名字：语义已经完全并入 require_admin
+require_admin_or_token = require_admin
 
 
 AdminDep = Depends(require_admin)

@@ -1,13 +1,19 @@
 """接口冒烟测试。
 
-    python scripts/smoke_test.py [--base http://127.0.0.1:8000]
+    python scripts/smoke_test.py [--base http://127.0.0.1:8000] [--token <密钥>]
 
 把统一后端的主要接口都走一遍，确认读写都通。
 测试数据用独立前缀，跑完自动清理。
+
+写操作需要管理员身份。传 --token（值就是会话密钥）即可，
+它会以 X-Admin-Token 请求头带上；也可以用环境变量
+XHS_ADMIN_TOKEN 或 MANAGER_SESSION_SECRET 提供。
+没有配置口令的本地环境不需要传，直接放行。
 """
 
 import argparse
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -23,12 +29,16 @@ for stream in (sys.stdout, sys.stderr):
 PREFIX = "smoke-test"
 _passed = 0
 _failed = 0
+# 写操作要带的管理员身份，由 main() 从命令行或环境变量里取
+_token = ""
 
 
 def request(base: str, method: str, path: str, payload: Any = None) -> Dict[str, Any]:
     url = base.rstrip("/") + path
     data = None
     headers = {}
+    if _token:
+        headers["X-Admin-Token"] = _token
     if payload is not None:
         data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -57,12 +67,22 @@ def check(name: str, condition: bool, detail: str = "") -> None:
 
 
 def main() -> int:
+    global _token
     parser = argparse.ArgumentParser(description="统一后端接口冒烟测试")
     parser.add_argument("--base", default="http://127.0.0.1:8000")
+    parser.add_argument(
+        "--token",
+        default="",
+        help="管理员身份令牌（会话密钥）。默认从 XHS_ADMIN_TOKEN 或 MANAGER_SESSION_SECRET 读取",
+    )
     args = parser.parse_args()
     base = args.base
 
-    print("🔍 测试目标：%s\n" % base)
+    _token = (args.token or os.environ.get("XHS_ADMIN_TOKEN")
+              or os.environ.get("MANAGER_SESSION_SECRET") or "").strip()
+
+    print("🔍 测试目标：%s" % base)
+    print("🔑 管理员身份：%s\n" % ("已带令牌" if _token else "未带令牌（后端未启用口令时应可正常写）"))
 
     print("▶ 基础状态")
     result = request(base, "GET", "/api/status")
