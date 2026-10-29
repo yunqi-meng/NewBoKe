@@ -3,9 +3,9 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import BackButton from '../../components/BackButton';
-import { friendsData } from '../../data/friends';
 import Comments from '../../components/Comments'; // 🌟 引入自建评论区
-import { siteConfig } from '../../siteConfig'; // 🌟 引入刚刚更新的全局配置文件
+import { useSiteConfig } from '../../components/SiteConfigProvider';
+import type { Friend } from '../../lib/types';
 
 // Framer Motion 动画变体：交错子元素
 const containerVariants = {
@@ -21,9 +21,10 @@ const itemVariants = {
   show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
 };
 
-export default function FriendsBoard() {
+export default function FriendsBoard({ friends }: { friends: Friend[] }) {
   // 🌟 控制复制按钮的状态
   const [isCopied, setIsCopied] = useState(false);
+  const siteConfig = useSiteConfig();
 
   // 🌟 直接从 siteConfig 读取申请格式
   const applyFormat = siteConfig.friendLinkApplyFormat;
@@ -58,7 +59,7 @@ export default function FriendsBoard() {
         animate="show"
         className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6"
       >
-        {friendsData.map((friend) => (
+        {friends.map((friend) => (
           <motion.div key={friend.id} variants={itemVariants} className="h-full">
             <a
               href={friend.url}

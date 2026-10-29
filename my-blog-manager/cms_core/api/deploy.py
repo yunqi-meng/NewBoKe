@@ -227,6 +227,14 @@ def _collect_status(blog_path, repo_root):
             built = status["build"].get("timestamp")
             if started and built and built >= started:
                 status["effective"] = True
+            # 🌟 纯内容发布不会重新构建站点，构建号的时间戳会比本次发布早，
+            #    这时要靠发布助手写下的「生效时间戳」来判断内容是否已经上线。
+            try:
+                effective_at = float(publish.get("effectiveAtTimestamp") or 0)
+            except (TypeError, ValueError):
+                effective_at = 0.0
+            if effective_at and started and effective_at >= float(started):
+                status["effective"] = True
             if publish.get("state") == "failed":
                 status["effective"] = False
 

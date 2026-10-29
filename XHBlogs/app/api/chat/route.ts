@@ -1,5 +1,5 @@
 // app/api/chat/route.ts
-import { siteConfig } from '../../../siteConfig';
+import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
 
 /**
  * AI 煤球的对话接口。
@@ -32,6 +32,7 @@ function readApiKey(): string {
 
 /** 接口地址，末尾斜杠去掉，避免拼出双斜杠 */
 function readBaseUrl(): string {
+  const siteConfig = getLiveSiteConfig();
   const raw = process.env.AI_BASE_URL || siteConfig.aiConfig.baseUrl || 'https://api.deepseek.com';
   return raw.trim().replace(/\/+$/, '');
 }
@@ -39,7 +40,7 @@ function readBaseUrl(): string {
 export async function POST(req: Request) {
   try {
     const { message } = await req.json();
-    const cfg = siteConfig.aiConfig;
+    const cfg = getLiveSiteConfig().aiConfig;
 
     const apiKey = readApiKey();
     if (!apiKey) {
@@ -124,7 +125,7 @@ export async function POST(req: Request) {
 export async function GET() {
   return Response.json({
     status: 'Ready',
-    model: siteConfig.aiConfig.modelId,
+    model: getLiveSiteConfig().aiConfig.modelId,
     provider: readBaseUrl(),
   });
 }

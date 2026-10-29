@@ -1,3 +1,14 @@
+## 0.4.8 - 2026-10-29
+
+- 公开站改为运行时渲染：根布局加上 `export const dynamic = 'force-dynamic'`，所有页面由预渲染（SSG）改为按请求渲染。改动前公开站的响应头是 `x-nextjs-prerender: 1` + `Cache-Control: s-maxage=31536000`，内容被冻结在构建那一刻的 HTML 里；现在改为 `no-store`，每次请求都重新渲染。
+- 站点配置运行时读取：新增 `XHBlogs/lib/siteConfigRuntime.ts`，从磁盘上的 `siteConfig.ts` 截出对象字面量并求值（字符串感知的括号平衡，避免被值里的 `}`、`//`、转义引号截断），再与编译期快照深合并（`XHBlogs/lib/siteConfigMerge.ts`）；解析失败自动回落到快照，站点不会因为配置写坏而打不开。`XHBlogs/app/layout.tsx` 的标题、图标、描述改为 `generateMetadata`，改站点标题不再需要重新构建。
+- 客户端组件统一改用 `useSiteConfig()`：新增 `XHBlogs/components/SiteConfigProvider.tsx` 与公开接口 `XHBlogs/app/api/config/route.ts`（不下发 `aiConfig`），导航、个人名片、社交链接、仪表盘、关于页、启动页、弹幕背景、壁纸轮播等全部改为从上下文取配置，窗口重新获得焦点时自动刷新。
+- 相册、友链、项目三块看板改为运行时读盘：新增 `XHBlogs/lib/tsData.ts`（字符串感知的数组截取 + 去掉 TS 风格尾随逗号，与引擎 `cms_core/tsdata.py` 规则一致）与 `XHBlogs/lib/types.ts`，`data/albums.ts`、`data/friends.ts`、`data/projects.ts` 不再被静态 import 打进产物，而是逐次请求读盘解析，由服务端页面通过 props 传给客户端看板。
+- 文章与杂谈详情页移除 `generateStaticParams`，路径改为 `XHBlogs/lib/siteRoot.ts` 统一解析（可用 `XHS_SITE_ROOT` 覆盖站点根目录），全站内容路径不再散落着 `process.cwd()`。
+- **发布不再需要重新构建站点**：服务器发布助手（`tools/xhblogs-publish`）在提交后先算出这次改动的文件清单，若只涉及内容路径（文章、杂谈、说说、关于页、相册 / 友链 / 项目数据、站点配置、上传的图片与音频）就跳过 `next build` 与重启，直接判定为「已实时生效」；只有代码路径（页面、组件、构建配置）变化时才重新构建公开站，并按需重建管理后台。此前每次发布都要等一次约 35 秒的全站构建，现在纯内容发布点完即见。
+- 发布状态新增 `effectiveAtTimestamp`：纯内容发布不会产生新的构建号，时间戳会比本次发布早，控制台改用这个字段判断「已同步到线上」，避免被误判成「有待发布的改动」。
+- 新增 `.gitattributes`：服务器上的发布助手是 bash 脚本，强制以 LF 换行检入，避免在 Windows 上编辑后被转成 CRLF 导致脚本在服务器上直接失败。
+
 ## 0.4.7 - 2026-10-29
 
 - 加固发布流程，避免连点两下把站点搞成半新半旧：引擎新增并发判定，发布与回退在有任务进行中时直接拒绝并提示「上一次发布还在进行中」；服务器助手脚本改用 `flock` 串行化，两次发布不会同时提交、推送和构建。

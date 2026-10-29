@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, MessageSquare, Sparkles, Activity } from 'lucide-react';
 import Comments from './Comments';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 import Link from 'next/link';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 
@@ -28,6 +28,7 @@ export default function AboutClient({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const siteConfig = useSiteConfig();
   const activeTab = searchParams.get('tab') || 'intro';
 
   const handleTabChange = (tab: string) => {

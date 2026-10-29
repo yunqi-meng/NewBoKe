@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 
 export default function SplashScreen() {
+  const siteConfig = useSiteConfig();
   const [show, setShow] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 

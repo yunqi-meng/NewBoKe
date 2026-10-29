@@ -1,3 +1,29 @@
+# Version 0.4.8 - The Public Site Now Renders Live
+
+**Click "发布上线" and the front end changes immediately.**
+
+- **The public site is no longer prerendered**: every route renders per request, so articles, moments,
+  the photo wall, friend links, projects, the about page and the site config are all read from disk on
+  each hit. The HTML used to be frozen at build time (`x-nextjs-prerender: 1` in the response headers),
+  which is why content only changed after a full rebuild.
+- **Publishing no longer waits for that ~35 second build**: the server-side publish helper now computes
+  the changed file list and skips `next build` plus the service restart when only content changed,
+  reporting the publish as already live. The public site is rebuilt only when code changed (pages,
+  components, build config), and the console is rebuilt on demand as well.
+- **The site config is live too**: changing the title, nickname, navigation, avatar, wallpaper, danmaku
+  list or ICP number in `siteConfig.ts` takes effect on refresh - even the browser tab title, which now
+  comes from `generateMetadata`.
+- **Albums, friend links and projects are read at runtime**: the console-generated `data/*.ts` files are
+  no longer bundled into the build. The parser follows the engine's rules (including stripping
+  TypeScript-style trailing commas), so they can't end up missing from the public site.
+- **The console no longer misreports "已同步到线上"**: the publish status now carries an effective
+  timestamp, so a content-only publish is correctly recognised as live even though it produced no new
+  build id.
+- **Hardening along the way**: a new `.gitattributes` keeps the server-side publish scripts at LF line
+  endings, so editing them on Windows can no longer break them on the server.
+
+---
+
 # Version 0.4.7 - The Console Now Shows Live Content
 
 **After publishing, a refresh in the console shows exactly what is live.**

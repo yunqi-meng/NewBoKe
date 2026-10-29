@@ -1,7 +1,7 @@
 // src/components/ClientSocials.tsx
 "use client";
 
-import { siteConfig } from '../siteConfig'; // 确保路径正确
+import { useSiteConfig } from './SiteConfigProvider';
 
 // 这里我们整合了 SocialBtn 和 ClientSocials
 function SocialBtn({ type, url, onClick }: { type: string, url?: string, onClick?: () => void }) {
@@ -30,6 +30,8 @@ function SocialBtn({ type, url, onClick }: { type: string, url?: string, onClick
 }
 
 export default function ClientSocials() {
+  const siteConfig = useSiteConfig();
+
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     alert(`✨ ${label}已复制到剪贴板: ${text}`);

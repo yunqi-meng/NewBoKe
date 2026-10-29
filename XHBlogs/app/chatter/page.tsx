@@ -1,20 +1,21 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import ChatterBoard from './ChatterBoard';
-import { siteConfig } from '@/siteConfig';
+import { sitePath } from '../../lib/siteRoot';
+import { liveMetadata } from '../../lib/pageMetadata';
 
 
-export const metadata = {
-  title: "杂谈 | "+ siteConfig.title,
-  description: "日常碎片与灵感记录",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return liveMetadata('杂谈', '日常碎片与灵感记录');
+}
 
 export default function ChatterPage() {
   // 注意：这里我们假设你的 md 文件放在根目录的 chatters 文件夹里
-  const chattersDirectory = path.join(process.cwd(), 'chatters');
+  const chattersDirectory = sitePath('chatters');
   let chatters = [];
 
   try {

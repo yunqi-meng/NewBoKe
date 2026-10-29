@@ -2,7 +2,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import { siteConfig } from '../../siteConfig';
+import { useSiteConfig } from '../../components/SiteConfigProvider';
 
 type Chatter = {
   slug: string;
@@ -15,6 +15,7 @@ type Chatter = {
 };
 
 export default function ChatterBoard({ chatters }: { chatters: Chatter[] }) {
+  const siteConfig = useSiteConfig();
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTag, setActiveTag] = useState("全部");
 

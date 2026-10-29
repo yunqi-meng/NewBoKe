@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 
 interface DanmakuItem {
   id: number;
@@ -12,6 +12,7 @@ interface DanmakuItem {
 }
 
 export default function DanmakuBackground() {
+  const siteConfig = useSiteConfig();
   const [danmakus, setDanmakus] = useState<DanmakuItem[]>([]);
 
   useEffect(() => {
@@ -33,7 +34,7 @@ export default function DanmakuBackground() {
       });
     }
     setDanmakus(generatedDanmakus);
-  }, []);
+  }, [siteConfig.danmakuList]);
 
   return (
     // 🌟 终极限制：去掉了 bottom-0，换成了 h-[30vh] 强制锁死容器高度！

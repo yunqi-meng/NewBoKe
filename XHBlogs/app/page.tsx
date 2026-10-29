@@ -7,12 +7,13 @@ import Navbar from '../components/Navbar';
 import DailyQuote from '../components/DailyQuote';
 import PageTransition from '../components/PageTransition';
 import SearchBar from '../components/SearchBar';
-import { siteConfig } from '../siteConfig';
+import { getLiveSiteConfig } from '../lib/siteConfigRuntime';
+import { sitePath } from '../lib/siteRoot';
 import CloudPlayer from '../components/CloudPlayer';
 import ThemeToggleBlock from '../components/ThemeToggleBlock';
 import ProfileCard from '../components/ProfileCard';
 import SiteDashboard from '../components/SiteDashboard';
-import { albums } from '../data/albums';
+import { readAlbumsFromDisk } from '../lib/tsData';
 import LyricBar from '../components/LyricBar';
 import { ToastProvider } from '../components/ToastProvider';
 
@@ -36,7 +37,9 @@ function formatUpdateTime(dateString: string) {
 }
 
 export default function Home() {
-  const postsDirectory = path.join(process.cwd(), 'posts');
+  const siteConfig = getLiveSiteConfig();
+  const albums = readAlbumsFromDisk();
+  const postsDirectory = sitePath('posts');
   let allPosts: any[] = [];
   try {
     if (fs.existsSync(postsDirectory)) {
@@ -64,7 +67,7 @@ export default function Home() {
   } catch (e) {}
   const top5Posts = allPosts.length > 0 ? allPosts.slice(0, 5) : [{ slug: 'none', title: '暂无文章', description: '快去写第一篇吧！', cover: siteConfig.defaultPostCover, date: '', formattedDate: '' }];
 
-  const chattersDirectory = path.join(process.cwd(), 'chatters');
+  const chattersDirectory = sitePath('chatters');
   let allChatters: any[] = [];
   try {
     if (fs.existsSync(chattersDirectory)) {

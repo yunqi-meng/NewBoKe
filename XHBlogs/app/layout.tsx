@@ -6,7 +6,8 @@ import { ThemeProvider } from "../components/ThemeProvider";
 import BackgroundEffects from "../components/BackgroundEffects";
 import { MusicProvider } from "../components/MusicProvider";
 import FloatingPlayer from "../components/FloatingPlayer";
-import { siteConfig } from "../siteConfig";
+import { getLiveSiteConfig } from "../lib/siteConfigRuntime";
+import { SiteConfigProvider } from "../components/SiteConfigProvider";
 import ClickEffect from "../components/ClickEffect";
 import BackgroundSlider from "../components/BackgroundSlider";
 import GlobalToolbox from "../components/GlobalToolbox";
@@ -26,16 +27,25 @@ const notoSerif = Noto_Serif_SC({
   display: 'swap',
 });
 
-export const metadata: Metadata = {
-  title: siteConfig.title,
-  description: siteConfig.bio,
-  icons: {
-    icon: siteConfig.faviconUrl,
-    apple: siteConfig.faviconUrl,
-  },
-};
+// 🌟 全站改为运行时渲染：内容与配置都从磁盘实时读取，
+// 后台发布后不再需要重新构建站点，前台刷新即可看到最新内容。
+export const dynamic = 'force-dynamic';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const siteConfig = getLiveSiteConfig();
+  return {
+    title: siteConfig.title,
+    description: siteConfig.bio,
+    icons: {
+      icon: siteConfig.faviconUrl,
+      apple: siteConfig.faviconUrl,
+    },
+  };
+}
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const siteConfig = getLiveSiteConfig();
+
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
@@ -63,7 +73,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       </head>
 
       <body className="w-screen overflow-x-hidden min-h-full flex flex-col relative transition-colors duration-1000 bg-slate-50 dark:bg-slate-950 font-serif">
-        <ThemeProvider>
+        <SiteConfigProvider initialConfig={siteConfig}>
+          <ThemeProvider>
 
           <SplashScreen />
 
@@ -133,6 +144,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           </div>
 
         </ThemeProvider>
+        </SiteConfigProvider>
       </body>
     </html>
   );

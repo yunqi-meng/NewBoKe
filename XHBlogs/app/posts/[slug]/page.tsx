@@ -17,25 +17,13 @@ import 'highlight.js/styles/atom-one-dark.css';
 
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';
-import { siteConfig } from '../../../siteConfig';
+import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
+import { sitePath } from '../../../lib/siteRoot';
 import ClientSocials from '../../../components/ClientSocials';
 import ClientTOC from '../../../components/ClientTOC';
 import BackButton from '../../../components/BackButton';
 import Comments from '../../../components/Comments';
 import SidebarLyric from '../../../components/SidebarLyric';
-
-export async function generateStaticParams() {
-  const postsDirectory = path.join(process.cwd(), 'posts');
-  if (!fs.existsSync(postsDirectory)) return [];
-
-  const filenames = fs.readdirSync(postsDirectory);
-
-  return filenames
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => ({
-      slug: name.replace(/\.md$/, ''),
-    }));
-}
 
 function extractToc(content: string) {
   const toc = [];
@@ -65,7 +53,8 @@ function extractToc(content: string) {
 }
 
 async function getPostData(slug: string) {
-  const fullPath = path.join(process.cwd(), 'posts', `${slug}.md`);
+  const siteConfig = getLiveSiteConfig();
+  const fullPath = sitePath('posts', `${slug}.md`);
   const fileContents = fs.readFileSync(fullPath, 'utf8');
   let { data, content } = matter(fileContents);
 
@@ -125,7 +114,7 @@ async function getPostData(slug: string) {
 }
 
 function getRecentPosts(currentSlug: string) {
-  const postsDirectory = path.join(process.cwd(), 'posts');
+  const postsDirectory = sitePath('posts');
   let fileNames: string[] = [];
   try { fileNames = fs.readdirSync(postsDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
   if (!fileNames) return [];
@@ -139,6 +128,7 @@ function getRecentPosts(currentSlug: string) {
 
 export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
+  const siteConfig = getLiveSiteConfig();
   const postData = await getPostData(resolvedParams.slug);
   const recentPosts = getRecentPosts(resolvedParams.slug);
 

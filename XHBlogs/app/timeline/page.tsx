@@ -1,19 +1,23 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import { siteConfig } from '../../siteConfig';
+import { getLiveSiteConfig } from '../../lib/siteConfigRuntime';
+import { sitePath } from '../../lib/siteRoot';
+import { liveMetadata } from '../../lib/pageMetadata';
 import TimelineClient from '../../components/TimelineClient';
 // 🌟 1. 引入 ToastProvider 喵！
 import { ToastProvider } from '../../components/ToastProvider';
 
-export const metadata = {
-  title: "归档与探索 | " + siteConfig.title,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return liveMetadata('归档与探索');
+}
 
 export default function Timeline() {
-  const postsDirectory = path.join(process.cwd(), 'posts');
+  const siteConfig = getLiveSiteConfig();
+  const postsDirectory = sitePath('posts');
   let posts: any[] = [];
   let tagCounts: Record<string, number> = {};
 

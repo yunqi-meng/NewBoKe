@@ -18,25 +18,16 @@ import 'highlight.js/styles/atom-one-dark.css';
 
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';
-import { siteConfig } from '../../../siteConfig';
+import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
+import { sitePath } from '../../../lib/siteRoot';
 import ClientSocials from '../../../components/ClientSocials';
 import SidebarLyric from '../../../components/SidebarLyric';
 import BackButton from '../../../components/BackButton';
 import Comments from '../../../components/Comments';
 
-export async function generateStaticParams() {
-  const chattersDirectory = path.join(process.cwd(), 'chatters');
-  if (!fs.existsSync(chattersDirectory)) return [];
-  const filenames = fs.readdirSync(chattersDirectory);
-  return filenames
-    .filter((name) => name.endsWith('.md'))
-    .map((name) => ({
-      slug: name.replace(/\.md$/, ''),
-    }));
-}
-
 async function getChatterData(slug: string) {
-  const fullPath = path.join(process.cwd(), 'chatters', `${slug}.md`);
+  const siteConfig = getLiveSiteConfig();
+  const fullPath = sitePath('chatters', `${slug}.md`);
   const fileContents = fs.readFileSync(fullPath, 'utf8');
 
   let { data, content } = matter(fileContents);
@@ -102,7 +93,7 @@ async function getChatterData(slug: string) {
 }
 
 function getRecentChatters(currentSlug: string) {
-  const chattersDirectory = path.join(process.cwd(), 'chatters');
+  const chattersDirectory = sitePath('chatters');
   let fileNames: string[] = [];
   try { fileNames = fs.readdirSync(chattersDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
   if (!fileNames) return [];
@@ -129,6 +120,7 @@ function generateCalendarMatrix(year: number, month: number, targetDay: number) 
 
 export default async function ChatterDetail({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
+  const siteConfig = getLiveSiteConfig();
   const chatterData = await getChatterData(resolvedParams.slug);
   const recentChatters = getRecentChatters(resolvedParams.slug);
 

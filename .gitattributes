@@ -1,0 +1,4 @@
+# 强制以 LF 换行检入：服务器上的发布助手是 bash 脚本，
+# 一旦被转成 CRLF 就会因为找不到命令而直接失败。
+*.sh text eol=lf
+tools/* text eol=lf

@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 // 🌟 引入咱们的控制中心配置
-import { siteConfig } from '../siteConfig';
+import { useSiteConfig } from './SiteConfigProvider';
 
 export default function SiteDashboard() {
+  const siteConfig = useSiteConfig();
   const [timeStr, setTimeStr] = useState('');
   const [uptimeStr, setUptimeStr] = useState('');
 

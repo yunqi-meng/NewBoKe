@@ -1,24 +1,27 @@
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import MomentList from './MomentList';
-import { siteConfig } from '../../siteConfig';
+import { getLiveSiteConfig } from '../../lib/siteConfigRuntime';
+import { sitePath } from '../../lib/siteRoot';
+import { liveMetadata } from '../../lib/pageMetadata';
 
-export const metadata = {
-  title: "说说 | " + siteConfig.title,
-  description: "生活动态与瞬间记录",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return liveMetadata('说说', '生活动态与瞬间记录');
+}
 
 export default function MomentsPage() {
+  const siteConfig = getLiveSiteConfig();
   let allMoments: any[] = [];
 
   try {
     // 🌟 终极防漏绝招：同时扫描两个可能的文件夹，把所有的说说都抓出来！
     const possibleDirs = [
-      path.join(process.cwd(), 'posts', 'moments'),
-      path.join(process.cwd(), 'moments')
+      sitePath('posts', 'moments'),
+      sitePath('moments')
     ];
 
     possibleDirs.forEach(dir => {
