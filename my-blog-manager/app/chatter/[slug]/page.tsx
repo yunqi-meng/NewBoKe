@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -24,22 +21,19 @@ import ClientSocials from '../../../components/ClientSocials';
 import SidebarLyric from '../../../components/SidebarLyric';
 import BackButton from '../../../components/BackButton';
 import Comments from '../../../components/Comments';
-import { managerPath } from '../../../lib/managerRoot';
+import { getArticle, getArticles } from '../../../lib/contentApi';
 
 // 杂谈正文要实时读工作副本：静态预渲染会把正文固化进构建产物，
 // 发布后不重建控制台，打开还是旧版本。
 export const dynamic = 'force-dynamic';
 
 async function getChatterData(slug: string, defaultCover: string) {
-  const fullPath = managerPath('chatters', `${slug}.md`);
-  let fileContents: string;
-  try {
-    fileContents = fs.readFileSync(fullPath, 'utf8');
-  } catch {
+  const article = await getArticle(slug);
+  if (!article) {
     notFound();
   }
 
-  let { data, content } = matter(fileContents);
+  let content = article.content || '';
 
   // ==========================================
   // 🌟 前台渲染清洗区：终极防吞换行 + 安全保护补丁！
@@ -93,28 +87,24 @@ async function getChatterData(slug: string, defaultCover: string) {
   return {
     slug,
     contentHtml: processedContent.toString(),
-    title: data.title || '碎片记录',
-    date: data.date,
-    mood: data.mood,
-    tags: data.tags && Array.isArray(data.tags) ? data.tags : [],
-    cover: data.cover || defaultCover
+    title: article.title || '碎片记录',
+    date: article.date,
+    mood: article.mood,
+    tags: article.tags && Array.isArray(article.tags) ? article.tags : [],
+    cover: article.cover || defaultCover
   };
 }
 
-function getRecentChatters(currentSlug: string) {
-  const chattersDirectory = managerPath('chatters');
-  let fileNames: string[] = [];
-  try { fileNames = fs.readdirSync(chattersDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
-  if (!fileNames) return [];
-
-  return fileNames.map(f => {
-    const s = f.replace(/\.md$/, '');
-    const c = fs.readFileSync(path.join(chattersDirectory, f), 'utf8');
-    const { data } = matter(c);
-    return { slug: s, title: data.title || '碎片记录', date: data.date || '1970-01-01' };
-  }).filter(p => p.slug !== currentSlug)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 3);
+async function getRecentChatters(currentSlug: string) {
+  const articles = await getArticles('chatter');
+  return articles
+    .filter((item) => item.slug !== currentSlug)
+    .slice(0, 3)
+    .map((item) => ({
+      slug: item.slug,
+      title: item.title || '碎片记录',
+      date: item.date || '1970-01-01',
+    }));
 }
 
 function generateCalendarMatrix(year: number, month: number, targetDay: number) {
@@ -131,7 +121,7 @@ export default async function ChatterDetail({ params }: { params: Promise<{ slug
   const resolvedParams = await params;
   const config = await getLiveSiteConfig();
   const chatterData = await getChatterData(resolvedParams.slug, config.defaultPostCover);
-  const recentChatters = getRecentChatters(resolvedParams.slug);
+  const recentChatters = await getRecentChatters(resolvedParams.slug);
 
   const dateObj = new Date(chatterData.date || '2026-03-24');
   const yearStr = dateObj.getFullYear();

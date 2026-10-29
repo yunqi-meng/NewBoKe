@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { ReactNode } from "react";
 
-export default function PageTransition({ children }: { children: ReactNode }) {
+export default function PageTransition({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <motion.div
       // 刚加载页面时：往下偏 20px，完全透明
@@ -12,6 +12,7 @@ export default function PageTransition({ children }: { children: ReactNode }) {
       animate={{ y: 0, opacity: 1 }}
       // 动画怎么演：用优雅的弹性物理动画，持续 0.8 秒
       transition={{ ease: "easeOut", duration: 0.8 }}
+      className={className}
     >
       {children}
     </motion.div>

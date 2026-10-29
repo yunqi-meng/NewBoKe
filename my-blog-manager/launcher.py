@@ -17,8 +17,46 @@ import socket
 import json
 import subprocess
 import traceback
+
 os.environ.setdefault("XHS_MANAGER_ROOT", EXE_DIR)
-from cms_core.main import app
+
+
+def _find_server_dir():
+    """找到统一后端（server/）所在目录。
+
+    仓库里的布局是 <仓库根>/server/app/main.py，
+    桌面版把后端一起打包到 exe 旁边，变成 <exe 目录>/server/app/main.py。
+    """
+    candidates = [
+        os.path.join(BASE_DIR, "server"),
+        os.path.join(BASE_DIR, "..", "server"),
+        os.path.join(EXE_DIR, "server"),
+        os.path.join(EXE_DIR, "..", "server"),
+    ]
+    for candidate in candidates:
+        path = os.path.abspath(candidate)
+        if os.path.isfile(os.path.join(path, "app", "main.py")):
+            return path
+    return None
+
+
+SERVER_DIR = _find_server_dir()
+if SERVER_DIR is None:
+    print("❌ 找不到统一后端（server/app/main.py），控制台无法启动。")
+    raise SystemExit(1)
+
+# 让后端的相对导入（from . import config）正常工作
+if SERVER_DIR not in sys.path:
+    sys.path.insert(0, SERVER_DIR)
+
+# 后端的数据目录：桌面版放在 exe 旁边的 data/，仓库里放在 server/data/
+if not os.environ.get("XHS_DATA_DIR"):
+    os.environ["XHS_DATA_DIR"] = os.path.join(EXE_DIR, "data")
+# 仓库根目录：快照与发布助手围着它转
+if not os.environ.get("XHS_REPO_ROOT"):
+    os.environ["XHS_REPO_ROOT"] = os.path.dirname(SERVER_DIR)
+
+from app.main import app
 
 frontend_process = None
 
@@ -93,6 +131,9 @@ if __name__ == "__main__":
     env_vars = os.environ.copy()
     env_vars["XHS_MANAGER_ROOT"] = EXE_DIR
     env_vars["XHS_ENGINE_API_PORT"] = str(backend_port)
+    env_vars["MANAGER_API_PORT"] = str(backend_port)
+    # 直接给出后端完整地址，两个前端都用同一套解析规则找它
+    env_vars["XHS_API_BASE_URL"] = f"http://127.0.0.1:{backend_port}"
     env_vars["PORT"] = str(frontend_port)
 
     standalone_dir = os.path.join(BASE_DIR, '.next', 'standalone')

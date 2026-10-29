@@ -32,7 +32,7 @@ const notoSerif = Noto_Serif_SC({
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
-  const siteConfig = getLiveSiteConfig();
+  const siteConfig = await getLiveSiteConfig();
   return {
     title: siteConfig.title,
     description: siteConfig.bio,
@@ -43,8 +43,8 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  const siteConfig = getLiveSiteConfig();
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const siteConfig = await getLiveSiteConfig();
 
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} h-full antialiased`} suppressHydrationWarning>

@@ -1,11 +1,8 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import type { Metadata } from 'next';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import ChatterBoard from './ChatterBoard';
-import { sitePath } from '../../lib/siteRoot';
+import { getArticles } from '../../lib/contentApi';
 import { liveMetadata } from '../../lib/pageMetadata';
 
 
@@ -13,37 +10,19 @@ export async function generateMetadata(): Promise<Metadata> {
   return liveMetadata('杂谈', '日常碎片与灵感记录');
 }
 
-export default function ChatterPage() {
-  // 注意：这里我们假设你的 md 文件放在根目录的 chatters 文件夹里
-  const chattersDirectory = sitePath('chatters');
-  let chatters = [];
-
-  try {
-    // 确保文件夹存在
-    if (!fs.existsSync(chattersDirectory)) {
-      fs.mkdirSync(chattersDirectory);
-    }
-
-    const fileNames = fs.readdirSync(chattersDirectory).filter(fileName => fileName.endsWith('.md'));
-
-    chatters = fileNames.map(fileName => {
-      const slug = fileName.replace(/\.md$/, '');
-      const fileContents = fs.readFileSync(path.join(chattersDirectory, fileName), 'utf8');
-      const { data, content } = matter(fileContents);
-
-      return {
-        slug,
-        title: data.title || '',
-        date: data.date || '未知时间',
-        tags: data.tags || [],
-        mood: data.mood || '',
-        cover: data.cover || '',
-        content: content.replace(/^#+ .*\n/m, '') // 去除开头的 markdown 标题以优化截取显示
-      };
-    }).sort((a, b) => (new Date(b.date).getTime() - new Date(a.date).getTime())); // 按时间倒序
-  } catch (e) {
-    console.error("读取杂谈文件失败:", e);
-  }
+export default async function ChatterPage() {
+  // 杂谈正文存在统一后端的数据库里，这里直接取列表
+  const items = await getArticles('chatter', true);
+  const chatters = items.map(item => ({
+    slug: item.slug,
+    title: item.title || '',
+    date: item.date || '未知时间',
+    tags: item.tags || [],
+    mood: item.mood || '',
+    cover: item.cover || '',
+    // 去掉开头的 markdown 标题，避免卡片上出现重复的大标题
+    content: (item.content || '').replace(/^#+ .*\n/m, ''),
+  }));
 
   return (
     <div className="min-h-screen relative pb-10">

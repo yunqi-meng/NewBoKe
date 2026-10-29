@@ -6,10 +6,10 @@ import { getLiveSiteConfig } from './siteConfigRuntime';
  *
  * 原来每个页面都是 `export const metadata = { title: "xx | " + siteConfig.title }`，
  * 那是构建期常量：改了站点标题必须重新构建站点才会变。
- * 现在改成 generateMetadata，在请求时读磁盘上的最新配置，标题立刻生效。
+ * 现在改成 generateMetadata，在请求时从统一后端读最新配置，标题立刻生效。
  */
-export function liveMetadata(title?: string, description?: string): Metadata {
-  const siteConfig = getLiveSiteConfig();
+export async function liveMetadata(title?: string, description?: string): Promise<Metadata> {
+  const siteConfig = await getLiveSiteConfig();
 
   return {
     title: title ? `${title} | ${siteConfig.title}` : siteConfig.title,

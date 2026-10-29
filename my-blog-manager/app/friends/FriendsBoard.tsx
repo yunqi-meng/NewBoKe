@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
-import type { Friend } from '../../data/friends';
+import type { Friend } from '../../lib/contentApi';
 import { Plus, Pencil, Trash2, AlertTriangle, Save, Edit3, X, CloudUpload, Sparkles } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
@@ -20,7 +20,7 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 30, scale: 0.9 },
-  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 24 } }
+  show: { opacity: 1, y: 0, scale: 1, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
 };
 
 export default function FriendsBoard() {

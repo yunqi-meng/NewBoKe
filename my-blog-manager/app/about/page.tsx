@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
 import { Suspense } from 'react';
 
@@ -21,49 +18,75 @@ import PageTransition from '../../components/PageTransition';
 
 // 🌟 引入刚刚写好的前端交互引擎
 import AboutClient from '../../components/AboutClient';
-import { managerPath } from '../../lib/managerRoot';
+import { getAbout, getArticles, getMoments } from '../../lib/contentApi';
 
 // 关于页与动态列表要实时读工作副本：静态预渲染会把内容固化进构建产物。
 export const dynamic = 'force-dynamic';
 
-// 🌟 读取指定目录下的 markdown 文件，并提取属性
-function getDirActivities(dirName: string, typeLabel: '文章' | '杂谈' | '说说', linkPrefix: string) {
-  const dirPath = managerPath(dirName);
-  if (!fs.existsSync(dirPath)) return [];
+type ActivityRecord = {
+  id: string;
+  type: '文章' | '杂谈' | '说说';
+  title: string;
+  date: string;
+  url: string;
+};
 
-  const files = fs.readdirSync(dirPath).filter(f => f.endsWith('.md'));
+/** 把数据库里的日期串转成 ISO，前端按本地时区显示。 */
+function toIsoStamp(value: string): string {
+  if (!value) return '1970-01-01T00:00:00Z';
+  const parsed = new Date(value);
+  if (isNaN(parsed.getTime())) return '1970-01-01T00:00:00Z';
+  return parsed.toISOString();
+}
 
-  return files.map(file => {
-    const content = fs.readFileSync(path.join(dirPath, file), 'utf8');
-    const { data } = matter(content);
-    return {
-      id: `${dirName}-${file}`,
-      type: typeLabel,
-      title: data.title || file.replace('.md', ''),
-      // 保留完整 ISO 时间供前端处理
-      date: data.date ? new Date(data.date).toISOString() : '1970-01-01T00:00:00Z',
-      url: `/${linkPrefix}/${file.replace('.md', '')}`
-    };
-  });
+/** 汇总文章、杂谈、说说三条时间线。 */
+async function loadActivities(): Promise<ActivityRecord[]> {
+  const [posts, chatters, moments] = await Promise.all([
+    getArticles('post'),
+    getArticles('chatter'),
+    getMoments(),
+  ]);
+
+  const records: ActivityRecord[] = [
+    ...posts.map((item) => ({
+      id: `posts-${item.slug}`,
+      type: '文章' as const,
+      title: item.title || item.slug,
+      date: toIsoStamp(item.date),
+      url: `/posts/${item.slug}`,
+    })),
+    ...chatters.map((item) => ({
+      id: `chatters-${item.slug}`,
+      type: '杂谈' as const,
+      title: item.title || item.slug,
+      date: toIsoStamp(item.date),
+      url: `/chatter/${item.slug}`,
+    })),
+    ...moments.map((item) => ({
+      id: `moments-${item.id}`,
+      type: '说说' as const,
+      title: item.content ? item.content.slice(0, 40) : '说说',
+      date: toIsoStamp(item.date),
+      url: '/moments',
+    })),
+  ];
+
+  return records.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }
 
 export default async function AdminAboutPage() {
-  const fullPath = managerPath('app', 'about', 'about.md');
+  const about = await getAbout();
   let contentHtml = "博主很懒，还没有写自我介绍哦...";
   let coverImage = "https://bu.dusays.com/2026/03/24/69c23dc278c78.jpg";
 
-  try {
-    const fileContents = fs.readFileSync(fullPath, 'utf8');
-    // 🌟 改为 let，以便进行文本预清洗
-    let { data, content } = matter(fileContents);
-
-    if (data.cover) coverImage = data.cover;
+  if (about) {
+    if (about.cover) coverImage = about.cover;
 
     // ==========================================
     // 🌟 解析前物理清洗区
     // ==========================================
     // 1. 强行给没有语言标记的代码块加上 cpp 标签，防止侦测失败
-    content = content.replace(/^```\s*$/gm, '```cpp');
+    let content = (about.content || '').replace(/^```\s*$/gm, '```cpp');
     // 2. 强行修复数字列表缺少空格导致无法渲染为列表的 Bug (1.百度 -> 1. 百度)
     content = content.replace(/^(\s*\d+)\.([^ \n])/gm, '$1. $2');
 
@@ -97,19 +120,10 @@ export default async function AdminAboutPage() {
       .process(content);
 
     contentHtml = processedContent.toString();
-  } catch (e) {
-    console.error("读取 about.md 失败", e);
   }
 
   // 🌟 3. 获取所有的活动动态
-  const posts = getDirActivities('posts', '文章', 'posts');
-  const chatters = getDirActivities('chatters', '杂谈', 'chatter');
-  const moments = getDirActivities('moments', '说说', 'moments');
-
-  // 将所有动态合并，并按时间倒序排列 (最新的在最上面)
-  const allActivities = [...posts, ...chatters, ...moments].sort((a, b) => {
-    return new Date(b.date).getTime() - new Date(a.date).getTime();
-  });
+  const allActivities = await loadActivities();
 
   return (
     <div className="min-h-screen relative pb-20">

@@ -42,10 +42,7 @@ next-env.d.ts
 __pycache__/
 *.py[cod]
 
-# 本地音乐 (音频二进制不入库，只有播放列表元数据入库)
-/public/audio/*
-!/public/audio/playlist.json
-
-# 本机上传的图片 (由控制台镜像过来，二进制不入库)
-/public/uploads/*
-!/public/uploads/.gitkeep
+# 图片与本地音乐都收在统一后端的 server/data/ 下，
+# 公开站通过 /uploads 与 /api/music 转发读取，这里不再放二进制
+/public/uploads/
+/public/audio/

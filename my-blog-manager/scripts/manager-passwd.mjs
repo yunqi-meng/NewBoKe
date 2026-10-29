@@ -10,7 +10,7 @@
  *                                                               生成随机会话密钥写进 env 文件
  *
  * 说明：密码只从命令行传入，脚本不会把明文口令写进任何文件，
- * 仓库里也不会保存任何凭据。哈希格式与 lib/auth.ts 保持一致。
+ * 仓库里也不会保存任何凭据。哈希格式与统一后端的 server/app/security.py 保持一致。
  */
 import crypto from 'node:crypto';
 import fs from 'node:fs';

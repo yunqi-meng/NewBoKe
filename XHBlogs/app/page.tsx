@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
 
 import Navbar from '../components/Navbar';
@@ -8,12 +5,11 @@ import DailyQuote from '../components/DailyQuote';
 import PageTransition from '../components/PageTransition';
 import SearchBar from '../components/SearchBar';
 import { getLiveSiteConfig } from '../lib/siteConfigRuntime';
-import { sitePath } from '../lib/siteRoot';
 import CloudPlayer from '../components/CloudPlayer';
 import ThemeToggleBlock from '../components/ThemeToggleBlock';
 import ProfileCard from '../components/ProfileCard';
 import SiteDashboard from '../components/SiteDashboard';
-import { readAlbumsFromDisk } from '../lib/tsData';
+import { getAlbums, getArticles } from '../lib/contentApi';
 import LyricBar from '../components/LyricBar';
 import { ToastProvider } from '../components/ToastProvider';
 
@@ -36,56 +32,33 @@ function formatUpdateTime(dateString: string) {
   } catch { return dateString; }
 }
 
-export default function Home() {
-  const siteConfig = getLiveSiteConfig();
-  const albums = readAlbumsFromDisk();
-  const postsDirectory = sitePath('posts');
-  let allPosts: any[] = [];
-  try {
-    if (fs.existsSync(postsDirectory)) {
-      const fileNames = fs.readdirSync(postsDirectory).filter(f => f.endsWith('.md'));
-      allPosts = fileNames.map(fileName => {
-        const fullPath = path.join(postsDirectory, fileName);
-        const { data, content } = matter(fs.readFileSync(fullPath, 'utf8'));
-        const rawDate = data.date || '1970-01-01';
-        return {
-          slug: fileName.replace(/\.md$/, ''),
-          ...data,
-          title: data.title || '',
-          description: data.description || '',
-          content: content || '',
-          date: rawDate,
-          formattedDate: formatUpdateTime(rawDate)
-        };
-      }).sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        if (dateB !== dateA) return dateB - dateA;
-        return b.slug.localeCompare(a.slug);
-      });
-    }
-  } catch (e) {}
+export default async function Home() {
+  const siteConfig = await getLiveSiteConfig();
+  const [albums, postItems, chatterItems] = await Promise.all([
+    getAlbums(),
+    getArticles('post'),
+    getArticles('chatter'),
+  ]);
+
+  const allPosts = postItems.map(item => ({
+    slug: item.slug,
+    title: item.title,
+    description: item.description,
+    cover: item.cover,
+    tags: item.tags,
+    date: item.date,
+    formattedDate: formatUpdateTime(item.date),
+  }));
   const top5Posts = allPosts.length > 0 ? allPosts.slice(0, 5) : [{ slug: 'none', title: '暂无文章', description: '快去写第一篇吧！', cover: siteConfig.defaultPostCover, date: '', formattedDate: '' }];
 
-  const chattersDirectory = sitePath('chatters');
-  let allChatters: any[] = [];
-  try {
-    if (fs.existsSync(chattersDirectory)) {
-      const chatterFiles = fs.readdirSync(chattersDirectory).filter(f => f.endsWith('.md'));
-      allChatters = chatterFiles.map(fileName => {
-        const fullPath = path.join(chattersDirectory, fileName);
-        const { data, content } = matter(fs.readFileSync(fullPath, 'utf8'));
-        const rawDate = data.date || '1970-01-01';
-        const cover = data.cover || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop';
-        return { slug: fileName.replace(/\.md$/, ''), title: data.title || '碎片记录', description: data.description || content.substring(0, 60), cover: cover, date: rawDate, formattedDate: formatUpdateTime(rawDate) };
-      }).sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        if (dateB !== dateA) return dateB - dateA;
-        return b.slug.localeCompare(a.slug);
-      });
-    }
-  } catch (e) {}
+  const allChatters = chatterItems.map(item => ({
+    slug: item.slug,
+    title: item.title || '碎片记录',
+    description: item.description || '',
+    cover: item.cover || 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop',
+    date: item.date,
+    formattedDate: formatUpdateTime(item.date),
+  }));
   const top5Chatters = allChatters.length > 0 ? allChatters.slice(0, 5) : [{ slug: 'none', title: '暂无记录', description: '记录一段思绪...', cover: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop', date: '', formattedDate: '' }];
 
   const chatterCount = allChatters.length;

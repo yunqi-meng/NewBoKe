@@ -14,9 +14,8 @@ const nextConfig: NextConfig = {
   },
 
   // 👇 终极大招 2：顺手把 ESLint 语法检查也屏蔽了，防止它出来捣乱！
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
+  // Next.js 16 起构建流程不再跑 ESLint（next lint 已移除），
+  // 规则统一放在 eslint.config.mjs 里，这里无需再声明。
 };
 
 export default nextConfig;

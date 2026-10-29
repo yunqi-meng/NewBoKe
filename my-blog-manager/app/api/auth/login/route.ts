@@ -1,64 +1,91 @@
 import { NextRequest } from 'next/server';
-import {
-  SESSION_TTL_SECONDS,
-  authEnabled,
-  buildSessionCookie,
-  createSessionToken,
-  verifyPassword,
-} from '../../../../lib/auth';
+import { backendBaseUrl } from '../../../../lib/backendPort';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** 登录失败限流：同一来源 10 分钟内最多尝试 10 次 */
-const WINDOW_MS = 10 * 60 * 1000;
-const MAX_ATTEMPTS = 10;
-const attempts = new Map<string, { count: number; resetAt: number }>();
+/**
+ * 登录接口网关：真正的校验交给统一后端。
+ *
+ * 为什么不再自己校验？
+ *   - 密码哈希与会话密钥只有一份（后端的 MANAGER_ADMIN_PASSWORD_HASH / MANAGER_SESSION_SECRET）；
+ *   - 限流也只有一份，不会出现「控制台能试、控制台代理却被拒」的两套规则；
+ *   - 后端认的是同一个 xh_mgr_session Cookie，公开站与管理后台互通。
+ *
+ * 这里只负责把后端种下的 Cookie 原样带回浏览器。
+ */
 
-function clientKey(request: NextRequest): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  const raw = forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
-  return raw;
+/** 把后端返回的 Set-Cookie 原样透传给浏览器 */
+function copyCookies(backend: Response): Headers {
+  const headers = new Headers();
+  const cookies = backend.headers.getSetCookie?.() ?? [];
+  for (const cookie of cookies) headers.append('Set-Cookie', cookie);
+  headers.set('Cache-Control', 'no-store');
+  return headers;
 }
 
 export async function POST(request: NextRequest) {
-  if (!authEnabled()) {
-    return Response.json({ detail: '控制台尚未启用密码登录' }, { status: 409 });
-  }
+  const base = await backendBaseUrl();
 
-  const key = clientKey(request);
-  const now = Date.now();
-  const record = attempts.get(key);
-  if (record && record.resetAt > now && record.count >= MAX_ATTEMPTS) {
-    return Response.json({ detail: '尝试次数过多，请稍后再试' }, { status: 429 });
-  }
-
-  let password = '';
+  let body = '';
   try {
-    const body = await request.json();
-    password = typeof body?.password === 'string' ? body.password : '';
+    body = await request.text();
   } catch {
-    password = '';
+    body = JSON.stringify({});
   }
 
-  if (!verifyPassword(password, process.env.MANAGER_ADMIN_PASSWORD_HASH?.trim())) {
-    const count = record && record.resetAt > now ? record.count + 1 : 1;
-    const resetAt = record && record.resetAt > now ? record.resetAt : now + WINDOW_MS;
-    attempts.set(key, { count, resetAt });
-    return Response.json({ detail: '密码错误' }, { status: 401 });
-  }
+  try {
+    const backend = await fetch(`${base}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: body || JSON.stringify({}),
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
 
-  attempts.delete(key);
-  const response = Response.json({ success: true });
-  response.headers.append('Set-Cookie', buildSessionCookie(createSessionToken()));
-  response.headers.set('Cache-Control', 'no-store');
-  return response;
+    const payload = await backend.json().catch(() => ({}));
+    const headers = copyCookies(backend);
+
+    if (!backend.ok || payload?.success === false) {
+      return Response.json(
+        { detail: payload?.message || '登录失败，请检查密码。' },
+        { status: backend.ok ? 401 : backend.status, headers },
+      );
+    }
+
+    return Response.json({ success: true }, { headers });
+  } catch (error) {
+    console.error('[auth] 登录请求后端失败：', error);
+    const reason = error instanceof Error ? error.message : String(error);
+    return Response.json(
+      { detail: `无法连接统一后端：${reason}` },
+      { status: 502 },
+    );
+  }
 }
 
 /** 查询当前是否需要登录 */
 export async function GET() {
-  return Response.json({
-    authEnabled: authEnabled(),
-    sessionTtl: SESSION_TTL_SECONDS,
-  });
+  const base = await backendBaseUrl();
+  try {
+    const backend = await fetch(`${base}/api/auth/session`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    });
+    const payload = await backend.json().catch(() => ({}));
+    return Response.json(
+      {
+        authEnabled: Boolean(payload?.authEnabled),
+        authenticated: Boolean(payload?.authenticated),
+        sessionTtl: payload?.sessionTtl ?? 7 * 24 * 60 * 60,
+      },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  } catch {
+    // 后端暂时不可达时，按「未启用登录」处理，让控制台仍能打开
+    return Response.json(
+      { authEnabled: false, authenticated: false, sessionTtl: 7 * 24 * 60 * 60 },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
 }

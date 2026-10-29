@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
-import type { Project } from '../../data/projects';
+import type { Project } from '../../lib/contentApi';
 import { Plus, Pencil, Trash2, AlertTriangle, Save, Edit3, X, Sparkles, Code2 } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';

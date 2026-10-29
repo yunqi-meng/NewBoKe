@@ -1,32 +1,65 @@
 #!/usr/bin/env bash
 # 线上发布助手（服务器部署形态）
 #
-# 控制台改完内容后点击「发布上线」，会依次完成：
-#   1. 把控制台工作区的内容镜像覆盖到网站源码目录（由控制台本身完成）
-#   2. 先与仓库最新版本合并（开发机也会推代码，不合并会被非快进拒绝）
-#   3. 提交这些改动到服务器上的 Git 仓库并推送
+# 🌟 新的发布模型：数据库是唯一真相，git 存的是「内容快照」。
+#
+#    内容（文章、说说、相册、友链、项目、站点配置）都存在统一后端的数据库里，
+#    发布 = 把当前内容导出一份快照 JSON（snapshots/）→ 提交进仓库 → 同步到线上。
+#    公开站与控制台都是运行时读数据库，所以内容改动不需要重新构建，刷新即可见。
+#
+# 脚本依次完成：
+#   1. 先与仓库最新版本合并（开发机也会推代码，不合并会被非快进拒绝）
+#   2. 提交本次内容快照（snapshots/ 下的 JSON）
+#   3. 推送回服务器上的裸仓库，保持源码仓库与线上同步
 #   4. 备份到 GitHub 仓库（异地存档，失败不影响发布）
-#   5. 重新构建公开站并重启服务
+#   5. 按需重建：只有代码变了才重建前端 / 重启后端，内容变了不用动
 #
-# 🌟 第 5 步现在是「按需构建」：公开站与控制台都已改成运行时渲染，
-#    文章/杂谈/说说/相册/友链/项目/站点配置都在请求时读盘，
-#    所以只有内容变化时根本不用重新构建，发布完立刻就能在前台看到。
+# 用法：xhblogs-publish [仓库路径] [publish|rollback]
+#   rollback 只是换个提交信息前缀（chore(rollback)），发布历史里能一眼分清。
 #
-# 本脚本只负责第 2~5 步，由控制台通过 sudo 免密调用
-# （授权见 /etc/sudoers.d/xhblogs-rebuild）。
+# 本脚本由统一后端通过 sudo 免密调用（授权见 /etc/sudoers.d/xhblogs-rebuild）。
 set -uo pipefail
 
 REPO="${1:-/opt/xinghui-blog}"
+KIND="${2:-publish}"
 BLOG_DIR="$REPO/XHBlogs"
 STATUS_FILE="$REPO/.publish-status.json"
 LOG="/var/log/xhblogs-publish.log"
 REBUILD="/usr/local/bin/xhblogs-rebuild"
 MANAGER_REBUILD="/usr/local/bin/xhblogs-manager-rebuild"
+BACKEND_RESTART="systemctl restart xhblogs-manager-api.service"
 APP_USER="xhblogs"
 GIT_NAME="Blog CMS"
 GIT_EMAIL="cms@localhost"
 
+case "$KIND" in
+  rollback) COMMIT_KIND="chore(rollback)" ;;
+  *)        COMMIT_KIND="chore(publish)" ;;
+esac
+
 log() { echo "$(date '+%F %T') $*" >> "$LOG"; }
+
+# --------------------------------------------------------------------------
+# 改动路径分类
+#
+#   content —— 内容快照。运行时读数据库，改完刷新即可见，不用重新构建
+#   site    —— 公开站代码。要重新 build + 重启 xhblogs
+#   console —— 控制台代码。要重新 build + 重启 xhblogs-manager-web
+#   backend —— 统一后端代码。只需重启 xhblogs-manager-api，不用重新构建
+#   other   —— 与线上无关（脚本、文档等）
+#
+# 这段逻辑单独抽成函数，tools/test-publish-paths.sh 会直接抽出来做断言，
+# 改分类规则时只改这一处，测试和真实发布不会走偏。
+# --------------------------------------------------------------------------
+classify_path() {
+  case "$1" in
+    snapshots/*)                      echo "content" ;;
+    XHBlogs/*)                        echo "site" ;;
+    my-blog-manager/*)                echo "console" ;;
+    server/app/*|server/requirements.txt) echo "backend" ;;
+    *)                               echo "other" ;;
+  esac
+}
 
 # 以网站运行用户执行命令，避免 root 触发 git 的 dubious ownership 拦截
 as_app_user() {
@@ -63,44 +96,6 @@ JSON
   chmod 644 "$STATUS_FILE" 2>/dev/null || true
 }
 
-# --------------------------------------------------------------------------
-# 哪些路径属于「内容」——内容改动不需要重新构建
-#
-# 公开站与控制台都已经改成运行时渲染：这些内容在请求时从磁盘读，
-# 控制台把它们镜像到站点目录的那一刻，前台就已经是新的了。
-# 其余路径（页面、组件、构建配置）是代码，必须重新构建才能生效。
-# --------------------------------------------------------------------------
-CONTENT_PATHS=(
-  "XHBlogs/posts/"
-  "XHBlogs/chatters/"
-  "XHBlogs/moments/"
-  "XHBlogs/app/about/about.md"
-  "XHBlogs/data/albums.ts"
-  "XHBlogs/data/friends.ts"
-  "XHBlogs/data/projects.ts"
-  "XHBlogs/siteConfig.ts"
-  "XHBlogs/public/"
-  "my-blog-manager/posts/"
-  "my-blog-manager/chatters/"
-  "my-blog-manager/moments/"
-  "my-blog-manager/data/"
-  "my-blog-manager/app/about/about.md"
-  "my-blog-manager/siteConfig.ts"
-  "my-blog-manager/music/"
-  "my-blog-manager/public/"
-)
-
-is_content_path() {
-  local path="$1"
-  local pattern
-  for pattern in "${CONTENT_PATHS[@]}"; do
-    case "$path" in
-      "$pattern"*) return 0 ;;
-    esac
-  done
-  return 1
-}
-
 START_TS=$(date +%s)
 
 # --------------------------------------------------------------------------
@@ -118,8 +113,8 @@ if ! flock -n 9; then
   flock 9
 fi
 
-write_status running "正在提交源码并同步到线上" "$START_TS"
-log "=== 收到发布请求：仓库 $REPO ==="
+write_status running "正在提交内容快照并同步到线上" "$START_TS"
+log "=== 收到发布请求：仓库 $REPO（$KIND） ==="
 
 if [ ! -d "$REPO/.git" ]; then
   log "仓库不存在：$REPO"
@@ -173,28 +168,20 @@ if as_app_user git -C "$REPO" fetch origin main >> "$LOG" 2>&1; then
   fi
 fi
 
-# 2. 只把内容相关的路径加入暂存区，避免误提交运行时文件
-PATHS=()
-for p in \
-  XHBlogs/posts XHBlogs/chatters XHBlogs/moments XHBlogs/data XHBlogs/app/about XHBlogs/siteConfig.ts \
-  XHBlogs/public/audio/playlist.json \
-  my-blog-manager/posts my-blog-manager/chatters my-blog-manager/moments my-blog-manager/data \
-  my-blog-manager/app/about my-blog-manager/siteConfig.ts \
-  my-blog-manager/music/playlist.json
-do
-  [ -e "$REPO/$p" ] && PATHS+=("$p")
-done
+# 2. 只把内容快照加入暂存区，避免误提交运行时文件
+#    （数据库、媒体、音乐都在仓库外运行，不会出现在这里）
+SNAPSHOT_DIR="$REPO/snapshots"
+mkdir -p "$SNAPSHOT_DIR"
+chown "$APP_USER":"$APP_USER" "$SNAPSHOT_DIR" 2>/dev/null || true
 
-if [ ${#PATHS[@]} -gt 0 ]; then
-  as_app_user git -C "$REPO" add -- "${PATHS[@]}" >> "$LOG" 2>&1
-fi
+as_app_user git -C "$REPO" add -- snapshots >> "$LOG" 2>&1
 
 if as_app_user git -C "$REPO" diff --cached --quiet; then
-  log "内容没有变化，跳过提交"
+  log "内容快照没有变化，跳过提交"
 else
   as_app_user git -C "$REPO" \
     -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" \
-    commit -m "chore(publish): 控制台发布 $(date '+%F %T')" >> "$LOG" 2>&1
+    commit -m "$COMMIT_KIND: 控制台发布 $(date '+%F %T')" >> "$LOG" 2>&1
   log "提交完成：$(as_app_user git -C "$REPO" rev-parse --short HEAD)"
 fi
 
@@ -231,8 +218,8 @@ fi
 
 # 5. 按需重建
 #
-#    只有内容变化 → 不用重建（站点运行时读盘，内容早就在线上了）
-#    代码有变化 → 公开站/控制台分别重新构建并重启
+#    只有内容变化 → 不用重建（站点运行时读数据库，内容早就在线上了）
+#    代码有变化 → 公开站/控制台分别重新构建，后端重启服务
 CHANGED_FILES=""
 if [ -n "$BASE_COMMIT" ]; then
   CHANGED_FILES=$(as_app_user git -C "$REPO" diff --name-only "$BASE_COMMIT" HEAD 2>/dev/null || true)
@@ -240,24 +227,25 @@ fi
 
 SITE_CODE_CHANGED=0
 CONSOLE_CODE_CHANGED=0
+BACKEND_CODE_CHANGED=0
 if [ -n "$CHANGED_FILES" ]; then
   OLD_IFS="$IFS"
   IFS=$'\n'
   # shellcheck disable=SC2086
   for changed_path in $CHANGED_FILES; do
     [ -z "$changed_path" ] && continue
-    if is_content_path "$changed_path"; then
-      continue
-    fi
-    case "$changed_path" in
-      XHBlogs/*) SITE_CODE_CHANGED=1 ;;
-      my-blog-manager/*) CONSOLE_CODE_CHANGED=1 ;;
+    case "$(classify_path "$changed_path")" in
+      content) continue ;;                       # 内容快照不是代码，不用重新构建
+      site)    SITE_CODE_CHANGED=1 ;;
+      console) CONSOLE_CODE_CHANGED=1 ;;
+      backend) BACKEND_CODE_CHANGED=1 ;;
+      *)       ;;                                # other：与线上无关
     esac
   done
   IFS="$OLD_IFS"
 fi
 
-log "本次改动：站点代码=$SITE_CODE_CHANGED 控制台代码=$CONSOLE_CODE_CHANGED"
+log "本次改动：站点代码=$SITE_CODE_CHANGED 控制台代码=$CONSOLE_CODE_CHANGED 后端代码=$BACKEND_CODE_CHANGED"
 
 if [ "$SITE_CODE_CHANGED" = "1" ]; then
   if [ ! -x "$REBUILD" ]; then
@@ -287,6 +275,18 @@ if [ "$CONSOLE_CODE_CHANGED" = "1" ]; then
   else
     log "未找到管理后台重建脚本 $MANAGER_REBUILD，跳过"
   fi
+fi
+
+# 后端改了代码就要重启服务（它读的是仓库里的 server/app/，不用重新构建前端）
+if [ "$BACKEND_CODE_CHANGED" = "1" ]; then
+  write_status running "正在重启统一后端" "$START_TS"
+  log "开始重启统一后端"
+  if ! $BACKEND_RESTART >> "$LOG" 2>&1; then
+    log "统一后端重启失败"
+    write_status failed "统一后端重启失败，请查看 $LOG" "$START_TS"
+    exit 1
+  fi
+  log "统一后端已重启"
 fi
 
 BUILD_ID=""

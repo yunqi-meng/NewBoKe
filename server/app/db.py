@@ -1,0 +1,77 @@
+"""数据库连接与会话。
+
+统一用 SQLAlchemy 2.x 的声明式模型，SQLite 与 MySQL 都能跑，
+换库只要改 XHS_DATABASE_URL。
+"""
+
+from contextlib import contextmanager
+
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+
+from . import config
+
+
+class Base(DeclarativeBase):
+    """所有 ORM 模型的基类。"""
+
+
+def _build_engine():
+    url = config.database_url()
+    kwargs = {"future": True, "pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        # SQLite 的连接参数与其它数据库不同：同一个连接会被多个线程复用
+        kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
+    return create_engine(url, **kwargs)
+
+
+engine = _build_engine()
+
+
+@event.listens_for(engine, "connect")
+def _sqlite_pragmas(dbapi_connection, _connection_record):
+    """打开 WAL 并开启外键约束，避免并发写入时互相锁死。"""
+    if not config.database_url().startswith("sqlite"):
+        return
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=30000")
+    finally:
+        cursor.close()
+
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False, future=True)
+
+
+def get_db():
+    """FastAPI 依赖：每个请求一个会话。"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@contextmanager
+def session_scope():
+    """脚本里用的会话上下文。"""
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+def init_db() -> None:
+    """建表（幂等）。"""
+    from . import models  # noqa: F401  确保模型都已注册
+
+    config.data_dir().mkdir(parents=True, exist_ok=True)
+    Base.metadata.create_all(engine)

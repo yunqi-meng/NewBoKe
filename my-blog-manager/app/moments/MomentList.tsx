@@ -155,7 +155,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
         location: newMoment.location,
         images: newMoment.images
       };
-      const apiUrl = `/api/proxy/api/moments/save`;
+      const apiUrl = `/api/proxy/api/moments`;
 
       const res = await fetch(apiUrl, {
         method: 'POST',
@@ -185,12 +185,11 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     if (!deleteConfirmId) return;
     setIsDeleting(true);
     try {
-      const apiUrl = `/api/proxy/api/moments/delete`;
+      const apiUrl = `/api/proxy/api/moments/${encodeURIComponent(deleteConfirmId)}`;
 
       const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: deleteConfirmId })
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
       });
 
       const data = await res.json();

@@ -1,6 +1,5 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { NextRequest } from 'next/server';
+import { backendBaseUrl } from '../../../lib/backendPort';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,11 +7,9 @@ export const dynamic = 'force-dynamic';
 /**
  * 本机图片仓库的读取入口。
  *
- * 控制台上传的图片落在 <控制台根目录>/data/uploads/，
- * 站点内统一以 /uploads/<文件名> 引用；公开站由 public/uploads/ 提供同一路径，
- * 两边引用同一份地址，不需要在渲染时做任何 URL 改写。
- *
- * 目录定位：服务器与桌面版都会注入 XHS_MANAGER_ROOT，本地开发回落到进程工作目录。
+ * 图片本体只保存在统一后端里（server/data/uploads/），
+ * 控制台上传后拿到的是 /uploads/<文件名>，这个路由把请求转给后端取回文件。
+ * 两端（公开站 / 控制台）用同一个地址引用同一批图片，不需要任何 URL 改写。
  */
 
 const MIME_TYPES: Record<string, string> = {
@@ -25,11 +22,6 @@ const MIME_TYPES: Record<string, string> = {
   '.svg': 'image/svg+xml',
 };
 
-function uploadsDir(): string {
-  const root = process.env.XHS_MANAGER_ROOT || process.cwd();
-  return path.join(root, 'data', 'uploads');
-}
-
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ path: string[] }> }
@@ -38,20 +30,30 @@ export async function GET(
   const name = segments.join('/');
 
   // 只接受纯文件名，任何路径分隔符或上级目录一律拒绝
-  if (!name || name !== path.basename(name) || name.startsWith('.')) {
+  if (!name || name !== name.split('/').pop() || name.startsWith('.')) {
     return new Response('非法文件名', { status: 400 });
   }
 
   try {
-    const file = await fs.readFile(path.join(uploadsDir(), name));
-    const extension = path.extname(name).toLowerCase();
-    return new Response(file, {
+    const base = await backendBaseUrl();
+    const response = await fetch(`${base}/api/media/file/${encodeURIComponent(name)}`, {
+      cache: 'no-store',
+      signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+      return new Response('图片不存在', { status: response.status });
+    }
+
+    const body = await response.arrayBuffer();
+    const extension = name.slice(name.lastIndexOf('.')).toLowerCase();
+    return new Response(body, {
       headers: {
         'Content-Type': MIME_TYPES[extension] || 'application/octet-stream',
         'Cache-Control': 'public, max-age=31536000, immutable',
       },
     });
   } catch {
-    return new Response('图片不存在', { status: 404 });
+    return new Response('图片暂时读不到', { status: 502 });
   }
 }

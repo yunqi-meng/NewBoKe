@@ -12,22 +12,46 @@ ROOT = Path(__file__).resolve().parent
 # data/ 与 public/ 下的内容都是使用者自己的东西，更新时一律不覆盖。
 PRESERVED_DIRS = {'data', 'public'}
 
+# 仓库根目录里由更新器托管的文件
+ROOT_FILES = {
+    'update.py', 'update.bat', 'LICENSE', 'README.md', 'README_en.md',
+    'UpdateLog.md', '.gitignore',
+}
+
+# 两个前端各自的「程序文件」目录
+APP_DIRS = {'app', 'components', 'context', 'lib'}
+
+# 两个前端根目录下的单个程序文件
+APP_FILES = {
+    'package.json', 'package-lock.json', 'postcss.config.mjs', 'tsconfig.json',
+    'next.config.ts', 'launcher.py', 'run_me.py', 'Start.bat', '.gitignore',
+}
+
+# 统一后端里属于「运行数据」的目录，更新时不能覆盖
+SERVER_PRESERVED = {'data', '.venv', 'venv', '__pycache__', '.env'}
+
 
 def managed_path(name):
     parts = Path(name).parts
     if len(parts) == 1:
-        return name in {'update.py', 'update.bat', 'LICENSE', 'README.md', 'README_en.md', 'UpdateLog.md', '.gitignore'}
-    if parts[0] == 'scripts':
+        return name in ROOT_FILES
+    top = parts[0]
+    if top in ('scripts', 'tools'):
         return True
-    if parts[0] not in ('XHBlogs', 'my-blog-manager') or len(parts) < 2:
+    if top == 'server':
+        # 统一后端：代码随更新走，运行数据（数据库、媒体、虚拟环境）保留
+        return not (len(parts) >= 2 and parts[1] in SERVER_PRESERVED)
+    if top not in ('XHBlogs', 'my-blog-manager') or len(parts) < 2:
         return False
-    if parts[1] in ('posts', 'chatters', 'moments', 'manager_data') or parts[-1] in ('siteConfig.ts', 'deploy_config.json', 'backend_config.json'):
+    if parts[1] in ('posts', 'chatters', 'moments', 'manager_data'):
+        return False
+    if parts[-1] in ('siteConfig.ts', 'deploy_config.json', 'backend_config.json'):
         return False
     if parts[1] in PRESERVED_DIRS:
         return False
     if parts[1] == 'app' and Path(name).suffix == '.md':
         return False
-    return parts[1] in {'app', 'components', 'context', 'lib', 'cms_core'} or len(parts)==2 and parts[1] in {'package.json', 'package-lock.json', 'postcss.config.mjs', 'tsconfig.json', 'next.config.ts', 'launcher.py', 'run_me.py', 'Start.bat', '.gitignore'}
+    return parts[1] in APP_DIRS or (len(parts) == 2 and parts[1] in APP_FILES)
 
 
 def preserve_existing(name, exists):
@@ -93,9 +117,30 @@ def main():
     npm=shutil.which('npm')
     for app in ('XHBlogs','my-blog-manager'):
         subprocess.run([npm,'install'],cwd=ROOT/app,shell=os.name=='nt',check=True)
+    install_backend_deps()
     print('Updated program files. Personal configuration, posts, daily quote content, images and private credentials were preserved.')
     if applied: print('Backup:',backup)
     print('Start the console and check your settings before publishing.')
+
+
+def install_backend_deps():
+    """给统一后端装依赖（server/ 下的 FastAPI 服务）。
+
+    虚拟环境放在 server/.venv，已经存在就只补装缺的包。
+    机器上没有 Python 时跳过——控制台仍可用，只是后端跑不起来。
+    """
+    requirements = ROOT/'server'/'requirements.txt'
+    if not requirements.exists():
+        return
+    python = shutil.which('python') or shutil.which('python3')
+    if not python:
+        print('Python not found, skipping backend dependencies.')
+        return
+    venv = ROOT/'server'/'.venv'
+    venv_python = venv/'Scripts'/'python.exe' if os.name=='nt' else venv/'bin'/'python'
+    if not venv_python.exists():
+        subprocess.run([python,'-m','venv',str(venv)],check=True)
+    subprocess.run([str(venv_python),'-m','pip','install','-r',str(requirements)],check=True)
 
 
 if __name__=='__main__':

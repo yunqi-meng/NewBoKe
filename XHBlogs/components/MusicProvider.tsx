@@ -64,27 +64,28 @@ const MusicContext = createContext<MusicContextType | null>(null);
 const DEFAULT_COVER = '/images/music-default.svg';
 
 /**
- * 读取控制台上传的本地音乐清单。
- * 清单由控制台写入 my-blog-manager/music/playlist.json，
- * 发布时镜像到 public/audio/playlist.json，公开站运行时直接读静态文件。
+ * 读取统一后端里的本地音乐清单。
+ *
+ * 音频本体与歌词只保存在后端（server/data/music/），
+ * 播放列表元数据在 music_tracks 表里，后台上传后公开站立刻就能看到。
  */
 async function loadLocalPlaylist(): Promise<any[]> {
   try {
-    const res = await fetch('/audio/playlist.json', { cache: 'no-store' });
+    const res = await fetch('/api/music/local', { cache: 'no-store' });
     if (!res.ok) return [];
 
     const data = await res.json();
-    const tracks = Array.isArray(data?.tracks) ? data.tracks : [];
+    const tracks = Array.isArray(data?.data?.tracks) ? data.data.tracks : [];
 
     return tracks
-      .filter((track: any) => track && track.file)
+      .filter((track: any) => track && track.file && track.available !== false)
       .map((track: any) => ({
         id: track.id || track.file,
         title: track.title || '未知歌曲',
         artist: track.artist || '本地音乐',
-        cover: track.cover ? `/audio/${track.cover}` : DEFAULT_COVER,
-        src: `/audio/${track.file}`,
-        lrcUrl: track.lyrics ? `/audio/${track.lyrics}` : null,
+        cover: track.cover ? `/api/music/cover/${encodeURIComponent(track.id)}` : DEFAULT_COVER,
+        src: `/api/music/file/${encodeURIComponent(track.file)}`,
+        lrcUrl: track.lyrics ? `/api/music/lyrics/${encodeURIComponent(track.id)}` : null,
         lyrics: [],
         source: 'local',
       }));

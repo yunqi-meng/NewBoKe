@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 清理 E2E 测试产生的说说：先删控制台工作区，再发布一次让镜像同步到公开站
+# 清理 E2E 测试产生的说说：删掉数据库里的测试说说，再发布一次留下干净的快照
 set -uo pipefail
 
 IDS=("$@")
 
-echo "=== 1. 删除控制台工作区里的测试说说 ==="
+echo "=== 1. 删除统一后端数据库里的测试说说 ==="
 for id in "${IDS[@]}"; do
   [ -z "$id" ] && continue
   curl -s -X POST http://127.0.0.1:8000/api/moments/delete \
@@ -12,7 +12,7 @@ for id in "${IDS[@]}"; do
   echo
 done
 
-echo "=== 2. 再发布一次，让镜像把测试内容从公开站撤掉 ==="
+echo "=== 2. 再发布一次，让快照与当前内容一致 ==="
 SECRET=$(sudo -n grep -E '^MANAGER_SESSION_SECRET=' /etc/xhblogs-manager.env | cut -d= -f2-)
 TOKEN=$(MANAGER_SESSION_SECRET="$SECRET" node -e 'const c=require("crypto");const e=String(Date.now()+7*24*3600*1000);process.stdout.write(e+"."+c.createHmac("sha256",process.env.MANAGER_SESSION_SECRET).update(e).digest("base64url"));')
 unset SECRET
@@ -38,4 +38,5 @@ if printf '%s' "$BODY" | grep -q "E2E-REALTIME-\|E2E-LOC-\|E2E-PROFILE-"; then
 else
   echo "公开站已无测试说说"
 fi
-ls /opt/xinghui-blog/my-blog-manager/moments/ /opt/xinghui-blog/XHBlogs/moments/ 2>/dev/null
+echo "=== 5. 最新快照 ==="
+ls -t /opt/xinghui-blog/snapshots/content-*.json 2>/dev/null | head -3

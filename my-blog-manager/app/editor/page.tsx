@@ -51,7 +51,7 @@ function EditorContent() {
     const fetchTags = async () => {
       setIsLoadingTags(true);
       try {
-        const res = await fetch(`/api/proxy/api/drafts/all_tags`);
+        const res = await fetch(`/api/proxy/api/tags`);
         const data = await res.json();
         if (data.success) {
           setHistoryPostTags(data.postTags || []);

@@ -41,23 +41,10 @@ next-env.d.ts
 /data/deploy_config.json
 /public/backend_config.json
 
-# 本机上传的图片 (二进制不入库，发布时镜像到公开站 public/uploads)
-/data/uploads/*
-!/data/uploads/.gitkeep
-
-# 评论数据库 (访客留言只存在本机，绝不入库)
-/data/comments.db
-/data/comments.db-wal
-/data/comments.db-shm
-/data/comments.db-journal
-
-# 每日一句 (内容与设置都是本机生成的运行数据，不入库)
-/data/dailyQuote.json
-/data/dailyQuoteConfig.json
-
-# 本地音乐 (音频/歌词/封面二进制不入库，只有播放列表元数据入库)
-/music/*
-!/music/playlist.json
+# 运行数据（图片、评论、每日一句、本地音乐）全部收在统一后端的 server/data/ 下，
+# 控制台这边只保留代码，数据库与二进制不入库
+/data/
+/music/
 
 # Local drafts and runtime data
 *.connection.json

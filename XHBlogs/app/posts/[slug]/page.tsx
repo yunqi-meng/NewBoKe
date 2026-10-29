@@ -1,7 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 import { unified } from 'unified';
 import remarkParse from 'remark-parse';
@@ -18,7 +16,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';
 import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
-import { sitePath } from '../../../lib/siteRoot';
+import { getArticle, getArticles } from '../../../lib/contentApi';
 import ClientSocials from '../../../components/ClientSocials';
 import ClientTOC from '../../../components/ClientTOC';
 import BackButton from '../../../components/BackButton';
@@ -53,10 +51,13 @@ function extractToc(content: string) {
 }
 
 async function getPostData(slug: string) {
-  const siteConfig = getLiveSiteConfig();
-  const fullPath = sitePath('posts', `${slug}.md`);
-  const fileContents = fs.readFileSync(fullPath, 'utf8');
-  let { data, content } = matter(fileContents);
+  const siteConfig = await getLiveSiteConfig();
+  const article = await getArticle(slug);
+  if (!article) {
+    notFound();
+  }
+
+  let content = article.content || '';
 
   // ==========================================
   // 🌟 前台渲染清洗区：终极防吞换行补丁！
@@ -106,31 +107,26 @@ async function getPostData(slug: string) {
     slug,
     contentHtml: processedContent.toString(),
     toc: extractToc(content),
-    title: data.title,
-    date: data.date,
-    tags: data.tags && Array.isArray(data.tags) ? data.tags : [],
-    cover: data.cover || siteConfig.defaultPostCover
+    title: article.title,
+    date: article.date,
+    tags: Array.isArray(article.tags) ? article.tags : [],
+    cover: article.cover || siteConfig.defaultPostCover
   };
 }
 
-function getRecentPosts(currentSlug: string) {
-  const postsDirectory = sitePath('posts');
-  let fileNames: string[] = [];
-  try { fileNames = fs.readdirSync(postsDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
-  if (!fileNames) return [];
-  return fileNames.map(f => {
-    const s = f.replace(/\.md$/, '');
-    const c = fs.readFileSync(path.join(postsDirectory, f), 'utf8');
-    const { data } = matter(c);
-    return { slug: s, title: data.title || '无标题', date: data.date };
-  }).filter(p => p.slug !== currentSlug).slice(0, 3);
+async function getRecentPosts(currentSlug: string) {
+  const posts = await getArticles('post');
+  return posts
+    .filter(p => p.slug !== currentSlug)
+    .slice(0, 3)
+    .map(p => ({ slug: p.slug, title: p.title || '无标题', date: p.date }));
 }
 
 export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const siteConfig = getLiveSiteConfig();
+  const siteConfig = await getLiveSiteConfig();
   const postData = await getPostData(resolvedParams.slug);
-  const recentPosts = getRecentPosts(resolvedParams.slug);
+  const recentPosts = await getRecentPosts(resolvedParams.slug);
 
   return (
     <div className="min-h-screen relative pb-20">

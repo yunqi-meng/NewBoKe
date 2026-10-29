@@ -1,6 +1,3 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 
@@ -19,14 +16,14 @@ import 'highlight.js/styles/atom-one-dark.css';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';
 import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
+import { getArticle, getArticles } from '../../../lib/contentApi';
 import ClientSocials from '../../../components/ClientSocials';
 import ClientTOC from '../../../components/ClientTOC';
 import BackButton from '../../../components/BackButton';
 import Comments from '../../../components/Comments';
 import SidebarLyric from '../../../components/SidebarLyric';
-import { managerPath } from '../../../lib/managerRoot';
 
-// 文章正文要实时读工作副本：静态预渲染会把正文固化进构建产物，
+// 文章正文要实时读统一后端：静态预渲染会把正文固化进构建产物，
 // 发布后不重建控制台，打开文章看到的还是旧版本。
 export const dynamic = 'force-dynamic';
 
@@ -58,14 +55,12 @@ function extractToc(content: string) {
 }
 
 async function getPostData(slug: string, defaultCover: string) {
-  const fullPath = managerPath('posts', `${slug}.md`);
-  let fileContents: string;
-  try {
-    fileContents = fs.readFileSync(fullPath, 'utf8');
-  } catch {
+  const article = await getArticle(slug);
+  if (!article) {
     notFound();
   }
-  let { data, content } = matter(fileContents);
+
+  let content = article.content || '';
 
   // ==========================================
   // 🌟 前台渲染清洗区：终极防吞换行补丁！
@@ -74,7 +69,7 @@ async function getPostData(slug: string, defaultCover: string) {
   // 1. 强行修复数字列表缺少空格导致无法渲染为列表的 Bug (1.百度 -> 1. 百度)
   content = content.replace(/^(\s*\d+)\.([^ \n])/gm, '$1. $2');
 
-  // 2. 🌟 拯救被 Markdown 引擎吞噬的“连续空行”！
+  // 2. 🌟 拯救被 Markdown 引擎吞噬的”连续空行”！
   // 统一换行符，并清理纯空格的废弃空行
   content = content.replace(/\r\n/g, '\n').replace(/^[ \t]+$/gm, '');
 
@@ -115,31 +110,26 @@ async function getPostData(slug: string, defaultCover: string) {
     slug,
     contentHtml: processedContent.toString(),
     toc: extractToc(content),
-    title: data.title,
-    date: data.date,
-    tags: data.tags && Array.isArray(data.tags) ? data.tags : [],
-    cover: data.cover || defaultCover
+    title: article.title,
+    date: article.date,
+    tags: article.tags && Array.isArray(article.tags) ? article.tags : [],
+    cover: article.cover || defaultCover
   };
 }
 
-function getRecentPosts(currentSlug: string) {
-  const postsDirectory = managerPath('posts');
-  let fileNames: string[] = [];
-  try { fileNames = fs.readdirSync(postsDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
-  if (!fileNames) return [];
-  return fileNames.map(f => {
-    const s = f.replace(/\.md$/, '');
-    const c = fs.readFileSync(path.join(postsDirectory, f), 'utf8');
-    const { data } = matter(c);
-    return { slug: s, title: data.title || '无标题', date: data.date };
-  }).filter(p => p.slug !== currentSlug).slice(0, 3);
+async function getRecentPosts(currentSlug: string) {
+  const articles = await getArticles('post');
+  return articles
+    .filter((item) => item.slug !== currentSlug)
+    .slice(0, 3)
+    .map((item) => ({ slug: item.slug, title: item.title || '无标题', date: item.date }));
 }
 
 export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
   const config = await getLiveSiteConfig();
   const postData = await getPostData(resolvedParams.slug, config.defaultPostCover);
-  const recentPosts = getRecentPosts(resolvedParams.slug);
+  const recentPosts = await getRecentPosts(resolvedParams.slug);
 
   return (
     <div className="min-h-screen relative pb-20">

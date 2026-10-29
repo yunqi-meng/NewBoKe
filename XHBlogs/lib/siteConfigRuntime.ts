@@ -1,101 +1,51 @@
-import fs from 'fs';
 import { siteConfig as staticSiteConfig } from '../siteConfig';
 import { deepMerge } from './siteConfigMerge';
-import { sitePath } from './siteRoot';
+import { getFullSiteConfig, getPublicSiteConfig } from './contentApi';
 
 export type SiteConfig = typeof staticSiteConfig;
 
 /**
- * 从 siteConfig.ts 源码里截出 `export const siteConfig = { ... }` 的对象字面量文本。
+ * 读取最新的站点配置（服务端用）。
  *
- * 这里用的是「字符串感知的括号平衡」而不是正则：
- * 值里带 `}`、带 `//`、带转义引号的字符串都很常见，正则会在这些地方截断。
- */
-function extractConfigLiteral(source: string): string | null {
-  const marker = source.indexOf('export const siteConfig');
-  if (marker === -1) return null;
-
-  const assignIndex = source.indexOf('=', marker);
-  if (assignIndex === -1) return null;
-
-  const openIndex = source.indexOf('{', assignIndex);
-  if (openIndex === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-
-  for (let i = openIndex; i < source.length; i++) {
-    const ch = source[i];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (ch === '\\') {
-        escaped = true;
-      } else if (ch === '"' || ch === "'" || ch === '`') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (ch === '"' || ch === "'" || ch === '`') {
-      inString = true;
-      continue;
-    }
-
-    if (ch === '{') {
-      depth += 1;
-    } else if (ch === '}') {
-      depth -= 1;
-      if (depth === 0) return source.slice(openIndex, i + 1);
-    }
-  }
-
-  return null;
-}
-
-/**
- * 把对象字面量求值成真正的 JS 对象。
+ * 配置的唯一真相现在在统一后端的数据库里，前台每次请求都去取一份，
+ * 所以控制台改完配置，公开站刷新一下就生效，不需要重新构建站点。
  *
- * siteConfig.ts 写的是标准 TS 对象字面量（可能带注释、单引号、尾随逗号），
- * 用 `new Function` 求值和打包器编译走的是同一套 JS 语义，最忠实；
- * 解析失败时返回 null，由调用方退回编译期快照，保证站点不会因为配置写坏而打不开。
+ * siteConfig.ts 仍然留着一份编译期快照，当作兜底：
+ * 后端暂时不可用时，站点照常显示，不会整页空白。
  */
-function evaluateConfigLiteral(literal: string): Record<string, unknown> | null {
+export async function getLiveSiteConfig(): Promise<SiteConfig> {
   try {
-    // eslint-disable-next-line no-new-func
-    const factory = new Function(`"use strict"; return (${literal});`);
-    const value = factory();
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      return value as Record<string, unknown>;
-    }
-  } catch {
-    // 配置语法有问题：退回快照
-  }
-  return null;
-}
-
-/**
- * 读取磁盘上最新的站点配置（服务端用）。
- *
- * siteConfig.ts 原本是被 Next.js 编译进产物的静态模块，
- * 发布后不重新构建站点就永远是旧值（标题、头像、壁纸都要等一次全站构建）；
- * 现在改由服务端在请求时读盘解析，站点配置立刻生效。
- */
-export function getLiveSiteConfig(): SiteConfig {
-  try {
-    const source = fs.readFileSync(sitePath('siteConfig.ts'), 'utf8');
-    const literal = extractConfigLiteral(source);
-    if (!literal) return staticSiteConfig;
-
-    const parsed = evaluateConfigLiteral(literal);
-    if (!parsed) return staticSiteConfig;
+    const live = await getFullSiteConfig();
+    if (!live || Object.keys(live).length === 0) return staticSiteConfig;
 
     return deepMerge(
       staticSiteConfig as unknown as Record<string, any>,
-      parsed,
+      live,
     ) as SiteConfig;
+  } catch {
+    return staticSiteConfig;
+  }
+}
+
+/**
+ * 下发给浏览器的公开配置。
+ *
+ * 与 getLiveSiteConfig 的区别：这一份不含 aiConfig，
+ * 煤球的模型与提示词属于服务端内部配置，不该出现在浏览器里。
+ */
+export async function getLivePublicSiteConfig(): Promise<SiteConfig> {
+  try {
+    const live = await getPublicSiteConfig();
+    const base = { ...(staticSiteConfig as unknown as Record<string, any>) };
+    // 静态兜底里也带着 aiConfig，这里一并摘掉
+    delete base.aiConfig;
+    delete base.geminiConfig;
+
+    if (!live || Object.keys(live).length === 0) return base as SiteConfig;
+
+    const { aiConfig, geminiConfig, ...publicLive } = live;
+
+    return deepMerge(base, publicLive as Record<string, any>) as SiteConfig;
   } catch {
     return staticSiteConfig;
   }

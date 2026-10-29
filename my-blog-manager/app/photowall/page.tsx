@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import type { Album, Photo } from '../../data/albums';
+import type { Album, Photo } from '../../lib/contentApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, Save, AlertTriangle, Sparkles, Edit3, CloudUpload } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
@@ -45,7 +45,7 @@ export default function PhotoWallPage() {
   // 所以相册列表必须实时向内容引擎读盘，界面里不允许出现任何过期快照。
   const loadAlbums = useCallback(async () => {
     try {
-      const response = await fetch('/api/proxy/api/gallery/list', { cache: 'no-store' });
+      const response = await fetch('/api/proxy/api/albums/list', { cache: 'no-store' });
       const data = await response.json();
       if (data?.success && Array.isArray(data.albums)) {
         setEditableAlbums(data.albums);

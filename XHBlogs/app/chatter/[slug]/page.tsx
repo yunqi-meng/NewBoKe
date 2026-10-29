@@ -1,7 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import matter from 'gray-matter';
 import Link from 'next/link';
+import { notFound } from 'next/navigation';
 
 // 🌟 核心升级：引入 Next.js 现代统一解析流
 import { unified } from 'unified';
@@ -19,18 +17,20 @@ import 'highlight.js/styles/atom-one-dark.css';
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';
 import { getLiveSiteConfig } from '../../../lib/siteConfigRuntime';
-import { sitePath } from '../../../lib/siteRoot';
+import { getArticle, getArticles } from '../../../lib/contentApi';
 import ClientSocials from '../../../components/ClientSocials';
 import SidebarLyric from '../../../components/SidebarLyric';
 import BackButton from '../../../components/BackButton';
 import Comments from '../../../components/Comments';
 
 async function getChatterData(slug: string) {
-  const siteConfig = getLiveSiteConfig();
-  const fullPath = sitePath('chatters', `${slug}.md`);
-  const fileContents = fs.readFileSync(fullPath, 'utf8');
+  const siteConfig = await getLiveSiteConfig();
+  const article = await getArticle(slug);
+  if (!article) {
+    notFound();
+  }
 
-  let { data, content } = matter(fileContents);
+  let content = article.content || '';
 
   // ==========================================
   // 🌟 前台渲染清洗区：终极防吞换行 + 安全保护补丁！（从 Post 完美移植）
@@ -84,28 +84,20 @@ async function getChatterData(slug: string) {
   return {
     slug,
     contentHtml: processedContent.toString(),
-    title: data.title || '碎片记录',
-    date: data.date,
-    mood: data.mood,
-    tags: data.tags && Array.isArray(data.tags) ? data.tags : [],
-    cover: data.cover || siteConfig.defaultPostCover
+    title: article.title || '碎片记录',
+    date: article.date,
+    mood: article.mood,
+    tags: Array.isArray(article.tags) ? article.tags : [],
+    cover: article.cover || siteConfig.defaultPostCover
   };
 }
 
-function getRecentChatters(currentSlug: string) {
-  const chattersDirectory = sitePath('chatters');
-  let fileNames: string[] = [];
-  try { fileNames = fs.readdirSync(chattersDirectory).filter(f => f.endsWith('.md')); } catch(e) {}
-  if (!fileNames) return [];
-
-  return fileNames.map(f => {
-    const s = f.replace(/\.md$/, '');
-    const c = fs.readFileSync(path.join(chattersDirectory, f), 'utf8');
-    const { data } = matter(c);
-    return { slug: s, title: data.title || '碎片记录', date: data.date || '1970-01-01' };
-  }).filter(p => p.slug !== currentSlug)
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 3);
+async function getRecentChatters(currentSlug: string) {
+  const chatters = await getArticles('chatter');
+  return chatters
+    .filter(p => p.slug !== currentSlug)
+    .slice(0, 3)
+    .map(p => ({ slug: p.slug, title: p.title || '碎片记录', date: p.date || '1970-01-01' }));
 }
 
 function generateCalendarMatrix(year: number, month: number, targetDay: number) {
@@ -120,9 +112,9 @@ function generateCalendarMatrix(year: number, month: number, targetDay: number) 
 
 export default async function ChatterDetail({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const siteConfig = getLiveSiteConfig();
+  const siteConfig = await getLiveSiteConfig();
   const chatterData = await getChatterData(resolvedParams.slug);
-  const recentChatters = getRecentChatters(resolvedParams.slug);
+  const recentChatters = await getRecentChatters(resolvedParams.slug);
 
   const dateObj = new Date(chatterData.date || '2026-03-24');
   const yearStr = dateObj.getFullYear();

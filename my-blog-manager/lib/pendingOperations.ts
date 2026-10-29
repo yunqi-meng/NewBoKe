@@ -17,11 +17,11 @@ export type FlushResult = {
   message: string;
 };
 
-/** 每种操作对应的引擎接口 */
+/** 每种操作对应的统一后端接口 */
 function endpointFor(op: any): { url: string; body: any } {
   switch (op.type) {
     case 'sync_photowall':
-      return { url: `${API_BASE}/api/gallery/sync`, body: { albums: op.value } };
+      return { url: `${API_BASE}/api/albums/sync`, body: { albums: op.value } };
     case 'sync_friends':
       return { url: `${API_BASE}/api/friends/sync`, body: { friends: op.value } };
     case 'sync_projects':
@@ -29,7 +29,7 @@ function endpointFor(op: any): { url: string; body: any } {
     case 'CONFIG':
       return { url: `${API_BASE}/api/config/update`, body: { updates: op.payload } };
     case 'create_moment':
-      return { url: `${API_BASE}/api/moments/save`, body: op.payload };
+      return { url: `${API_BASE}/api/moments`, body: op.payload };
     default:
       // 文章、说说、草稿等写作类操作统一走草稿同步接口
       return { url: `${API_BASE}/api/drafts/sync_local`, body: { operations: [op] } };
