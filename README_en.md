@@ -1,3 +1,22 @@
+# Version 0.4.9 - Measured End to End
+
+**Measured on the server: the front end changes half a second after you click publish.**
+
+- **The console no longer promises a 1-3 minute wait**: the copy under the publish button and the
+  "构建中" state label now read "同步中", with a note that only code changes trigger a rebuild.
+  The rollback copy stays as it is, because the rollback helper really does still rebuild the site.
+- **Numbers from the server**: saving a moment and clicking 发布上线 made the public site show it
+  **509 ms** later (626 ms counting from the save). No `next build` ran - the build id and the
+  artifact timestamp stayed untouched. The same flow took about 39 seconds before.
+- **"已同步到线上" stays accurate**: a content-only publish produces no new build id, so the
+  effective timestamp in the status file is what proves it actually went live.
+- **The publish chain is now reproducible**: two end-to-end scripts run the full "save → publish →
+  poll the public site → print the status" timing on the server and clean up the test content
+  afterwards. The session cookie is minted on the fly from the server's own secret, never written
+  to disk and never printed.
+
+---
+
 # Version 0.4.8 - The Public Site Now Renders Live
 
 **Click "发布上线" and the front end changes immediately.**

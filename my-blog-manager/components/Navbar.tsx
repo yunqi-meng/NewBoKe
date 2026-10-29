@@ -222,7 +222,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
                       🚀 发布上线
                     </button>
                     <p className="mt-2 text-[10px] leading-5 text-slate-400 text-center">
-                      点一次即可：写回本地改动 → 同步到博客并重新构建。
+                      点一次即可：写回本地改动 → 同步到博客，内容立即生效。
                     </p>
                   </motion.div>
                 )}
@@ -268,7 +268,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
                   </span>
                 )}
                 <span className="text-xs opacity-80 text-red-400 font-bold mt-2 block">
-                  发布会覆盖站点源码目录，并重新构建线上站点，约 1-3 分钟生效。
+                  发布会覆盖站点源码目录，内容改动刷新页面即可见（涉及代码改动时才重建站点）。
                 </span>
               </p>
               <div className="flex gap-3">

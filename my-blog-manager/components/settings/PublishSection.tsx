@@ -75,8 +75,8 @@ const EMPTY_STATUS: PublishStatus = {
 
 const STATE_TEXT: Record<string, string> = {
   requested: '已排队',
-  running: '构建中',
-  busy: '已跳过（有构建在跑）',
+  running: '同步中',
+  busy: '已跳过（另一次发布在跑）',
   done: '已完成',
   failed: '失败',
 };
@@ -305,6 +305,7 @@ export default function PublishSection() {
                 <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
                   {status.build?.time || '尚未构建'}
                 </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">仅代码改动才会重建站点</p>
               </div>
             </div>
 
@@ -361,7 +362,7 @@ export default function PublishSection() {
             {isPublishing || inFlight ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                {inFlight ? '正在构建发布…' : '正在提交发布…'}
+                {inFlight ? '正在同步发布…' : '正在提交发布…'}
               </>
             ) : (
               <>
@@ -376,7 +377,7 @@ export default function PublishSection() {
             )}
           </button>
           <p className="mt-3 text-center text-[11px] leading-6 text-slate-400">
-            一次点击完成：写回本地改动 → 镜像内容 → 提交源码仓库 → 重新构建公开站 → 重启服务，约 1-3 分钟生效。
+            一次点击完成：写回本地改动 → 镜像内容 → 提交源码仓库 → 同步到线上，内容改动刷新即生效。
           </p>
         </div>
 

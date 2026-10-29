@@ -394,7 +394,7 @@ async def publish_to_live(request: Request):
         if _publish_in_progress(repo_root):
             return {
                 "success": False,
-                "message": "⏳ 上一次发布还在进行中（约需 1-3 分钟），请等它结束后再发布。",
+                "message": "⏳ 上一次发布还在进行中，请等它结束后再发布。",
                 "serverMode": True,
                 "busy": True,
             }
@@ -404,7 +404,7 @@ async def publish_to_live(request: Request):
             "state": "requested",
             "startedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
             "startedAtTimestamp": time.time(),
-            "message": "已提交发布请求，正在等待构建…",
+            "message": "已提交发布请求，正在同步到线上…",
         })
 
         try:
@@ -420,7 +420,7 @@ async def publish_to_live(request: Request):
 
         return {
             "success": True,
-            "message": "🚀 发布请求已提交：内容已镜像，源码正在提交并重建线上站点，约 1-3 分钟生效。",
+            "message": "🚀 发布请求已提交：内容已镜像，源码正在提交并同步到线上，内容改动会立即生效。",
             "serverMode": True,
             "statusFile": status_file,
         }
