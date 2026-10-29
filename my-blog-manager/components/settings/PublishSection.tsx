@@ -175,6 +175,10 @@ export default function PublishSection() {
         clearOperations();
         showToast(data.message, 'success');
         setTimeout(loadStatus, 1500);
+      } else if (data.busy) {
+        // 上一轮发布还没结束：这是排队提示，不是发布失败
+        showToast(data.message, 'info');
+        setTimeout(loadStatus, 1500);
       } else {
         showToast(`❌ 发布失败：${data.message}`, 'error');
       }
@@ -202,6 +206,9 @@ export default function PublishSection() {
       if (data.success) {
         showToast(data.message, 'success');
         setTimeout(loadHistory, 1500);
+      } else if (data.busy) {
+        // 有发布或回退正在进行中，属于排队提示
+        showToast(data.message, 'info');
       } else {
         showToast(`❌ 回退失败：${data.message}`, 'error');
       }

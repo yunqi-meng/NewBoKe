@@ -54,6 +54,22 @@ JSON
 }
 
 START_TS=$(date +%s)
+
+# --------------------------------------------------------------------------
+# 并发保护：同一时刻只允许一个发布助手在跑
+#
+# 连点两下「发布上线」会让两个助手同时进入同一个工作区：一个推送被非快进
+# 拒绝，两个 next build 同时跑，最后站点停在半新半旧的状态。
+# 这里用 flock 把后来的那一次挡住，等前一次结束再继续。
+# --------------------------------------------------------------------------
+LOCK_FILE="/var/lock/xhblogs-publish.lock"
+[ -d /var/lock ] || LOCK_FILE="/tmp/xhblogs-publish.lock"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  log "已有发布任务在运行，等待其完成"
+  flock 9
+fi
+
 write_status running "正在提交源码并重建站点" "$START_TS"
 log "=== 收到发布请求：仓库 $REPO ==="
 

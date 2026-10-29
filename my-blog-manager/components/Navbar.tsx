@@ -131,6 +131,9 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
       if (data.success) {
         clearOperations();
         showToast(data.message, "success");
+      } else if (data.busy) {
+        // 上一轮发布还没结束：这是排队提示，不是发布失败
+        showToast(data.message, "info");
       } else {
         showToast(`❌ 发布失败: ${data.message}`, "error");
       }

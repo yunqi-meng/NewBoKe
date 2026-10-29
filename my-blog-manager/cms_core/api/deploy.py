@@ -21,6 +21,10 @@ SERVER_PUBLISH_HELPER = "/usr/local/bin/xhblogs-publish"
 SERVER_ROLLBACK_HELPER = "/usr/local/bin/xhblogs-rollback"
 DEFAULT_REPO_ROOT = os.path.dirname(PROJECT_ROOT)
 PUBLISH_STATUS_FILE = ".publish-status.json"
+# 发布进行中的判定：状态文件里的 state 属于这几种就算"正在发布"
+PUBLISH_RUNNING_STATES = ("requested", "running", "building")
+# 超过这个秒数还停在"进行中"，就当作上次发布异常中断，允许重新发布
+PUBLISH_STALE_SECONDS = 15 * 60
 
 
 # --------------------------------------------------------------------------
@@ -79,6 +83,30 @@ def _git(repo, args, timeout=60):
 def _is_server_mode():
     """是否运行在服务器部署形态（存在发布助手脚本）"""
     return platform.system() == "Linux" and os.path.exists(SERVER_PUBLISH_HELPER)
+
+
+def _publish_in_progress(repo_root=None):
+    """是否已经有一次发布正在跑。
+
+    连点两下「发布上线」会同时拉起两个发布助手：它们会在同一个工作区里
+    互相踩（一个推送被拒、两个 next build 同时跑），最后留下半新半旧的站点。
+    这里先拦一道，助手脚本内部还有 flock 兜底。
+    """
+    root = repo_root or DEFAULT_REPO_ROOT
+    status = _read_json(os.path.join(root, PUBLISH_STATUS_FILE), None)
+    if not isinstance(status, dict):
+        return False
+    if str(status.get("state", "")).strip() not in PUBLISH_RUNNING_STATES:
+        return False
+    started = status.get("startedAtTimestamp")
+    try:
+        started_at = float(started)
+    except (TypeError, ValueError):
+        started_at = 0.0
+    # 状态文件停在"进行中"太久，说明上一次发布异常中断，允许重新发布
+    if started_at and (time.time() - started_at) > PUBLISH_STALE_SECONDS:
+        return False
+    return True
 
 
 def _default_blog_path():
@@ -286,6 +314,14 @@ async def rollback_to_commit(request: Request):
         if not _is_server_mode():
             return {"success": False, "message": "当前不是服务器部署环境，无法自动回退"}
 
+        # 发布与回退都会改同一个工作区，不能同时进行
+        if _publish_in_progress(repo_root):
+            return {
+                "success": False,
+                "message": "⏳ 当前有发布或回退任务正在进行中，请等它结束后再操作。",
+                "busy": True,
+            }
+
         status_file = os.path.join(repo_root, PUBLISH_STATUS_FILE)
         _write_json(status_file, {
             "state": "requested",
@@ -345,6 +381,16 @@ async def publish_to_live(request: Request):
             }
 
         repo_root = DEFAULT_REPO_ROOT
+
+        # 连点两次会让两个发布助手同时改同一个工作区，先挡住后来的那一次
+        if _publish_in_progress(repo_root):
+            return {
+                "success": False,
+                "message": "⏳ 上一次发布还在进行中（约需 1-3 分钟），请等它结束后再发布。",
+                "serverMode": True,
+                "busy": True,
+            }
+
         status_file = os.path.join(repo_root, PUBLISH_STATUS_FILE)
         _write_json(status_file, {
             "state": "requested",
