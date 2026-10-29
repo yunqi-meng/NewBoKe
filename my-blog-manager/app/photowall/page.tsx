@@ -41,7 +41,7 @@ export default function PhotoWallPage() {
   // 🌟 实时读取磁盘上的相册数据
   //
   // data/albums.ts 会被 Next.js 打包进客户端 bundle，如果在这里直接 import，
-  // 页面拿到的永远是「构建那一刻」的快照：删掉的照片点完「更新本地」刷新后又会复活。
+  // 页面拿到的永远是「构建那一刻」的快照：删掉的照片点完「发布上线」刷新后又会复活。
   // 所以相册列表必须实时向内容引擎读盘。
   const loadAlbums = useCallback(async () => {
     try {
@@ -68,7 +68,7 @@ export default function PhotoWallPage() {
       label: "同步画廊数据变更",
       value: newAlbums
     });
-    showToast("📍 变更已加入待处理队列，请在 Navbar 点击更新本地", "info");
+    showToast("📍 变更已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
   };
 
   // 🌟 所有变更统一走这里：用不可变更新写回 state，

@@ -140,7 +140,7 @@ function EditorContent() {
         value: payload
       });
       setHasUnsavedChanges(false);
-      showToast("🚀 已加入待处理队列！", "info");
+      showToast("🚀 已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
       if (shouldExitAfterSave) router.back();
       return;
     }

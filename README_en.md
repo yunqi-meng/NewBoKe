@@ -1,3 +1,25 @@
+# Version 0.4.6 - One Button To Publish, And A Way Back
+
+**Publishing is now a single button, and every step can be undone.**
+
+- **No more "update local" step**: you used to press "📥 更新本地" to write your edits back, then
+  "🚀 发布上线". Both the inbox and the publish panel now carry a single "🚀 发布上线" button. One click
+  writes the pending edits back, mirrors the content, commits the source repository, rebuilds the public
+  site and restarts the service.
+- **The blog follows along**: about 1-3 minutes later, articles, moments, the photo wall, friend links,
+  the project grid, the about page and the site config are all live.
+- **Half-finished changes never ship**: if any write-back step fails, the publish stops right there and
+  tells you why.
+- **Step back whenever you want**: the "4. 发布历史与回退" card in **Settings → 发布上线** lists the last
+  20 steps (commit id, subject, time). The version currently live is marked "当前线上"; any earlier step can
+  be restored with "回退到这里", which puts the content back to that state and rebuilds the site.
+- **History survives**: a rollback is a new commit, not a rewrite, so you can keep stepping backwards.
+- **Content only**: articles, moments, album / friend / project data, the about page, site config, local
+  music and uploaded images return to that step; the source code itself is untouched, and rollbacks are
+  pushed to the server repository and the GitHub backup as well.
+
+---
+
 # Version 0.4.5 - Daily Quote Replaces the Daily Briefing
 
 **The Daily Briefing feature is gone; a daily AI-generated line of encouragement takes its place.**
@@ -376,7 +398,7 @@ machine pushes code to the same branch. Two writers on one branch collide easily
 
 ## II. Update Settings and Publish
 
-To protect data safety, this console uses an **"Operation Staging Area"** mechanism. **Please pay special attention!** Many settings must be actively "Updated to Local" after modification to be truly saved. When this operation is required, there is usually a highlighted prompt at the top of the interface.
+To protect data safety, this console uses an **"Operation Staging Area"** mechanism. **Please pay special attention!** Many settings must be actively published after modification to be truly written back and live. When this operation is required, there is usually a highlighted prompt at the top of the interface.
 
 **Operation Example: Modifying Personal Profile**
 
@@ -386,22 +408,29 @@ After modifying the content, click **[Stage to Operation Queue]**:
 
 ![暂存队列](picture/Pasted%20image%2020260427125430.png)
 
-At this point, the top toolbox will prompt pending operations. You can undo at any time (clear all), or click **[Update Local]**.
+At this point, the top toolbox will prompt pending operations. You can undo at any time (clear all), then click **[🚀 Publish]** in the operation box at the top right (or the same button under **Settings → Publish**).
 
-> ⚠️ Note: After clicking "Update Local," the data is only saved in your console environment.
+> ⚠️ Note: the write-back happens as the first step of the publish. If it fails, the publish stops right there and tells you why — a half-written set of changes never ships.
 
-Next, click **[🚀 Publish]** in the operation box at the top right (or the same button under **Settings → Publish**). After you confirm, the system does four things on its own:
+After you confirm, the system does five things on its own:
 
-1. **Mirror the content** — posts, moments, talks and the site configuration are copied over the blog source directory;
-2. **Commit the repository** — the change is committed in the server working tree and pushed to the bare repository;
-3. **Rebuild** — `npm run build` produces a fresh prebuilt output;
-4. **Restart the service** — `xhblogs` restarts and the change goes live.
+1. **Write back to local** — every staged change (albums / friend links / projects / site config / moments / articles) is written back into the content engine;
+2. **Mirror the content** — posts, moments, talks and the site configuration are copied over the blog source directory;
+3. **Commit the repository** — the change is committed in the server working tree and pushed to the bare repository;
+4. **Rebuild** — `npm run build` produces a fresh prebuilt output;
+5. **Restart the service** — `xhblogs` restarts and the change goes live.
 
 The whole cycle takes roughly 1-3 minutes. Build logs land in `/var/log/xhblogs-publish.log`.
 
 The publishing and modification of all content, such as blog posts, moments, and talks, follow this process.
 
-> **💡 Golden Rule**: Staging Queue -> Update Local -> Publish
+> **💡 Golden Rule**: Staging Queue -> 🚀 Publish
+
+### Publish history and rollback
+
+The "4. 发布历史与回退" card under **Settings → Publish** lists the last 20 steps with commit id, subject and time; the version currently live is marked "当前线上". Clicking **"回退到这里"** on any step restores articles, moments, album / friend / project data, the about page, site config, local music and uploaded images to the content state of that step, then commits, pushes and rebuilds — about 1-3 minutes.
+
+A rollback is a **new commit**, so the history is never broken and you can keep stepping backwards; the source code itself is untouched. Rollback logs land in `/var/log/xhblogs-publish.log` as well.
 
 ### Online status panel
 
@@ -425,7 +454,7 @@ and every site references them with the same in-site address: `/uploads/<file na
    machine to the content engine and is written to disk.
 3. Once stored, the console previews it directly through `/uploads/<file name>`; pasting an external
    image URL still works exactly as before.
-4. Press "Add to queue" -> "Update local" to write `data/albums.ts`, then "Publish". `sync.py`
+4. Press "Add to queue" -> "🚀 Publish": the publish writes `data/albums.ts` and then `sync.py`
    mirrors `data/uploads/` into the public site's `public/uploads/`, so the public site serves the
    very same addresses.
 

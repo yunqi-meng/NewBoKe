@@ -50,7 +50,7 @@ export default function FriendsBoard() {
       label: "同步友链数据变更",
       value: nextList
     });
-    showToast("📍 变更已加入待处理队列，请在 Navbar 点击更新本地", "info");
+    showToast("📍 变更已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
   };
 
   const handleSaveFriend = () => {

@@ -134,7 +134,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
       payload: payload,
       timestamp: new Date().toLocaleString()
     });
-    showToast("✅ 队列保存成功！\n请点击右上角导航栏的 📥 收件箱更新本地", "success");
+    showToast("✅ 队列保存成功！\n点右上角「🚀 发布上线」即可写回并上线", "success");
     setIsPublishOpen(false);
     setNewMoment({ content: '', location: '', images: [] });
   };

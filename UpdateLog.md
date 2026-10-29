@@ -1,3 +1,13 @@
+## 0.4.6 - 2026-10-29
+
+- 发布流程合并为单一按钮：控制台改完内容不必再先点「📥 更新本地」，收件箱与「设置 → 发布上线」都只保留一个「🚀 发布上线」。点击后自动依次完成「写回本地改动 → 镜像内容 → 提交源码仓库 → 重新构建公开站 → 重启服务」，博客随之更新，约 1-3 分钟生效。
+- 新增 `my-blog-manager/lib/pendingOperations.ts`：把收件箱里的待处理操作按类型逐条写回内容引擎（相册 / 友链 / 项目 / 站点配置 / 说说 / 文章），任一条失败即中止发布并给出原因，不会带着半套改动上线。
+- 新增发布回退机制：引擎新增 `GET /api/deploy/history`（最近 20 次提交，区分发布 / 回退 / 代码提交）与 `POST /api/deploy/rollback`（回退到指定提交）；服务器新增 `/usr/local/bin/xhblogs-rollback` 助手与 `/etc/sudoers.d/xhblogs-rollback` 免密规则。
+- 回退语义是「内容回到前一步」：把文章、说说、说说配图、相册 / 友链 / 项目数据、关于页、站点配置、本地音乐与上传图片等内容路径恢复到目标提交的状态，之后新增的内容会被移除；源码与历史不回退，回退本身也会留下一次提交，因此可以继续往前回退，历史不会断。
+- 控制台「设置 → 发布上线」新增「4. 发布历史与回退」面板：列出每一步的提交号、说明与时间，当前线上版本标注「当前线上」，其余步骤可一键回退（回退约 1-3 分钟生效）。
+- 收件箱里的提示语同步更新：照片墙、友链、项目矩阵、说说、编辑器在改动入队后统一提示「点右上角 🚀 发布上线 即可写回并上线」。
+- 服务器与 GitHub 双远端保持一致：发布与回退提交都会推送到服务器裸仓库与 GitHub 备份。
+
 ## 0.4.5 - 2026-10-29
 
 - 每日选刊整套下线：删除公开站 `components/DailyBriefing.tsx` 与 `data/dailyBriefing*.{ts,json}`、`data/briefingConfig.json`、`data/terraReadingNotes.ts`、`lib/briefingWindow.ts`、`public/images/briefing-default.svg`，控制台 `components/settings/Briefing*.tsx`、`briefingApi.ts`、`app/briefing/`、`app/api/briefing/`，引擎 `cms_core/briefing_*.py` 与 `cms_core/public/briefing_agent.py`，以及仓库根目录四个只覆盖选刊的测试文件；控制台侧栏「每日选刊」入口一并移除。
