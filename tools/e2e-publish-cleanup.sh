@@ -32,7 +32,8 @@ for i in $(seq 1 60); do
 done
 
 echo "=== 4. 校验公开站已无测试内容 ==="
-if curl -s http://127.0.0.1:8080/moments | grep -q "E2E-REALTIME-"; then
+BODY=$(curl -s http://127.0.0.1:8080/moments)
+if printf '%s' "$BODY" | grep -q "E2E-REALTIME-\|E2E-LOC-\|E2E-PROFILE-"; then
   echo "仍然可见，需要检查"
 else
   echo "公开站已无测试说说"

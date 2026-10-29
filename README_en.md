@@ -6,8 +6,13 @@
   "构建中" state label now read "同步中", with a note that only code changes trigger a rebuild.
   The rollback copy stays as it is, because the rollback helper really does still rebuild the site.
 - **Numbers from the server**: saving a moment and clicking 发布上线 made the public site show it
-  **509 ms** later (626 ms counting from the save). No `next build` ran - the build id and the
-  artifact timestamp stayed untouched. The same flow took about 39 seconds before.
+  **128 ms** later (271 ms counting from the save; the publish call itself takes 33 ms). No `next build`
+  ran - the build id and the artifact timestamp stayed untouched. The same flow took about 39 seconds
+  before.
+- **A measurement pitfall worth knowing about**: polling with `curl ... | grep -q` looks fine but is
+  not. When grep matches it exits early, curl gets SIGPIPE, and with `set -o pipefail` the hit is
+  scored as a miss - which is how the same run reported 0.5 s, 2.3 s, 4.4 s and 8.3 s in a row. The
+  scripts now fetch the page first and match afterwards; the reading is stable at ~0.1 s.
 - **"已同步到线上" stays accurate**: a content-only publish produces no new build id, so the
   effective timestamp in the status file is what proves it actually went live.
 - **The publish chain is now reproducible**: two end-to-end scripts run the full "save → publish →
