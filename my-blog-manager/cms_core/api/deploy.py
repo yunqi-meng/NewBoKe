@@ -51,7 +51,11 @@ def _write_json(path, payload):
 
 
 def _run(cmd, cwd=None, timeout=60):
-    """执行外部命令，返回 (returncode, stdout, stderr)"""
+    """执行外部命令，返回 (returncode, stdout, stderr)
+
+    固定按 UTF-8 解码：Windows 默认按 GBK 解码，会把中文提交说明读成乱码甚至
+    直接抛 UnicodeDecodeError（发布历史因此在本地桌面版读不出来）。
+    """
     try:
         proc = subprocess.Popen(
             cmd,
@@ -59,6 +63,8 @@ def _run(cmd, cwd=None, timeout=60):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             universal_newlines=True,
+            encoding="utf-8",
+            errors="replace",
         )
         stdout, stderr = proc.communicate(timeout=timeout)
         return proc.returncode, stdout, stderr

@@ -343,6 +343,9 @@ export default function PublishSection() {
 
         {/* 3. 发布动作 */}
         <div className="pt-2">
+          <label className="mb-3 block text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase flex items-center gap-1">
+            <Rocket size={14} className="text-indigo-500" /> 3. 发布上线
+          </label>
           <button
             onClick={handlePublish}
             disabled={isPublishing || inFlight}
