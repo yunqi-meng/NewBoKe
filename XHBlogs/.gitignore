@@ -49,3 +49,4 @@ __pycache__/
 
 # 本机上传的图片 (由控制台镜像过来，二进制不入库)
 /public/uploads/*
+!/public/uploads/.gitkeep
