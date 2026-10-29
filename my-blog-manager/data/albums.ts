@@ -11,12 +11,12 @@ export const albums: Album[] = [
     "date": "2026.01",
     "photos": [
       {
-        "url": "/uploads/20261029-095538-259a0979e67b.png",
-        "caption": "QODER 本机直传测试"
-      },
-      {
         "url": "https://bu.dusays.com/2026/03/31/69cb69bb530d8.jpg",
         "caption": "原来的人"
+      },
+      {
+        "url": "https://bu.dusays.com/2026/03/24/69c24230de927.jpg",
+        "caption": "星空漫游"
       }
     ]
   },
