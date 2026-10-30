@@ -19,6 +19,15 @@ interface Props {
   onOpenImageTool: () => void;
 }
 
+function Label({ icon: Icon, text, color }: { icon: React.ElementType; text: string; color: string }) {
+  return (
+    <div className={`flex items-center gap-2 mb-3 border-l-4 ${color} pl-4`}>
+      <Icon size={14} className="text-slate-400" />
+      <span className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-800 dark:text-slate-200">{text}</span>
+    </div>
+  );
+}
+
 export default function MetaMatrix({
   type, tags, setTags, cover, setCover, summary, setSummary, mood, setMood,
   allHistoryPostTags, allHistoryChatterTags, isLoadingTags, allHistoryMoods, onSave, isSaving, lastSaved, onOpenImageTool
@@ -33,13 +42,6 @@ export default function MetaMatrix({
       setTagInput('');
     }
   };
-
-  const Label = ({ icon: Icon, text, color }: any) => (
-    <div className={`flex items-center gap-2 mb-3 border-l-4 ${color} pl-4`}>
-      <Icon size={14} className="text-slate-400" />
-      <span className="font-black text-[10px] uppercase tracking-[0.2em] text-slate-800 dark:text-slate-200">{text}</span>
-    </div>
-  );
 
   return (
     <div className="flex flex-col h-full overflow-hidden relative">

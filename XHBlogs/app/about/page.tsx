@@ -106,7 +106,6 @@ async function renderMarkdown(source: string): Promise<string> {
     .use(remarkMath)
     .use(remarkRehype, { allowDangerousHtml: true })
     // 🌟 核心修复：开启自动语言侦测，并限制语言白名单！
-    // @ts-ignore
     .use(rehypeHighlight, {
       detect: true,
       ignoreMissing: true,

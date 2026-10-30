@@ -9,7 +9,6 @@
 """
 
 import json
-import time
 from datetime import datetime
 from pathlib import Path
 
@@ -125,26 +124,3 @@ def _import_into(tables: dict, db) -> dict:
         counts[name] = len(rows)
     db.flush()
     return counts
-
-
-def latest_snapshot() -> Path:
-    """最新一份快照文件。"""
-    directory = config.snapshots_dir()
-    if not directory.exists():
-        return None
-    files = sorted(directory.glob("content-*.json"))
-    return files[-1] if files else None
-
-
-def snapshot_name_for_now() -> str:
-    return "content-" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".json"
-
-
-def wait_for_snapshot(path: Path, timeout: float = 5.0) -> bool:
-    """等快照文件真正落盘（发布流程里用来确认导出成功）。"""
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        if Path(path).exists() and Path(path).stat().st_size > 0:
-            return True
-        time.sleep(0.05)
-    return False

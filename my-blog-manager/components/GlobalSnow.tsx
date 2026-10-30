@@ -1,13 +1,27 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 
 export default function GlobalSnow() {
   const [isWinter, setIsWinter] = useState(false);
   const [mounted, setMounted] = useState(false);
+  // 雪花在挂载后一次性生成：Math.random 放在渲染过程里会破坏 React 的纯渲染约定，
+  // 这个组件在挂载前本来就返回 null，没有首屏水合问题。
+  const [snowParticles, setSnowParticles] = useState<
+    { char: string; size: number; left: number; duration: number; delay: number; opacity: number }[]
+  >([]);
 
   useEffect(() => {
     setMounted(true);
+    const types = ["❄", "❅", "❆"];
+    setSnowParticles(Array.from({ length: 40 }).map(() => ({
+      char: types[Math.floor(Math.random() * types.length)],
+      size: Math.random() * 15 + 10,
+      left: Math.random() * 100,
+      duration: Math.random() * 6 + 4,
+      delay: Math.random() * 5,
+      opacity: Math.random() * 0.5 + 0.3,
+    })));
     // 1. 初始化检查：从 localStorage 读取或检查 body 类名
     const checkWinter = () => {
       const isActive = document.body.classList.contains("winter-mode") || localStorage.getItem("winter-mode") === "true";
@@ -31,17 +45,6 @@ export default function GlobalSnow() {
     return () => observer.disconnect();
   }, []);
 
-  const snowParticles = useMemo(() => {
-    const types = ["❄", "❅", "❆"];
-    return Array.from({ length: 40 }).map(() => ({
-      char: types[Math.floor(Math.random() * types.length)],
-      size: Math.random() * 15 + 10,
-      left: Math.random() * 100,
-      duration: Math.random() * 6 + 4,
-      delay: Math.random() * 5,
-      opacity: Math.random() * 0.5 + 0.3,
-    }));
-  }, []);
 
   if (!mounted || !isWinter) return null;
 

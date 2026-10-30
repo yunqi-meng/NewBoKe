@@ -31,9 +31,13 @@ export const getLiveSiteConfig = cache(async (): Promise<SiteConfig> => {
     const live = await getPublicSiteConfig();
     if (!live || Object.keys(live).length === 0) return base as SiteConfig;
 
-    const { aiConfig, geminiConfig, ...publicLive } = live;
+    // 后端公开接口已经不带 aiConfig / geminiConfig，这里再兜一次：
+    // 无论后端返回什么，内部配置都不进页面。
+    const publicLive = { ...(live as Record<string, any>) };
+    delete publicLive.aiConfig;
+    delete publicLive.geminiConfig;
 
-    return deepMerge(base, publicLive as Record<string, any>) as SiteConfig;
+    return deepMerge(base, publicLive) as SiteConfig;
   } catch {
     return base as SiteConfig;
   }

@@ -93,7 +93,6 @@ async function getPostData(slug: string) {
     // 🌟 allowDangerousHtml 必须开启，这样上面生成的 <br/> 才能顺利通过变成真正的换行！
     .use(remarkRehype, { allowDangerousHtml: true })
     // 🌟 核心升级：开启代码语言自动侦测，并限制白名单，大幅提高 C++ 和常用语言的猜中率！
-    // @ts-ignore
     .use(rehypeHighlight, {
       detect: true,
       ignoreMissing: true,

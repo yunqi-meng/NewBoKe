@@ -3,7 +3,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSiteConfig } from '../../components/SiteConfigProvider';
-import { Plus, Pencil, Trash2, Search, Sparkles, AlertTriangle, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Sparkles, AlertTriangle } from 'lucide-react';
 import { useToast } from '../../components/ToastProvider';
 
 type Chatter = {
@@ -69,7 +69,7 @@ export default function ChatterBoard({ chatters: initialChatters }: { chatters: 
       } else {
         showToast("❌ 销毁失败: " + data.message, "error");
       }
-    } catch (err) {
+    } catch {
       showToast("❌ 无法连接到 Python 引擎", "error");
     } finally {
       setDeleteModal({ isOpen: false, slug: null, title: null });
@@ -108,7 +108,7 @@ export default function ChatterBoard({ chatters: initialChatters }: { chatters: 
 
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">确认要销毁吗？</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-8 leading-relaxed">
-                你正在尝试抹除 <span className="text-red-500 font-bold">"{deleteModal.title}"</span>。<br />
+                你正在尝试抹除 <span className="text-red-500 font-bold">&quot;{deleteModal.title}&quot;</span>。<br />
                 此操作将永久从硬盘删除源文件，不可撤回。
               </p>
 

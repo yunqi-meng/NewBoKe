@@ -14,14 +14,13 @@ import os
 import re
 import subprocess
 import time
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Depends, Request
 
 from .. import config
 from ..security import require_admin
-from ..snapshot import export_snapshot, import_snapshot, read_snapshot
+from ..snapshot import export_snapshot, import_snapshot
 
 router = APIRouter()
 

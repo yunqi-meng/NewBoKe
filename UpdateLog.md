@@ -1,3 +1,18 @@
+## 0.5.2 - 2026-10-30
+
+- **删掉一整批已经没人引用的文件**：公开站与控制台的 `WeatherEffect.tsx`、`WeatherWidget.tsx`（天气小组件早已下线）、公开站的 `GlobalSnow.tsx`（控制台那份仍在用，公开站没有任何地方挂载）、控制台 `lib/managerApi.ts`、根目录的 `update.py` / `update.bat`（旧 GitHub 拉取更新器，早已被服务器发布助手取代）与 `scripts/checkConfig.mjs`（带硬编码片段的配置自检脚本，会改文件且无调用方）。公开站的 `/api/weather`（依赖未配置的 `QWEATHER_KEY`）、`/api/test` 与控制台的空目录 `app/api/ping` 一并删除。仓库不再跟踪 `.idea/`，`__pycache__/` 也清掉了。
+- **清掉约 8.5MB 无用静态资源**：两端的 `file.svg` / `globe.svg` / `next.svg` / `vercel.svg` / `window.svg` / `spaceship.bin`，控制台的 `recreation-bg.png` / `recreation-fg.png` / `tabby-cat.png`。保留仍在使用的 `siamese-cat.png`、`music-default.svg`。
+- **依赖瘦身**：公开站删掉整套 Tiptap（编辑器只在控制台用）、`three` / `@react-three/*`（全仓 0 处引用）、`gray-matter`、`openai`、`remark-html`、`next-themes`、`remark` 共 23 个包；控制台删掉 `three` / `@react-three/*`、`gray-matter`、`marked`、`openai`、`remark`、`remark-html`、`next-themes`、`@tiptap/extension-placeholder` 共 10 个包。两份 `package-lock.json` 同步重算（分别减少约 1800 与 850 行），本地 `node_modules` 实际移除 149 / 75 个包。删完后两端 `next build` 均通过，说明确实没有隐藏引用。
+- **修复：新建草稿重复保存会产生多条记录**。编辑器里的文档 id 用 `useState` 只读不写，第一次保存后后端返回的真实 id 被丢掉，再点「存草稿」仍以 `id=null` 提交，后端每次生成新 id，于是每存一次多一条草稿。改为用 ref 记住返回的 id，并在浏览器里连点两次「存草稿」实测：草稿表里始终只有 1 条（修复前会是 2 条）。
+- **修复：播放列表为空时点上一首 / 下一首会算出 `NaN`**。两端 `MusicProvider` 的 `nextSong` / `prevSong` 补上空列表直接返回，避免 `(prev + 1) % 0` 把 `currentIndex` 污染成 `NaN`、播放器进入「有歌但不显示」的状态。
+- **修复：编辑器 Tiptap 重复扩展告警**。`StarterKit` v3 自带 `link` 与 `underline`，代码里又单独挂了一份，控制台打开编辑器会报 `Duplicate extension names found`。改为在 `StarterKit.configure` 里关掉内置版，统一使用单独配置的那一份，浏览器控制台已清零。
+- **修复：本地控制台可能被过期的 `backend_config.json` 带到错误端口**。提交进仓库的 `public/backend_config.json` 还留着旧启动器写的 `api_port: 58643`，本地不带环境变量启动时，控制台会把 `/api/proxy` 转发到不存在的端口（表现为直接跳登录页或整站报错）。该文件现在只作为桌面版的端口提示，默认值改为 8000 并与解析顺序一致；设置页也改为「文件不存在不算错误」，服务器部署没有这个文件时不再误判为离线。
+- **修复：`SplashScreen` 在声明之前调用 `exitSplash`**。两端的开屏组件先写 `useEffect`、后写 `exitSplash`，React Compiler 的 lint 明确报「变量在声明前被访问」；把函数提到 effect 之前，行为保持不变。
+- **修复：雪花粒子在渲染期调用 `Math.random`**。`GlobalSnow` 用 `useMemo` 在渲染里生成随机粒子，违反 React 的纯渲染约定。改为挂载后在 effect 里生成一次；组件本来就在挂载前返回 `null`，不会引入水合差异。`WindyGrass` 早就是 effect 生成，未受影响。
+- **音乐页歌词改为派生值**：两端音乐页原来用 `useState` + `useEffect` 在切歌后再 `setParsedLyrics`，等于每切一首歌多渲一轮，中间还会闪一帧空歌词。解析逻辑抽成模块级 `parseLyrics`，页面用 `useMemo` 直接派生，切歌即换，同时消掉了 `set-state-in-effect` 告警。
+- **未使用代码清理**：两端去掉一批未使用的图标 / 类型 / 变量与 `catch (e)` 形参；把 `MetaMatrix` 的 `Label`、`RichTextEditor` 的 `Btn` 从渲染函数内部提到模块级（避免每次渲染重建组件、React Compiler 报 `static-components`）；把已经不需要的 `@ts-ignore` 全部移除（先改成 `@ts-expect-error` 用 `tsc` 验证这些行本来就不报错，再删掉注释）；JSX 里裸写的引号改为 `&quot;` / `&apos;`。后端删除 `config.server_mode()`、`auth.fingerprint()` 与未使用的 `List` 导入。
+- **验证**：两端 `tsc --noEmit` 0 错误；`next build` 均成功（控制台首次构建因 `fonts.gstatic.com` 拉取失败中断，重试即通过，与代码无关）；后端冒烟测试 27 通过 / 0 失败；两端全部路由逐条 curl 均 200；浏览器实际打开首页、音乐页、编辑器、照片墙，控制台无报错。ESLint 剩余两类问题按现状保留：`@typescript-eslint/no-explicit-any`（历史遗留的数据结构写法，逐个改类型收益低、风险高）与 `react-hooks/set-state-in-effect`（都是「挂载后读 localStorage / 拉配置」的客户端初始化，属于该规则允许的经典例外，组件在挂载前返回 null，不存在级联渲染）。
+
 ## 0.5.1 - 2026-10-30
 
 - **页面不再重复请求同一份配置**：公开站与控制台的服务端读取函数全部用 `React.cache()` 包了一层。此前渲染一个页面，`generateMetadata`、根布局、页面本身会各发一次 `/api/config`，一次首页渲染要发 4 次相同的配置请求；现在同一轮渲染内只发 1 次，结果在请求内复用。缓存作用域只是「这一次服务端渲染」，不会把旧内容留给下一次请求，实时性不受影响。

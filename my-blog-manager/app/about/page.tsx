@@ -109,8 +109,7 @@ export default async function AdminAboutPage() {
       .use(remarkMath)
       .use(remarkRehype, { allowDangerousHtml: true })
       // 🌟 核心升级：开启自动侦测，并限制白名单，大幅提高 C++ 等语言的猜中率
-      // @ts-ignore
-      .use(rehypeHighlight, {
+        .use(rehypeHighlight, {
         detect: true,
         ignoreMissing: true,
         subset: ['cpp', 'c', 'python', 'java', 'javascript', 'typescript', 'go', 'rust', 'bash', 'json', 'html', 'css', 'sql', 'xml']

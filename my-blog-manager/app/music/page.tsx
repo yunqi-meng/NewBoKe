@@ -2,11 +2,49 @@
 
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, RefreshCcw, ListMusic, Mic2, Disc3, Volume2, VolumeX, Search, X, MessageSquare } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, RefreshCcw, Disc3, Volume2, VolumeX, Search, X, MessageSquare } from 'lucide-react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import { useMusic } from '../../components/MusicProvider';
 import Comments from '../../components/Comments';
+
+type LyricLine = { time: number; text: string };
+
+/**
+ * 把一首歌的歌词字段解析成带时间轴的列表。
+ *
+ * 以前靠 useState + useEffect 在切歌后再 set 一次，等于每切一首歌多渲一轮，
+ * 中间还会闪一帧空歌词。歌词只由 song 决定，直接 useMemo 派生即可。
+ */
+function parseLyrics(lrc?: string, lyric?: string, lyrics?: unknown): LyricLine[] {
+  const rawLrc = lrc || lyric || (typeof lyrics === 'string' ? lyrics : '');
+
+  if (Array.isArray(lyrics) && lyrics.length > 0) return lyrics as LyricLine[];
+  if (!rawLrc || typeof rawLrc !== 'string') return [];
+
+  const lines = rawLrc.split('\n');
+  const parsed: LyricLine[] = [];
+  const timeExp = /\[(\d{2,}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
+  let hasValidTime = false;
+
+  for (const line of lines) {
+    const text = line.replace(/\[\d{2,}:\d{2}(?:[.:]\d{2,3})?\]/g, '').trim();
+    if (!text) continue;
+
+    let match;
+    while ((match = timeExp.exec(line)) !== null) {
+      hasValidTime = true;
+      const min = parseInt(match[1], 10);
+      const sec = parseInt(match[2], 10);
+      const ms = match[3] ? parseFloat(`0.${match[3]}`) : 0;
+      parsed.push({ time: min * 60 + sec + ms, text });
+    }
+  }
+
+  if (hasValidTime) return parsed.sort((a, b) => a.time - b.time);
+  // 兜底：没有时间戳的纯文本歌词也照原样排出列表
+  return lines.map((l) => ({ time: -1, text: l.trim() })).filter((l) => l.text);
+}
 
 export default function MusicPage() {
   const {
@@ -24,59 +62,11 @@ export default function MusicPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   // 🌟 1. 核心修复：改用 State 存储解析后的歌词，确保异步更新能触发 UI 刷新
-  const [parsedLyrics, setParsedLyrics] = useState<any[]>([]);
-
-  // 🌟 2. 核心修复：深度监控歌词数据流
-  useEffect(() => {
-    // 切歌瞬间，先清空旧歌词，显示加载状态
-    if (!currentSong) {
-      setParsedLyrics([]);
-      return;
-    }
-
-    // 提取歌词文本（全兼容模式）
-    const rawLrc = currentSong.lrc || currentSong.lyric || (typeof currentSong.lyrics === 'string' ? currentSong.lyrics : '');
-
-    // 如果已经有结构化数组了（部分 API 会直接给数组）
-    if (Array.isArray(currentSong.lyrics) && currentSong.lyrics.length > 0) {
-      setParsedLyrics(currentSong.lyrics);
-      return;
-    }
-
-    if (!rawLrc || typeof rawLrc !== 'string') {
-      setParsedLyrics([]);
-      return;
-    }
-
-    // 解析引擎
-    const lines = rawLrc.split('\n');
-    const parsed = [];
-    const timeExp = /\[(\d{2,}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
-    let hasValidTime = false;
-
-    for (const line of lines) {
-      const text = line.replace(/\[\d{2,}:\d{2}(?:[.:]\d{2,3})?\]/g, '').trim();
-      if (!text) continue;
-
-      let match;
-      while ((match = timeExp.exec(line)) !== null) {
-        hasValidTime = true;
-        const min = parseInt(match[1], 10);
-        const sec = parseInt(match[2], 10);
-        const ms = match[3] ? parseFloat(`0.${match[3]}`) : 0;
-        parsed.push({ time: min * 60 + sec + ms, text });
-      }
-    }
-
-    if (hasValidTime) {
-      setParsedLyrics(parsed.sort((a, b) => a.time - b.time));
-    } else {
-      // 兜底：如果没有时间戳，也作为列表显示
-      setParsedLyrics(lines.map(l => ({ time: -1, text: l.trim() })).filter(l => l.text));
-    }
-
-    // 监听：歌曲ID、歌词文本、以及所有可能的歌词字段
-  }, [currentSong?.id, currentSong?.lyric, currentSong?.lrc, currentSong?.lyrics]);
+  // 歌词由当前歌曲直接派生，切歌即换，不需要再 setState 引发第二轮渲染
+  const parsedLyrics = useMemo(
+    () => parseLyrics(currentSong?.lrc, currentSong?.lyric, currentSong?.lyrics),
+    [currentSong?.lrc, currentSong?.lyric, currentSong?.lyrics]
+  );
 
   const activeLyricIndex = useMemo(() => {
     if (!parsedLyrics.length) return -1;

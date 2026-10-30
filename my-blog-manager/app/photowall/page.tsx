@@ -3,9 +3,9 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import type { Album, Photo } from '../../lib/contentApi';
+import type { Album } from '../../lib/contentApi';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Pencil, Trash2, Search, Image as ImageIcon, X, Save, AlertTriangle, Sparkles, Edit3, CloudUpload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, X, Save, AlertTriangle, Edit3, CloudUpload } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
 import FloatingImageTool from '../../components/editor/FloatingImageTool';

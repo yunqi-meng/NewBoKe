@@ -10,7 +10,7 @@ from fastapi import APIRouter, Body, Depends
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
-from ..helpers import dumps_list, loads_list, now_stamp
+from ..helpers import dumps_list, loads_list
 from ..models import Album, AlbumPhoto, Friend, Project
 from ..security import require_admin
 
@@ -199,8 +199,3 @@ def delete_project(project_id: str, db: Session = Depends(get_db),
     db.delete(row)
     db.commit()
     return {"success": True, "message": "项目已删除"}
-
-
-def touch() -> str:
-    """给前端一个「最近更新时间」用。"""
-    return now_stamp()

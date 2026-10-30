@@ -38,7 +38,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
             localStorage.setItem('targetBlogPath', data.blogPath);
           }
         }
-      } catch (e) {
+      } catch {
         const path = localStorage.getItem('targetBlogPath') || "";
         setTargetBlogPath(path);
       }
@@ -137,7 +137,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
       } else {
         showToast(`❌ 发布失败: ${data.message}`, "error");
       }
-    } catch (error) {
+    } catch {
       showToast("无法连接到内容引擎进行发布", "error");
     }
   };

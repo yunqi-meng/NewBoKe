@@ -4,7 +4,7 @@
 现在统一落在数据库的 articles 与 moments 两张表。
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.orm import Session, defer
@@ -167,7 +167,3 @@ def all_tags(db: Session = Depends(get_db)):
         "postTags": sorted(post_tags),
         "chatterTags": sorted(chatter_tags),
     }
-
-
-def article_payload_list(articles: List[dict]) -> List[dict]:
-    return articles

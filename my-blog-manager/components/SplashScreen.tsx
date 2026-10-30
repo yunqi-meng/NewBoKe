@@ -11,6 +11,16 @@ export default function SplashScreen() {
   const [show, setShow] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
+  const exitSplash = () => {
+    setShow(false);
+    sessionStorage.setItem('hasSeenSplash', 'true');
+
+    // 【核心解封】：动画快结束时，给 html 加上类名，CSS 会自动把内容显示出来
+    setTimeout(() => {
+      document.documentElement.classList.add('splash-seen');
+    }, 500);
+  };
+
   useEffect(() => {
     setIsMounted(true);
     const hasSeenSplash = sessionStorage.getItem('hasSeenSplash') === 'true';
@@ -32,16 +42,6 @@ export default function SplashScreen() {
       document.documentElement.classList.add('splash-seen');
     }
   }, []);
-
-  const exitSplash = () => {
-    setShow(false);
-    sessionStorage.setItem('hasSeenSplash', 'true');
-
-    // 【核心解封】：动画快结束时，给 html 加上类名，CSS 会自动把内容显示出来
-    setTimeout(() => {
-      document.documentElement.classList.add('splash-seen');
-    }, 500);
-  };
 
   if (!isMounted) return null;
 

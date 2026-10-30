@@ -30,11 +30,11 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { createLowlight, all } from 'lowlight';
 
 import {
-  Undo2, Redo2, Eraser, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
+  Undo2, Redo2, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered, ListTodo,
   Highlighter, Code2, Heading1, Heading2, Heading3,
   Type, ImageIcon, Quote, RemoveFormatting, ChevronDown,
-  Pipette, Hash, Check, Link2, Superscript as SupIcon, Subscript as SubIcon, Minus, Palette, Lock
+  Pipette, Hash, Check, Link2, Superscript as SupIcon, Subscript as SubIcon, Palette, Lock
 } from 'lucide-react';
 
 const lowlight = createLowlight(all);
@@ -146,6 +146,19 @@ interface EditorProps {
   onChange?: () => void;
 }
 
+function Btn({ onClick, active, children, title }: { onClick: () => void; active?: boolean; children: React.ReactNode; title?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`p-2.5 rounded-xl transition-all duration-300 ease-out flex items-center justify-center 
+        ${active ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/40 scale-110' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, setTitle, initialContent, onOpenImageTool, isTitleLocked, onChange }, ref) => {
   const [textColors, setTextColors] = useState<string[]>(['#6366F1', '#000000']);
   const [highlightColors, setHighlightColors] = useState<string[]>(['#FEF08A', '#BBF7D0']);
@@ -157,9 +170,13 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
 
   const editor = useEditor({
     extensions: [
+      // StarterKit v3 自带 link 与 underline，这里关掉内置版，
+      // 统一由下面单独配置的 Underline / Link 提供，避免重名扩展告警和双重行为。
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
         codeBlock: false,
+        link: false,
+        underline: false,
       }),
       // 🌟 挂载 Markdown 扩展：transformPastedText 让粘贴进来的 markdown 文本（**bold**、|表格|、```代码```、列表等）被解析成真实富文本节点
       Markdown.configure({
@@ -265,17 +282,6 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
     const safeUrl = /^https?:\/\//.test(url) ? url : `https://${url}`;
     editor.chain().focus().extendMarkRange('link').setLink({ href: safeUrl }).run();
   };
-
-  const Btn = ({ onClick, active, children, title }: any) => (
-    <button
-      onClick={onClick}
-      title={title}
-      className={`p-2.5 rounded-xl transition-all duration-300 ease-out flex items-center justify-center 
-        ${active ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/40 scale-110' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
-    >
-      {children}
-    </button>
-  );
 
   return (
     <div className="flex flex-col h-full w-full min-h-0 bg-transparent relative">

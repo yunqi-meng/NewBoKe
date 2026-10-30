@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import DailyQuoteSection from '../../components/settings/DailyQuoteSection';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import { useOperations } from '../../context/OperationContext';
 import { useSiteConfig } from '../../components/SiteConfigProvider';
 import Navbar from '../../components/Navbar';
@@ -20,7 +20,7 @@ import FooterSection from '../../components/settings/FooterSection';
 import AICatSection from '../../components/settings/AICatSection';
 
 function SettingsContent() {
-  const { operations, addOperation } = useOperations();
+  const { addOperation } = useOperations();
   // 配置实时取自引擎：设置页填的永远是磁盘上的最新值
   const siteConfig = useSiteConfig();
   const [activeTab, setActiveTab] = useState('profile');
@@ -75,12 +75,15 @@ function SettingsContent() {
     const controller = new AbortController();
     const fetchRealConfig = async () => {
       try {
+        // backend_config.json 只是桌面版可选的本机连接提示：
+        // 不存在不算错误（服务器部署就没有这个文件），存在且标明预览副本才拦下。
         const configRes = await fetch(`/backend_config.json?t=${Date.now()}`, { signal: controller.signal });
-        if (!configRes.ok) throw new Error('无法读取本机连接设置');
-        const configData = await configRes.json();
-        if (configData.previewOnly === true) {
-          setBackendMode('preview');
-          return;
+        if (configRes.ok) {
+          const configData = await configRes.json().catch(() => ({}));
+          if (configData.previewOnly === true) {
+            setBackendMode('preview');
+            return;
+          }
         }
 
         const res = await fetch(`/api/proxy/api/config/get`, { cache: 'no-store', signal: controller.signal });
@@ -106,7 +109,7 @@ function SettingsContent() {
         } else {
           setBackendMode('offline');
         }
-      } catch (error) {
+      } catch {
         if (!controller.signal.aborted) setBackendMode('offline');
       }
     };

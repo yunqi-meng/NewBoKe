@@ -3,7 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import TimelineNode from './TimelineNode';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Search, AlertTriangle, Sparkles, LayoutGrid, ListTree, Calendar, Hash, ArrowRight, Edit3, ArrowUp } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Sparkles, LayoutGrid, ListTree, Edit3, ArrowUp } from 'lucide-react';
 import { useToast } from './ToastProvider';
 import Link from 'next/link';
 
@@ -67,7 +67,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
       } else {
         showToast("❌ 销毁失败: " + data.message, "error");
       }
-    } catch (err) {
+    } catch {
       showToast("无法连接到 Python 引擎", "error");
     } finally {
       setDeleteModal({ isOpen: false, slug: null, title: null });
@@ -88,7 +88,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
           left: 0,
           behavior: 'smooth'
         });
-      } catch (error) {
+      } catch {
         gridScrollRef.current.scrollTo(0, 0);
       }
     }
@@ -106,7 +106,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50" />
               <div className="w-20 h-20 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6"><AlertTriangle className="w-10 h-10 text-red-500" /></div>
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">销毁这篇文章？</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-8 leading-relaxed">你正在抹除 <span className="text-red-500 font-bold">"{deleteModal.title}"</span>。<br />此操作将永久删除物理 MD 文件，不可撤回。</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-8 leading-relaxed">你正在抹除 <span className="text-red-500 font-bold">&quot;{deleteModal.title}&quot;</span>。<br />此操作将永久删除物理 MD 文件，不可撤回。</p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteModal({ isOpen: false, slug: null, title: null })} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all">保留</button>
                 <button onClick={confirmDelete} className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-500/30 hover:bg-red-600 transition-all">确认销毁</button>

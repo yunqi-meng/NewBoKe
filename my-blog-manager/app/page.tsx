@@ -14,7 +14,6 @@ import { ToastProvider } from '../components/ToastProvider';
 
 import LatestPostsCarousel from '../components/LatestPostsCarousel';
 import LatestChatterCarousel from '../components/LatestChatterCarousel';
-import DanmakuBackground from '../components/DanmakuBackground';
 
 // 控制台首页要显示的是「工作副本」里的最新内容：
 // 静态预渲染会把内容固化进构建产物，发布后不重建控制台就会一直显示旧文章。

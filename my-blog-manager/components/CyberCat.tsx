@@ -51,7 +51,7 @@ export default function CyberCat() {
 
       const data = await res.json();
       speak(data.reply, 8000);
-    } catch (error) {
+    } catch {
       speak("吧唧吧唧... 鱼干好吃，但本喵卡壳了喵...", 4000);
     } finally {
       setIsThinking(false);
@@ -80,7 +80,7 @@ export default function CyberCat() {
 
       const data = await res.json();
       speak(data.reply, 8000);
-    } catch (error) {
+    } catch {
       speak("铲屎官的网线被老鼠咬断了吧？喵！", 4000);
     } finally {
       setIsThinking(false);

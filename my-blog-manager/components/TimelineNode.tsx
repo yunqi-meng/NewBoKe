@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { Pencil, Trash2, Calendar, Tag } from "lucide-react";
+import { Pencil, Trash2, Calendar } from "lucide-react";
 
 interface Props {
   post: any;

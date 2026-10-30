@@ -20,9 +20,11 @@ function EditorContent() {
   const { addOperation } = useOperations();
 
   const [docType, setDocType] = useState<string>(searchParams.get('type') || 'post');
-  const [currentDocId, setCurrentDocId] = useState(
-    searchParams.get('type') === 'about' ? 'about' : (searchParams.get('id') || 'new')
-  );
+  // 新建草稿第一次保存后，后端会分配一个真实 id。用 ref 记住它，
+  // 否则后续再点「存草稿」仍会带着 id=null 提交，每存一次就多出一条重复草稿。
+  const initialDocId =
+    searchParams.get('type') === 'about' ? 'about' : (searchParams.get('id') || 'new');
+  const docIdRef = useRef(initialDocId);
 
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState<string[]>([]);
@@ -64,13 +66,13 @@ function EditorContent() {
   }, []);
 
   useEffect(() => {
-    if (currentDocId !== 'new') {
+    if (initialDocId !== 'new') {
       const loadDraft = async () => {
         try {
           const res = await fetch(`/api/proxy/api/drafts/get`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: currentDocId, type: docType })
+            body: JSON.stringify({ id: initialDocId, type: docType })
           });
 
           const data = await res.json();
@@ -89,11 +91,11 @@ function EditorContent() {
           } else {
              showToast(data.message || "❌ 未找到草稿或原文件", "error");
           }
-        } catch (e) { showToast("❌ 读取失败", "error"); }
+        } catch { showToast("❌ 读取失败", "error"); }
       };
       loadDraft();
     }
-  }, [currentDocId]);
+  }, [initialDocId]);
 
   useEffect(() => {
     if (!isLoadingTags) {
@@ -125,7 +127,7 @@ function EditorContent() {
       showToast("⚠️ 请填写标题", "warning"); return;
     }
     const payload = {
-      id: docType === 'about' ? 'about' : (currentDocId === 'new' ? null : currentDocId),
+      id: docType === 'about' ? 'about' : (docIdRef.current === 'new' ? null : docIdRef.current),
       type: docType, title, tags, cover, mood, description: summary,
       content: editorRef.current?.getContent() || '',
       date: date || new Date().toISOString().split('T')[0],
@@ -152,6 +154,7 @@ function EditorContent() {
       });
       const data = await res.json();
       if (data.success) {
+        if (data.id) docIdRef.current = data.id;
         setLastSaved(new Date().toLocaleTimeString());
         setHasUnsavedChanges(false);
         showToast("💾 草稿已落盘", "success");
@@ -160,7 +163,7 @@ function EditorContent() {
           router.back();
         }
       }
-    } catch (e) { showToast("❌ 保存失败", "error"); }
+    } catch { showToast("❌ 保存失败", "error"); }
     finally { setIsSaving(false); }
   };
 

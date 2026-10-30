@@ -4,7 +4,6 @@
 两边共用 MANAGER_SESSION_SECRET，所以控制台的中间件与后端能互相认得。
 """
 
-import hashlib
 import time
 from collections import defaultdict
 
@@ -83,8 +82,3 @@ def session_info(request: Request):
         "authenticated": security.is_authenticated(request),
         "sessionTtl": security.SESSION_TTL_SECONDS,
     }
-
-
-def fingerprint(value: str) -> str:
-    """给访客标识用的小工具。"""
-    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, MessageSquare, Sparkles, Activity } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import Comments from './Comments';
 import { useSiteConfig } from './SiteConfigProvider';
 import Link from 'next/link';
@@ -83,7 +83,7 @@ export default function AboutClient({
     startDate.setDate(endDate.getDate() - 364);
     startDate.setDate(startDate.getDate() - startDate.getDay());
 
-    let curr = new Date(startDate);
+    const curr = new Date(startDate);
     const weeksArr = [];
     let currentWeek = [];
 
@@ -142,7 +142,7 @@ export default function AboutClient({
         <div className="mt-4 md:mt-6 mb-6 md:mb-8 relative flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight mb-2 md:mb-3 transition-colors duration-700">关于我</h1>
-            <p className="text-sm md:text-lg text-indigo-600 dark:text-indigo-400 font-bold tracking-widest uppercase transition-colors duration-700">Hello World, I'm {siteConfig.authorName}</p>
+            <p className="text-sm md:text-lg text-indigo-600 dark:text-indigo-400 font-bold tracking-widest uppercase transition-colors duration-700">Hello World, I&apos;m {siteConfig.authorName}</p>
           </div>
 
           <div className="flex items-center gap-1 bg-white/50 dark:bg-slate-900/50 p-1.5 rounded-2xl shadow-inner border border-white/40 dark:border-white/5">

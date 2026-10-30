@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import type { Friend } from '../../lib/contentApi';
-import { Plus, Pencil, Trash2, AlertTriangle, Save, Edit3, X, CloudUpload, Sparkles } from 'lucide-react';
+import { Plus, Trash2, AlertTriangle, Save, Edit3, CloudUpload, Sparkles } from 'lucide-react';
 import { useOperations } from '../../context/OperationContext';
 import { useToast } from '../../components/ToastProvider';
 import FloatingImageTool from '../../components/editor/FloatingImageTool';
@@ -126,7 +126,7 @@ export default function FriendsBoard() {
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[40px] shadow-2xl border border-white/50 p-10 text-center">
               <div className="w-16 h-16 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6"><AlertTriangle className="text-red-500" /></div>
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">切断引力？</h3>
-              <p className="text-sm text-slate-500 mb-8">确认从列表中移除 <span className="font-bold text-red-500">"{deleteModal.name}"</span> 吗？</p>
+              <p className="text-sm text-slate-500 mb-8">确认从列表中移除 <span className="font-bold text-red-500">&quot;{deleteModal.name}&quot;</span> 吗？</p>
               <div className="flex gap-3">
                 <button onClick={() => setDeleteModal({ ...deleteModal, isOpen: false })} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black hover:bg-slate-200 transition-colors">取消</button>
                 <button onClick={confirmDelete} className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-xs font-black shadow-lg hover:bg-red-600 transition-colors">确认移除</button>

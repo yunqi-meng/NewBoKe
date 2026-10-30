@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost, Plus, Image as ImageIcon, X, Send, Link as LinkIcon, Zap, Trash2, AlertTriangle } from 'lucide-react';
 import MomentComments from '../../components/MomentComments';
@@ -39,7 +39,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const processedMoments = useMemo(() => {
-    let baseMoments = moments ? [...moments] : [];
+    const baseMoments = moments ? [...moments] : [];
 
     // 拦截并在顶层混合暂缓队列的数据
     const pendingMoments = operations

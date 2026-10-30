@@ -17,8 +17,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 for stream in (sys.stdout, sys.stderr):
     try:

@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import { ToastProvider, useToast } from '../../components/ToastProvider';
-import { AlertTriangle, Search, Trash2, X, Sparkles, Pencil } from 'lucide-react';
+import { AlertTriangle, Search, X, Sparkles, Pencil } from 'lucide-react';
 
 function DraftsContent() {
   const { showToast } = useToast();
@@ -38,7 +38,7 @@ function DraftsContent() {
       } else {
         setDrafts([]);
       }
-    } catch (error) {
+    } catch {
       setDrafts([]);
     } finally {
       setIsLoading(false);
@@ -68,7 +68,7 @@ function DraftsContent() {
       } else {
         showToast(`销毁失败: ${data.message}`, "error");
       }
-    } catch (error) {
+    } catch {
       showToast("引擎连接失败", "error");
     } finally {
       // 关闭弹窗并重置状态
@@ -119,7 +119,7 @@ function DraftsContent() {
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">销毁这篇草稿？</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mb-8 leading-relaxed">
                 你正在尝试抹除未发布的草稿 <br />
-                <span className="text-red-500 font-bold">"{deleteModal.title}"</span>。<br />
+                <span className="text-red-500 font-bold">&quot;{deleteModal.title}&quot;</span>。<br />
                 此操作不可逆，所有未保存的灵感将永久消失。
               </p>
 

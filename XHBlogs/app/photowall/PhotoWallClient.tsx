@@ -102,7 +102,7 @@ export default function PhotoWallClient({ albums }: { albums: Album[] }) {
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-20 mt-10">
-                  {matchedAlbums.map((album, index) => (
+                  {matchedAlbums.map((album) => (
                     <div
                       key={album.id}
                       onClick={() => { setSearchQuery(''); setCurrentAlbum(album); }}

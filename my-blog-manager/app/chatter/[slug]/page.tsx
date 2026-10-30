@@ -74,7 +74,6 @@ async function getChatterData(slug: string) {
     .use(remarkGfm)
     .use(remarkMath)
     .use(remarkRehype, { allowDangerousHtml: true })
-    // @ts-ignore
     .use(rehypeHighlight, {
       detect: true,
       ignoreMissing: true,

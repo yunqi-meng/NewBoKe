@@ -62,7 +62,7 @@ expect backend "server/requirements.txt"
 expect other "README.md"
 expect other "UpdateLog.md"
 expect other "tools/xhblogs-publish"
-expect other "update.py"
+expect other "LICENSE"
 expect other ".gitignore"
 
 rm -f "$TMP"

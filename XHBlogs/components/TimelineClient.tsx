@@ -3,11 +3,11 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import TimelineNode from './TimelineNode';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Sparkles, LayoutGrid, ListTree, Calendar, Hash, ArrowUp } from 'lucide-react';
+import { Search, Sparkles, LayoutGrid, ListTree, Calendar, ArrowUp } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TimelineClient({ posts: initialPosts, tags }: { posts: any[], tags: { name: string, count: number }[] }) {
-  const [posts, setPosts] = useState(initialPosts);
+  const posts = initialPosts;
   const [selectedTag, setSelectedTag] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -69,7 +69,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
     if (gridScrollRef.current) {
       try {
         gridScrollRef.current.scroll({ top: 0, left: 0, behavior: 'smooth' });
-      } catch (error) {
+      } catch {
         gridScrollRef.current.scrollTo(0, 0);
       }
     }

@@ -96,8 +96,3 @@ def password_hash() -> str:
 
 def auth_enabled() -> bool:
     return bool(password_hash())
-
-
-def server_mode() -> bool:
-    """线上服务器部署形态（用于决定发布走 git 助手还是本地提示）。"""
-    return Path("/usr/local/bin/xhblogs-publish").exists() and os.name == "posix"
