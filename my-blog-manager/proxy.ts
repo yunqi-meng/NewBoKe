@@ -69,5 +69,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // 两条规则缺一不可：
+  //   带 basePath 时，下面这条会被编译成 /console/…（前缀后面必须有斜杠），
+  //   恰好漏掉 /console 本身，控制台首页就会绕开登录校验；
+  //   所以单独补一条 '/'，编译后正好匹配 /console 与 /console/。
+  matcher: ['/', '/((?!_next/static|_next/image|favicon.ico).*)'],
 };
