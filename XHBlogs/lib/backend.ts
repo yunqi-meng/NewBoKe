@@ -18,6 +18,12 @@ import path from 'node:path';
 const DEFAULT_API_PORT = 8000;
 const REQUEST_TIMEOUT = 15000;
 
+/** 内容类 GET 的缓存时长（秒）：60s 内走缓存，发布后由 revalidateTag 即时失效 */
+const CONTENT_REVALIDATE_SECONDS = 60;
+
+// 进程内只读一次 backend_config.json，避免每个请求都打磁盘
+let cachedConfigPort: number | null | undefined;
+
 export async function resolveApiPort(): Promise<number> {
   const fromEnv =
     process.env.MANAGER_API_PORT ||
@@ -26,13 +32,21 @@ export async function resolveApiPort(): Promise<number> {
     const parsed = Number(fromEnv);
     if (Number.isInteger(parsed) && parsed > 0 && parsed < 65536) return parsed;
   }
+  if (cachedConfigPort !== undefined) {
+    return cachedConfigPort ?? DEFAULT_API_PORT;
+  }
   try {
     const root = process.env.XHS_MANAGER_ROOT ?? process.cwd();
     const raw = await fs.readFile(path.join(root, 'public/backend_config.json'), 'utf8');
     const parsed = Number(JSON.parse(raw).api_port);
-    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) return parsed;
+    if (Number.isInteger(parsed) && parsed >= 1 && parsed <= 65535) {
+      cachedConfigPort = parsed;
+      return parsed;
+    }
+    cachedConfigPort = null;
   } catch {
-    // 本地桌面版的连接文件可能不存在，继续用默认端口
+    // 本地桌面版的连接文件可能不存在，继续用默认端口；也记为已尝试，避免重复读盘
+    cachedConfigPort = null;
   }
   return DEFAULT_API_PORT;
 }
@@ -46,13 +60,19 @@ export async function resolveBackendBase(): Promise<string> {
 /**
  * 调用统一后端并解析 JSON。
  *
+ * 内容类 GET 走 60 秒 ISR 缓存 + 'content' 标签：发布后调用
+ * /api/revalidate 可立即失效，平时命中缓存少打后端。
+ *
  * 后端不可用时返回 fallback：站点宁可少显示一点内容，也不能整页打不开。
  */
 export async function backendJson<T>(endpoint: string, fallback: T): Promise<T> {
   const base = await resolveBackendBase();
   try {
     const response = await fetch(`${base}${endpoint}`, {
-      cache: 'no-store',
+      next: {
+        revalidate: CONTENT_REVALIDATE_SECONDS,
+        tags: ['content'],
+      },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       headers: { Accept: 'application/json' },
     });

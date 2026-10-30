@@ -4,35 +4,25 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSiteConfig } from './SiteConfigProvider';
 
+/** 开屏动画总时长（展示 + 淡出 ≈ 1s） */
+const SHOW_MS = 650;
+const EXIT_SECONDS = 0.35;
+
 export default function SplashScreen() {
   const siteConfig = useSiteConfig();
   const [show, setShow] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const exitSplash = () => {
-    setShow(false);
-    sessionStorage.setItem('hasSeenSplash', 'true');
-
-    // 【核心解封】：动画快结束时，给 html 加上类名，CSS 会自动把内容显示出来
-    setTimeout(() => {
-      document.documentElement.classList.add('splash-seen');
-    }, 500);
-  };
-
   useEffect(() => {
     setIsMounted(true);
-    const hasSeenSplash = sessionStorage.getItem('hasSeenSplash') === 'true';
+    if (sessionStorage.getItem('hasSeenSplash') === 'true') return;
 
-    if (!hasSeenSplash) {
-      setShow(true);
-      const timer = setTimeout(() => {
-        exitSplash();
-      }, 2200);
-      return () => clearTimeout(timer);
-    } else {
-      // 容错处理：确保直接访问时类名存在
-      document.documentElement.classList.add('splash-seen');
-    }
+    setShow(true);
+    const timer = setTimeout(() => {
+      setShow(false);
+      sessionStorage.setItem('hasSeenSplash', 'true');
+    }, SHOW_MS);
+    return () => clearTimeout(timer);
   }, []);
 
   if (!isMounted) return null;
@@ -42,8 +32,9 @@ export default function SplashScreen() {
       {show && (
         <motion.div
           key="splash-screen-container"
-          exit={{ opacity: 0, scale: 1.1, filter: "blur(20px)" }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
+          // 仅淡出 + 轻微放大，去掉 blur 滤镜（退出时的全屏模糊很贵）
+          exit={{ opacity: 0, scale: 1.05 }}
+          transition={{ duration: EXIT_SECONDS, ease: "easeInOut" }}
           className="fixed inset-0 z-[100000] flex flex-col items-center justify-center bg-white dark:bg-slate-950"
         >
           <div className="relative z-10 flex flex-col items-center">
@@ -64,12 +55,14 @@ export default function SplashScreen() {
             </h1>
             <p className="text-[10px] font-black text-slate-400 tracking-[0.5em] mb-12">INITIALIZING SYSTEM</p>
 
-            <div className="w-40 h-[1.5px] bg-slate-200 dark:bg-slate-800 relative">
+            <div className="w-40 h-[1.5px] bg-slate-200 dark:bg-slate-800 relative overflow-hidden">
               <motion.div
-                initial={{ width: "0%" }}
-                animate={{ width: "100%" }}
-                transition={{ duration: 1.8, ease: "easeInOut" }}
-                className="absolute top-0 left-0 h-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)]"
+                // transform + scaleX 代替 width 动画：走合成层，不触发布局重排
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 0.6, ease: "easeInOut" }}
+                style={{ originX: 0 }}
+                className="absolute inset-0 h-full w-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.8)]"
               />
             </div>
           </div>

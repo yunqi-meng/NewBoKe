@@ -26,8 +26,32 @@ export default function SiteDashboard() {
     };
 
     updateTime(); // 初始执行一次
-    const timer = setInterval(updateTime, 1000);
-    return () => clearInterval(timer);
+    let timer: number | null = null;
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const start = () => {
+      if (timer !== null) return;
+      timer = window.setInterval(updateTime, 1000);
+    };
+    const onVisibility = () => {
+      if (document.hidden) stop();
+      else {
+        updateTime(); // 回到前台立即刷新一次，不等下一拍
+        start();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) start();
+
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [START_DATE]);
 
   return (

@@ -71,17 +71,34 @@ interface ProjectResponse {
   projects?: Project[];
 }
 
-/** 文章 / 杂谈列表（默认不含正文，列表页只要元信息） */
-export const getArticles = cache(async function getArticles(
+/** 文章列表读取结果：ok 表示后端这次是真成功（而非兜底失败） */
+export interface ArticlesResult {
+  ok: boolean;
+  articles: ArticleSummary[];
+}
+
+/**
+ * 文章 / 杂谈列表（默认不含正文，列表页只要元信息）。
+ * ok=false 且列表为空 ⇒ 后端不可连，页面可据此显示「后端暂不可连」。
+ */
+export const getArticlesResult = cache(async function getArticlesResult(
   type: 'post' | 'chatter',
   includeContent = false,
-): Promise<ArticleSummary[]> {
+): Promise<ArticlesResult> {
   const suffix = includeContent ? '&include_content=true' : '';
   const payload = await backendJson<ArticleListResponse>(
     `/api/articles?type=${type}${suffix}`,
     { success: false, articles: [] },
   );
-  return payload.articles ?? [];
+  return { ok: payload.success === true, articles: payload.articles ?? [] };
+});
+
+export const getArticles = cache(async function getArticles(
+  type: 'post' | 'chatter',
+  includeContent = false,
+): Promise<ArticleSummary[]> {
+  const { articles } = await getArticlesResult(type, includeContent);
+  return articles;
 });
 
 /** 单篇文章 / 杂谈（含正文 Markdown） */
@@ -139,8 +156,8 @@ export const getProjects = cache(async function getProjects(): Promise<Project[]
 });
 
 /** 站点配置（不含 aiConfig，公开站只认这一份） */
-export const getPublicSiteConfig = cache(async function getPublicSiteConfig(): Promise<Record<string, any>> {
-  const payload = await backendJson<{ success: boolean; data?: Record<string, any> }>(
+export const getPublicSiteConfig = cache(async function getPublicSiteConfig(): Promise<Record<string, unknown>> {
+  const payload = await backendJson<{ success: boolean; data?: Record<string, unknown> }>(
     '/api/config/public',
     { success: false, data: {} },
   );

@@ -15,15 +15,36 @@ export default function BackgroundSlider() {
   useEffect(() => {
     if (images.length <= 1) return;
 
-    const timer = setInterval(() => {
-      setIndex((prev) => (prev + 1) % images.length);
-    }, 10000); // 10秒切换一次
+    let timer: number | null = null;
+    const stop = () => {
+      if (timer !== null) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+    const start = () => {
+      if (timer !== null) return;
+      timer = window.setInterval(() => {
+        setIndex((prev) => (prev + 1) % images.length);
+      }, 10000);
+    };
 
-    return () => clearInterval(timer);
+    const onVisibility = () => {
+      if (document.hidden) stop();
+      else start();
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    if (!document.hidden) start();
+
+    return () => {
+      stop();
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [images.length]);
 
-  // 图片列表长度变化时重置索引，防止越界
-  useEffect(() => { setIndex(0); }, [images.length]);
+  // 列表长度变化时用取模兜住越界，不再在 effect 里同步 setState
+  const safeIndex = images.length > 0 ? index % images.length : 0;
 
   return (
     <div className="absolute inset-0 z-[-10] overflow-hidden">
@@ -36,9 +57,9 @@ export default function BackgroundSlider() {
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             // 当前显示的图片 opacity 为 1，其他的为 0
-            opacity: i === index ? 1 : 0,
+            opacity: i === safeIndex ? 1 : 0,
             // 解决层级重叠导致的渲染压力
-            visibility: Math.abs(i - index) <= 1 || (i === images.length - 1 && index === 0) ? 'visible' : 'hidden'
+            visibility: Math.abs(i - safeIndex) <= 1 || (i === images.length - 1 && safeIndex === 0) ? 'visible' : 'hidden'
           }}
         />
       ))}

@@ -45,16 +45,16 @@ export default function Fireflies() {
 
       {/* 动画引擎 */}
       <style>{`
-        /* 内层：纯粹的光芒呼吸闪烁 */
+        /* 内层：纯粹的光芒呼吸闪烁（阴影静态给定，keyframes 只动 opacity/transform，
+           避免 box-shadow 逐帧重绘） */
         @keyframes fireflyBreathe {
-          0%, 100% { 
-            opacity: 0; 
+          0%, 100% {
+            opacity: 0;
             transform: scale(0.3);
           }
-          50% { 
-            opacity: 1; 
-            transform: scale(1.2); 
-            box-shadow: 0 0 10px 3px rgba(100, 255, 150, 0.8), 0 0 20px 6px rgba(50, 255, 100, 0.4);
+          50% {
+            opacity: 1;
+            transform: scale(1.2);
           }
         }
 
@@ -100,6 +100,7 @@ export default function Fireflies() {
               width: `${fly.size}px`,
               height: `${fly.size}px`,
               backgroundColor: 'rgba(200, 255, 200, 0.9)',
+              boxShadow: '0 0 10px 3px rgba(100, 255, 150, 0.8), 0 0 20px 6px rgba(50, 255, 100, 0.4)',
               animation: `fireflyBreathe ${fly.breatheDuration}s ease-in-out infinite`,
               animationDelay: `${fly.breatheDelay}s`,
             }}

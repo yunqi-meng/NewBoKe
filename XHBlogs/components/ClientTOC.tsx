@@ -1,42 +1,22 @@
 "use client";
 import { useEffect, useState } from 'react';
+import { getHeadingId } from '../lib/headingSlug';
 
 type TocItem = {
   level: number;
   text: string;
-  id: string;
-};
-
-// 🌟 核心增幅：终极 Markdown 净化器！
-// 专门用来扒掉诸如 [链接名字](https://...) 的外壳，只留下 "链接名字"
-const cleanMarkdownHeading = (rawText: string) => {
-  if (!rawText) return '';
-  return rawText
-    // 1. 提取超链接中的文本内容：[我的标题](https://...) -> 我的标题
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
-    // 2. 去除 Markdown 图片：![图片](URL) -> 图片
-    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
-    // 3. 兜底防御：去除可能混入的 HTML 标签
-    .replace(/<\/?[^>]+(>|$)/g, '')
-    // 4. 去除加粗、斜体、删除线、行内代码符号等
-    .replace(/[*_~`#]/g, '')
-    .trim();
-};
-
-// 🌟 底层 ID 净化器
-const getSafeId = (rawText: string) => {
-  // 先把超链接外壳扒掉，得到纯文本
-  const cleanText = cleanMarkdownHeading(rawText);
-  // 再杀掉所有标点、空格，只保留汉字、字母和数字生成绝对安全的 ID
-  return 'toc-' + cleanText
-    .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, '')
-    .toLowerCase();
+  id?: string;
 };
 
 // 🌟 侧边栏视觉净化器
 const getDisplayText = (rawText: string) => {
-  // 直接调用终极净化器，展示纯洁无瑕的标题名！
-  return cleanMarkdownHeading(rawText);
+  if (!rawText) return '';
+  return rawText
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+    .replace(/<\/?[^>]+(>|$)/g, '')
+    .replace(/[*_~`#]/g, '')
+    .trim();
 };
 
 export default function ClientTOC({ toc }: { toc: TocItem[] }) {
@@ -46,48 +26,63 @@ export default function ClientTOC({ toc }: { toc: TocItem[] }) {
     const contentDiv = document.getElementById('article-content');
     if (!contentDiv) return;
 
-    const headings = Array.from(contentDiv.querySelectorAll('h1, h2, h3'));
+    const headings = Array.from(contentDiv.querySelectorAll<HTMLElement>('h1, h2, h3'));
+    if (headings.length === 0) return;
 
-    // 🌟 强制统一正文 ID
+    // 标题 id 现由服务端在渲染管线生成；这里只兜底补齐历史/异常情况
     headings.forEach((heading) => {
-      // heading.textContent 拿到的是渲染后的纯文字（已经没有超链接语法了）
-      // 再过一遍 getSafeId，确保正文和侧边栏的 ID 100% 对齐！
-      heading.id = getSafeId(heading.textContent || '');
+      if (!heading.id) heading.id = getHeadingId(heading.textContent || '');
     });
 
-    const handleScroll = () => {
-      const scrollY = window.scrollY;
-      const offset = 150;
-
-      let currentActiveId = "";
-
-      for (const heading of headings) {
-        const elementTop = heading.getBoundingClientRect().top + scrollY;
-        if (scrollY >= elementTop - offset) {
-          currentActiveId = heading.id;
-        } else {
-          break;
+    // 用 IntersectionObserver 代替每帧 getBoundingClientRect 扫全部标题
+    const visible = new Set<string>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).id;
+          if (!id) continue;
+          if (entry.isIntersecting) visible.add(id);
+          else visible.delete(id);
         }
+        if (visible.size === 0) return;
+        // 取文档顺序里最靠上的可见标题
+        let current = '';
+        for (const heading of headings) {
+          if (heading.id && visible.has(heading.id)) {
+            current = heading.id;
+            break;
+          }
+        }
+        if (current) setActiveId(current);
+      },
+      {
+        // 顶部留出导航栏偏移；下方留 40% 视口不参与，避免底部标题过早抢高亮
+        rootMargin: '-120px 0px -40% 0px',
+        threshold: 0,
       }
+    );
 
-      if (currentActiveId) setActiveId(currentActiveId);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    setTimeout(handleScroll, 100);
-
-    return () => window.removeEventListener('scroll', handleScroll);
+    headings.forEach((heading) => observer.observe(heading));
+    return () => observer.disconnect();
   }, [toc]);
 
-  const scrollToHeading = (e: React.MouseEvent, id: string) => {
-    // 🌟 防止任何超链接的意外默认行为
+  const scrollToHeading = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    // 保留自定义缓动滚动；原生锚点作为 JS 失效时的兜底
     e.preventDefault();
 
     const targetElement = document.getElementById(id);
     if (!targetElement) return;
 
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const offset = 100;
     const targetY = targetElement.getBoundingClientRect().top + window.scrollY - offset;
+
+    if (reduceMotion) {
+      window.scrollTo(0, targetY);
+      setActiveId(id);
+      return;
+    }
+
     const startY = window.scrollY;
     const distance = targetY - startY;
     const duration = 600;
@@ -125,22 +120,21 @@ export default function ClientTOC({ toc }: { toc: TocItem[] }) {
       <h3 className="font-black text-slate-900 dark:text-white mb-4 border-l-4 border-indigo-500 pl-2 text-sm uppercase tracking-widest">
         Table of Contents
       </h3>
-      <nav className="flex flex-col gap-2 relative">
+      <nav className="flex flex-col gap-2 relative" aria-label="文章目录">
         <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-slate-200 dark:bg-slate-700/50 rounded-full"></div>
 
-        {toc.map((item, index) => {
-          // 视觉上：扒掉超链接，完美展示 "3.万度"
+        {toc.map((item) => {
           const displayText = getDisplayText(item.text);
-
-          // 底层跳转：生成纯净版的 ID "toc-3万度"，绝对不会找错目标！
-          const safeId = getSafeId(item.text);
+          // 服务端已生成 id 时优先用；否则按同一套规则现算
+          const safeId = item.id || getHeadingId(item.text);
           const isActive = activeId === safeId;
 
           return (
-            <button
-              key={index}
+            <a
+              key={safeId}
+              href={`#${safeId}`}
               onClick={(e) => scrollToHeading(e, safeId)}
-              className={`text-left text-sm transition-all duration-300 line-clamp-2 cursor-pointer relative pl-4
+              className={`text-left text-sm transition-all duration-300 line-clamp-2 cursor-pointer relative pl-4 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60
                 ${item.level === 1 ? 'font-bold mt-2' : ''}
                 ${item.level === 2 ? 'ml-2' : ''}
                 ${item.level === 3 ? 'ml-4 text-xs' : ''}
@@ -151,7 +145,7 @@ export default function ClientTOC({ toc }: { toc: TocItem[] }) {
                 <span className="absolute left-[-5px] top-[50%] -translate-y-[50%] w-[6px] h-[6px] rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]"></span>
               )}
               {displayText}
-            </button>
+            </a>
           );
         })}
       </nav>

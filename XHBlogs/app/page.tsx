@@ -9,7 +9,7 @@ import CloudPlayer from '../components/CloudPlayer';
 import ThemeToggleBlock from '../components/ThemeToggleBlock';
 import ProfileCard from '../components/ProfileCard';
 import SiteDashboard from '../components/SiteDashboard';
-import { getAlbums, getArticles } from '../lib/contentApi';
+import { getAlbums, getArticlesResult } from '../lib/contentApi';
 import LyricBar from '../components/LyricBar';
 import { ToastProvider } from '../components/ToastProvider';
 
@@ -33,12 +33,15 @@ function formatUpdateTime(dateString: string) {
 
 export default async function Home() {
   // 配置和内容一起发出去：串行 await 会让一页多等一整个来回
-  const [siteConfig, albums, postItems, chatterItems] = await Promise.all([
+  const [siteConfig, albums, postResult, chatterResult] = await Promise.all([
     getLiveSiteConfig(),
     getAlbums(),
-    getArticles('post'),
-    getArticles('chatter'),
+    getArticlesResult('post'),
+    getArticlesResult('chatter'),
   ]);
+
+  const postItems = postResult.articles;
+  const chatterItems = chatterResult.articles;
 
   const allPosts = postItems.map(item => ({
     slug: item.slug,
@@ -49,7 +52,10 @@ export default async function Home() {
     date: item.date,
     formattedDate: formatUpdateTime(item.date),
   }));
-  const top5Posts = allPosts.length > 0 ? allPosts.slice(0, 5) : [{ slug: 'none', title: '暂无文章', description: '快去写第一篇吧！', cover: siteConfig.defaultPostCover, date: '', formattedDate: '' }];
+  // 后端不可连且列表为空时给出信号，而不是误导性的「暂无文章」
+  const postsEmptyTitle = !postResult.ok ? '后端暂不可连' : '暂无文章';
+  const postsEmptyDesc = !postResult.ok ? '内容服务暂时无法访问，请稍后再试' : '快去写第一篇吧！';
+  const top5Posts = allPosts.length > 0 ? allPosts.slice(0, 5) : [{ slug: 'none', title: postsEmptyTitle, description: postsEmptyDesc, cover: siteConfig.defaultPostCover, date: '', formattedDate: '' }];
 
   const allChatters = chatterItems.map(item => ({
     slug: item.slug,
@@ -59,7 +65,9 @@ export default async function Home() {
     date: item.date,
     formattedDate: formatUpdateTime(item.date),
   }));
-  const top5Chatters = allChatters.length > 0 ? allChatters.slice(0, 5) : [{ slug: 'none', title: '暂无记录', description: '记录一段思绪...', cover: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop', date: '', formattedDate: '' }];
+  const chatterEmptyTitle = !chatterResult.ok ? '后端暂不可连' : '暂无记录';
+  const chatterEmptyDesc = !chatterResult.ok ? '内容服务暂时无法访问，请稍后再试' : '记录一段思绪...';
+  const top5Chatters = allChatters.length > 0 ? allChatters.slice(0, 5) : [{ slug: 'none', title: chatterEmptyTitle, description: chatterEmptyDesc, cover: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?q=80&w=1000&auto=format&fit=crop', date: '', formattedDate: '' }];
 
   const chatterCount = allChatters.length;
   const realPhotoCount = albums.reduce((total, album) => total + album.photos.length, 0);
@@ -102,8 +110,8 @@ export default async function Home() {
                 <div className="col-span-1 lg:col-span-8 flex flex-col gap-6">
 
                   {/* 照片墙大海报 */}
-                  <Link href="/photowall" className="w-full rounded-3xl bg-white/40 dark:bg-slate-800/50 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-xl overflow-hidden transition-all duration-700 hover:scale-[1.02] relative group min-h-[200px] sm:min-h-[220px] flex-shrink-0">
-                    <img src={latestAlbum.cover} decoding="async" className="w-full h-full absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-105 opacity-90"/>
+                  <Link href="/photowall" className="w-full rounded-3xl bg-white/40 dark:bg-slate-800/50 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-xl overflow-hidden transition-all duration-700 hover:scale-[1.02] relative group min-h-[200px] sm:min-h-[220px] flex-shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-indigo-500/60">
+                    <img src={latestAlbum.cover} alt={latestAlbum.title} loading="lazy" decoding="async" className="w-full h-full absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-105 opacity-90"/>
                     <div className="absolute inset-0 bg-black/30 dark:bg-black/50 group-hover:bg-black/10 transition-colors duration-500"></div>
                     <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 right-6">
                       <h3 className="text-2xl sm:text-3xl font-bold text-white mb-1 sm:mb-2 underline decoration-pink-400">{latestAlbum.title}</h3>

@@ -9,13 +9,8 @@ export default function BackgroundEffects() {
 
   return (
     <>
-      {/* 核心魔法：根据 isDark 切换特效组件 */}
-      <div className={`transition-opacity duration-1000 ${isDark ? 'opacity-100' : 'opacity-0'}`}>
-        <Fireflies />
-      </div>
-      <div className={`transition-opacity duration-1000 ${isDark ? 'opacity-0' : 'opacity-100'}`}>
-        <Sakura />
-      </div>
+      {/* 只渲染当前主题的那一个粒子层：两个都挂着会白跑动画帧 */}
+      {isDark ? <Fireflies /> : <Sakura />}
 
       {/* 草地一直存在，但它内部会自动改变颜色 */}
       <WindyGrass />

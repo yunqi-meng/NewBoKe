@@ -1,6 +1,6 @@
-import 'katex/dist/katex.min.css';
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Serif_SC } from "next/font/google";
+import { MotionConfig } from "framer-motion";
 import "./globals.css";
 import { ThemeProvider } from "../components/ThemeProvider";
 import BackgroundEffects from "../components/BackgroundEffects";
@@ -14,6 +14,7 @@ import GlobalToolbox from "../components/GlobalToolbox";
 import SplashScreen from "../components/SplashScreen";
 import CyberCat from '../components/CyberCat';
 import DanmakuBackground from '../components/DanmakuBackground';
+import DesktopOnly from '../components/DesktopOnly';
 
 import MobileBackButton from '../components/MobileBackButton';
 
@@ -27,9 +28,8 @@ const notoSerif = Noto_Serif_SC({
   display: 'swap',
 });
 
-// 🌟 全站改为运行时渲染：内容与配置都从磁盘实时读取，
-// 后台发布后不再需要重新构建站点，前台刷新即可看到最新内容。
-export const dynamic = 'force-dynamic';
+// 不再 force-dynamic：内容 fetch 带 revalidate:60 + tags:['content']，
+// 页面可静态/ISR 渲染；发布后通过 /api/revalidate 即时失效。
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteConfig = await getLiveSiteConfig();
@@ -49,15 +49,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="zh-CN" className={`${geistSans.variable} ${geistMono.variable} ${notoSerif.variable} h-full antialiased`} suppressHydrationWarning>
       <head>
-        <style
-          suppressHydrationWarning
-          dangerouslySetInnerHTML={{
-            __html: `
-              #app-mount-root { opacity: 0; visibility: hidden; pointer-events: none; }
-              html.splash-seen #app-mount-root { opacity: 1 !important; visibility: visible !important; pointer-events: auto !important; }
-            `
-          }}
-        />
+        {/* 绘制前设置 dark 类 / 已看过开屏标记，避免主题闪烁；内容不再被 splash 门控 */}
         <script
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
@@ -65,6 +57,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               try {
                 if (sessionStorage.getItem('hasSeenSplash') === 'true') {
                   document.documentElement.classList.add('splash-seen');
+                }
+                if (localStorage.getItem('blog-theme') === 'light') {
+                  document.documentElement.classList.remove('dark');
+                } else {
+                  document.documentElement.classList.add('dark');
                 }
               } catch (e) {}
             `
@@ -75,21 +72,23 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className="w-screen overflow-x-hidden min-h-full flex flex-col relative transition-colors duration-1000 bg-slate-50 dark:bg-slate-950 font-serif">
         <SiteConfigProvider initialConfig={siteConfig}>
           <ThemeProvider>
+            <MotionConfig reducedMotion="user">
 
           <SplashScreen />
 
           <MusicProvider>
-            <div id="app-mount-root" className="flex-1 flex flex-col transition-opacity duration-1000">
+            <div id="app-mount-root" className="flex-1 flex flex-col">
               <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
                 {!siteConfig.useGradient && <BackgroundSlider />}
                 <div className="absolute inset-0 z-[-9] bg-white/30 dark:bg-slate-900/40 backdrop-blur-md transition-colors duration-1000"></div>
 
+                {/* 渐变层：改用 transform 驱动（图层放大后平移），避免 background-position 全屏重绘 */}
                 <div
-                  className="absolute inset-0 z-[-8] opacity-60 dark:opacity-20 mix-blend-color transition-opacity duration-1000 transform-gpu"
+                  className="absolute inset-[-30%] z-[-8] opacity-60 dark:opacity-20 mix-blend-color transition-opacity duration-1000 transform-gpu will-change-transform"
                   style={{
                     background: `linear-gradient(-45deg, ${siteConfig.themeColors.join(', ')})`,
                     backgroundSize: '400% 400%',
-                    animation: 'gradientMove 15s ease infinite' // 🌟 全端保留渐变流动
+                    animation: 'gradientDrift 15s ease infinite'
                   }}
                 ></div>
 
@@ -97,23 +96,29 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/40 dark:bg-indigo-900/20 blur-[100px] rounded-full z-[-7] md:mix-blend-overlay"></div>
                 <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/30 dark:bg-purple-900/30 blur-[100px] rounded-full z-[-7] md:mix-blend-overlay"></div>
 
-                {/* 隐藏手机端高负载粒子特效 */}
-                <div className="hidden md:block absolute inset-0 w-full h-full">
-                  <BackgroundEffects />
+                {/* 隐藏手机端高负载粒子特效：桌面端才真正挂载 */}
+                <div className="absolute inset-0 w-full h-full">
+                  <DesktopOnly>
+                    <BackgroundEffects />
+                  </DesktopOnly>
                 </div>
               </div>
 
               {/* 隐藏手机端弹幕 */}
-              <div className="hidden md:block">
-                <DanmakuBackground />
+              <div>
+                <DesktopOnly>
+                  <DanmakuBackground />
+                </DesktopOnly>
               </div>
 
               <div className="relative z-10 flex-1 flex flex-col">
                 {children}
               </div>
 
-              <div className="hidden md:block">
-                <FloatingPlayer />
+              <div>
+                <DesktopOnly>
+                  <FloatingPlayer />
+                </DesktopOnly>
               </div>
 
               <div className="hidden md:block">
@@ -125,25 +130,30 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
               </div>
 
               {/* 隐藏手机端点击粒子 */}
-              <div className="hidden md:block">
-                <ClickEffect />
+              <div>
+                <DesktopOnly>
+                  <ClickEffect />
+                </DesktopOnly>
               </div>
             </div>
 
             <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `
-              @keyframes gradientMove { 
-                0% { background-position: 0% 50%; } 
-                50% { background-position: 100% 50%; } 
-                100% { background-position: 0% 50%; } 
+              @keyframes gradientDrift {
+                0% { transform: translate3d(0, 0, 0); }
+                50% { transform: translate3d(8%, -6%, 0); }
+                100% { transform: translate3d(0, 0, 0); }
               }
             `}} />
           </MusicProvider>
 
-          <div className="hidden md:block">
-            <CyberCat />
+          <div>
+            <DesktopOnly>
+              <CyberCat />
+            </DesktopOnly>
           </div>
 
-        </ThemeProvider>
+            </MotionConfig>
+          </ThemeProvider>
         </SiteConfigProvider>
       </body>
     </html>

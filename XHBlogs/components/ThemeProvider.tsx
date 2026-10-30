@@ -18,6 +18,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const isDarkMode = savedTheme !== 'light';
     setIsDark(isDarkMode);
 
+    // 首屏 dark 类已由 layout <head> 内联脚本在绘制前设置；
+    // 这里再对齐一次，保证与 localStorage 真实状态一致
     const root = document.documentElement;
     if (isDarkMode) {
       root.classList.add('dark');
@@ -43,11 +45,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('blog-theme', newDark ? 'dark' : 'light');
   };
 
-  // 在客户端挂载完成前，为了防止闪屏，先隐藏内容
-  if (!mounted) {
-    return <div className="invisible">{children}</div>;
-  }
-
+  // 首屏直接渲染内容，不再用 invisible 等待挂载（dark 类由内联脚本保证）
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme }}>
       {children}

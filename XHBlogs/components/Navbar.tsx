@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, PanInfo } from 'framer-motion';
 import { useSiteConfig } from './SiteConfigProvider';
@@ -9,7 +9,6 @@ import { useSiteConfig } from './SiteConfigProvider';
 export default function Navbar() {
   const siteConfig = useSiteConfig();
   const [showNav, setShowNav] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
@@ -19,7 +18,7 @@ export default function Navbar() {
   const smoothRotation = useSpring(rawRotation, { stiffness: 200, damping: 25 });
   const inverseRotation = useTransform(smoothRotation, (r) => -r);
 
-  const handlePan = (event: any, info: PanInfo) => {
+  const handlePan = (_event: MouseEvent, info: PanInfo) => {
     if (!wheelRef.current) return;
     const rect = wheelRef.current.getBoundingClientRect();
     const centerX = rect.left + rect.width / 2;
@@ -39,6 +38,11 @@ export default function Navbar() {
   // --- 🌟 物理引擎：手机端按钮拖拽逻辑 ---
   const dragY = useMotionValue(0);
   const [constraints, setConstraints] = useState({ top: 0, bottom: 0 });
+  // 拖拽过就不再当成点击打开菜单（替代旧的 velocity 判断）
+  const draggedRef = useRef(false);
+  const openButtonRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -54,20 +58,62 @@ export default function Navbar() {
     if (isMobileMenuOpen) rawRotation.set(0);
   }, [isMobileMenuOpen, rawRotation]);
 
-  // 控制 PC 端导航栏
+  // 控制 PC 端导航栏：ref 记录上次 scrollY，rAF 节流，仅在隐藏标志变化时 setState
+  const lastScrollYRef = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
   useEffect(() => {
     const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-      if (currentScrollY > lastScrollY && currentScrollY > 80) {
-        setShowNav(false);
-      } else {
-        setShowNav(true);
-      }
-      setLastScrollY(currentScrollY);
+      if (rafRef.current !== null) return;
+      rafRef.current = requestAnimationFrame(() => {
+        rafRef.current = null;
+        const currentScrollY = window.scrollY;
+        const shouldHide = currentScrollY > lastScrollYRef.current && currentScrollY > 80;
+        lastScrollYRef.current = currentScrollY;
+        const next = !shouldHide;
+        setShowNav((prev) => (prev === next ? prev : next));
+      });
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY]);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    };
+  }, []);
+
+  const closeMobileMenu = useCallback(() => setIsMobileMenuOpen(false), []);
+  const openMobileMenu = useCallback(() => setIsMobileMenuOpen(true), []);
+
+  // 手机菜单：Escape 关闭 + 锁滚动 + 焦点管理
+  useEffect(() => {
+    if (!isMobileMenuOpen) {
+      // 关闭后把焦点还给触发球
+      if (wasOpenRef.current) {
+        openButtonRef.current?.focus();
+      }
+      wasOpenRef.current = false;
+      return;
+    }
+
+    wasOpenRef.current = true;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isMobileMenuOpen]);
 
   const navLinks = [
     { name: '首页', href: '/' },
@@ -84,19 +130,24 @@ export default function Navbar() {
   return (
     <>
       {/* PC端导航栏 */}
-      <header className={`hidden md:block w-full fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b ${showNav ? 'translate-y-0' : '-translate-y-full'} bg-white/40 dark:bg-slate-900/50 backdrop-blur-xl border-white/20 dark:border-white/5 shadow-sm`}>
+      <header className={`hidden md:block w-full fixed top-0 left-0 right-0 z-50 transition-transform duration-500 border-b ${showNav ? 'translate-y-0' : '-translate-y-full'} bg-white/40 dark:bg-slate-900/50 backdrop-blur-xl border-white/20 dark:border-white/5 shadow-sm`}>
         <div className="w-[90%] max-w-6xl mx-auto h-16 flex items-center justify-between px-4 sm:px-[30px] box-border">
-          <Link href="/" className="text-xl font-black text-slate-800 dark:text-white tracking-tighter hover:text-indigo-600 dark:hover:text-indigo-400 transition-all duration-300">
+          <Link href="/" className="text-xl font-black text-slate-800 dark:text-white tracking-tighter hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors duration-300 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60">
             {siteConfig.navTitle || siteConfig.authorName}
             <span className="text-indigo-500 mx-1">{siteConfig.navSuffix || 'の'}</span>
             {siteConfig.navAfter || '宝藏之地'}
           </Link>
-          <nav className="flex gap-8 text-sm font-bold">
+          <nav className="flex gap-8 text-sm font-bold" aria-label="主导航">
             {/* PC端依然使用全量的 navLinks */}
             {navLinks.map((link) => {
               const isActive = pathname === link.href || pathname === `${link.href}/`;
               return (
-                <Link key={link.href} href={link.href} className={`relative py-1 transition-colors ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-200 hover:text-indigo-600'}`}>
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`relative py-1 transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-700 dark:text-slate-200 hover:text-indigo-600'}`}
+                >
                   {link.name}
                   {isActive && <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-indigo-500 rounded-full animate-pulse"></span>}
                 </Link>
@@ -109,17 +160,25 @@ export default function Navbar() {
       {/* 📱 手机端：可拖拽吸附的触发球 */}
       <div className="md:hidden">
         <motion.button
+          ref={openButtonRef}
           drag="y"
           dragConstraints={constraints}
           dragElastic={0.1}
           dragMomentum={false}
           style={{ y: dragY }}
+          onDragStart={() => { draggedRef.current = true; }}
           onClick={() => {
-            if (Math.abs(dragY.getVelocity()) < 10) {
-              setIsMobileMenuOpen(true);
+            // 拖拽后的合成 click 不当作打开
+            if (draggedRef.current) {
+              draggedRef.current = false;
+              return;
             }
+            openMobileMenu();
           }}
-          className={`fixed top-1/2 right-0 -translate-y-1/2 w-12 h-28 bg-indigo-500/80 backdrop-blur-xl rounded-l-full shadow-[-5px_0_20px_rgba(99,102,241,0.4)] z-[60] flex items-center justify-center transition-all duration-500 border-y border-l border-white/30 touch-none ${isMobileMenuOpen ? 'translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
+          aria-label="打开导航菜单"
+          aria-expanded={isMobileMenuOpen}
+          aria-haspopup="dialog"
+          className={`fixed top-1/2 right-0 -translate-y-1/2 w-12 h-28 bg-indigo-500/80 backdrop-blur-xl rounded-l-full shadow-[-5px_0_20px_rgba(99,102,241,0.4)] z-[60] flex items-center justify-center transition-[transform,opacity] duration-500 border-y border-l border-white/30 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${isMobileMenuOpen ? 'translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
         >
           <div className="flex flex-col gap-1.5 items-center justify-center mr-2">
             <div className="w-1.5 h-1.5 bg-white/90 rounded-full"></div>
@@ -141,6 +200,9 @@ export default function Navbar() {
               />
 
               <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-label="导航菜单"
                 initial={{ scale: 0.5, opacity: 0, rotate: -90 }}
                 animate={{ scale: 1, opacity: 1, rotate: 0 }}
                 exit={{ scale: 0.5, opacity: 0, rotate: 90 }}
@@ -154,7 +216,12 @@ export default function Navbar() {
                   className="w-full h-full rounded-full border border-white/30 dark:border-slate-500/50 bg-white/40 dark:bg-slate-800/50 backdrop-blur-3xl shadow-[0_0_50px_rgba(0,0,0,0.3)] pointer-events-auto relative cursor-grab active:cursor-grabbing"
                 >
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 border-4 border-slate-300 dark:border-slate-500 flex items-center justify-center shadow-inner z-10">
-                    <button onClick={() => setIsMobileMenuOpen(false)} className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-black shadow-lg hover:bg-red-500 hover:rotate-90 transition-all duration-300 active:scale-95">
+                    <button
+                      ref={closeButtonRef}
+                      onClick={closeMobileMenu}
+                      aria-label="关闭导航菜单"
+                      className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white font-black shadow-lg hover:bg-red-500 hover:rotate-90 transition-all duration-300 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                    >
                       ✕
                     </button>
                   </div>
@@ -177,9 +244,10 @@ export default function Navbar() {
                           <Link
                             href={link.href}
                             onClick={() => setIsMobileMenuOpen(false)}
-                            className={`flex items-center justify-center w-full h-full rounded-full transition-all duration-300 ${
-                              isActive 
-                                ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.8)] scale-110' 
+                            aria-current={isActive ? 'page' : undefined}
+                            className={`flex items-center justify-center w-full h-full rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${
+                              isActive
+                                ? 'bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.8)] scale-110'
                                 : 'bg-white/90 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-md hover:scale-110 border border-white/50 dark:border-slate-600'
                             }`}
                           >
