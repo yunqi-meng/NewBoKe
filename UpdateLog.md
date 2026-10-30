@@ -6,6 +6,9 @@
 - **按钮改为「推送到 GitHub 仓库」**：导航栏图标按钮与「设置 → 推送到 GitHub」面板统一改名，弹窗说明「保存已实时生效，这里只把当前内容导成快照提交并推送」；推送成功只意味着版本留档，不会覆盖或回滚任何已保存内容。面板新增推送结果状态（已推送到 GitHub / GitHub 推送失败（见日志）/ 仓库未配置 github 远端），仓库是否配置 `github` 远端由 `/api/deploy/config` 与 `/api/deploy/status` 一并返回。
 - **发布助手把 GitHub 推送单独记账**：`tools/xhblogs-publish` 在提交服务器仓库后单独执行 `git push github HEAD:main`，结果写入状态文件的 `github` 字段；失败只记录、不改变「内容已生效」的事实，结尾文案按 `pushed / failed / none` 分别说明。回退同样会同步到 GitHub。
 - **文档同步**：中英文 README 的发布章节改写为「保存即生效，推送留版本」，去掉暂存区说明。
+- **修复：控制台 `package-lock.json` 与 `package.json` 不同步**。0.5.2 依赖瘦身后 lock 里少了 `@tiptap/extension-bubble-menu` 依赖的 `@floating-ui/dom@1.8.0`，本机 npm 11 不报错、服务器 npm 10 的 `npm ci` 直接失败（`Missing: @floating-ui/dom@1.8.0 from lock file`），部署第一步就中断。按原版本把这一条补回 lock，其余 218 个依赖版本一个没动；随后 `tsc --noEmit`、`next build` 均通过。
+- **修复：`xhblogs-deploy` 部署时不会重装运维脚本**。`/usr/local/bin/xhblogs-publish` 是安装时的副本，`git pull` 不会更新它，导致 0.5.3 的 GitHub 推送结果始终没进状态文件。部署脚本改为识别 `tools/*` 改动并重装发布 / 重建脚本（脚本自身改动给出提示）；同时 `write_status` 补写 `github` 字段，控制台的角标这才有数据来源。
+- **服务器部署与实测（2026-10-30）**：4 个提交推到 aliyun 仓库后在服务器跑 `xhblogs-deploy`——控制台 `npm ci` 安装 548 个包、构建成功并重启；统一后端重启；公开站单独 `xhblogs-rebuild` 重建（第一次部署中断在控制台 `npm ci`，公开站构建没跑到，已补）。冒烟测试 **27 通过 / 0 失败**；三服务 `active`；`https://www.xinghuisama.top` 首页、说说、照片墙、时间轴均 200；在服务器上实际点一次推送：快照 `content-20261030-*` 提交、推送到服务器仓库与 GitHub 均成功，状态文件 `state=done`、`github=pushed`，控制台显示「已推送到 GitHub 仓库」。
 - **验证**：控制台 `tsc --noEmit` 0 错误，`next build` 成功（exit 0）；后端冒烟测试 27 通过 / 0 失败；本地起后端 + 控制台 + 公开站实测：改个人简介保存后公开站首页立即出现新文案、改回后立即消失；发一条说说后公开站立刻可见、删除后立即消失；点「推送到 GitHub 仓库」后端返回 200 并生成 `content-*.json` 快照，本地无发布助手时如实提示「到服务器上点推送」；连续两次用同一个 id 保存草稿，草稿表始终只有 1 条；浏览器控制台无报错。
 
 ## 0.5.2 - 2026-10-30
