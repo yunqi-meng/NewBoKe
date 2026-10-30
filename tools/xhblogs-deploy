@@ -10,6 +10,7 @@
 #   my-blog-manager/*    → 重建控制台（standalone 产物 + 重启两个服务）
 #   server/app/*         → 只需重启统一后端（xhblogs-manager-api）
 #   server/requirements.txt → 装依赖 + 重启统一后端
+#   tools/*              → 重装 /usr/local/bin 下的运维脚本
 #
 # 用法：sudo /usr/local/bin/xhblogs-deploy
 set -euo pipefail
@@ -41,6 +42,7 @@ changed=$(as_app_user "git -C '$REPO' diff --name-only '$before' '$after'" || tr
 need_site=0
 need_console=0
 need_backend=0
+need_tools=0
 while IFS= read -r path; do
   [ -z "$path" ] && continue
   case "$path" in
@@ -48,6 +50,7 @@ while IFS= read -r path; do
     XHBlogs/*) need_site=1 ;;
     my-blog-manager/*) need_console=1 ;;
     server/app/*|server/requirements.txt) need_backend=1 ;;
+    tools/*) need_tools=1 ;;
   esac
 done <<< "$changed"
 
@@ -65,6 +68,20 @@ if printf '%s\n' "$changed" | grep -q '^server/requirements.txt$'; then
   echo "安装统一后端依赖…"
   as_app_user "cd '$REPO/server' && python3.11 -m venv .venv && .venv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host mirrors.aliyun.com -r requirements.txt"
   need_backend=1
+fi
+
+# 运维脚本是复制到 /usr/local/bin 的，不会随 git pull 自动生效；
+# 脚本自身除外（正在运行，替换自己容易出问题），需要手动重装一次。
+if [ "$need_tools" = "1" ]; then
+  echo "更新运维脚本…"
+  for name in xhblogs-publish xhblogs-rebuild xhblogs-manager-rebuild; do
+    if [ -f "$REPO/tools/$name" ]; then
+      install -m 755 "$REPO/tools/$name" "/usr/local/bin/$name"
+    fi
+  done
+  if ! cmp -s "$REPO/tools/xhblogs-deploy" /usr/local/bin/xhblogs-deploy; then
+    echo "注意：xhblogs-deploy 自身也有改动，请执行一次 sudo install -m 755 $REPO/tools/xhblogs-deploy /usr/local/bin/xhblogs-deploy"
+  fi
 fi
 
 if [ "$need_site" = "1" ]; then
