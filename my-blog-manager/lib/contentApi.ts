@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { backendBaseUrl } from './backendPort';
 
 /**
@@ -91,8 +92,17 @@ export async function backendJson<T>(endpoint: string, fallback: T): Promise<T> 
   }
 }
 
+/**
+ * 下面这些读取函数都套了 React.cache()：
+ * 同一轮渲染里页面和子组件常常重复要同一份数据，
+ * 缓存后一次请求内只打一次后端，页面之间不会各自排队。
+ *
+ * 注意 cache() 的作用域是「一次服务端渲染」，不会把旧内容留给下一次请求，
+ * 所以实时性不受影响。
+ */
+
 /** 文章 / 杂谈列表（默认不含正文） */
-export async function getArticles(
+export const getArticles = cache(async function getArticles(
   type: 'post' | 'chatter',
   includeContent = false,
 ): Promise<ArticleSummary[]> {
@@ -102,31 +112,31 @@ export async function getArticles(
     { articles: [] },
   );
   return payload.articles ?? [];
-}
+});
 
 /** 单篇文章 / 杂谈（含正文 Markdown） */
-export async function getArticle(slug: string): Promise<ArticleDetail | null> {
+export const getArticle = cache(async function getArticle(slug: string): Promise<ArticleDetail | null> {
   const payload = await backendJson<{ article?: ArticleDetail | null }>(
     `/api/articles/${encodeURIComponent(slug)}`,
     {},
   );
   return payload.article ?? null;
-}
+});
 
 /** 关于页 */
-export async function getAbout(): Promise<ArticleDetail | null> {
+export const getAbout = cache(async function getAbout(): Promise<ArticleDetail | null> {
   const payload = await backendJson<{ about?: ArticleDetail | null }>('/api/about', {});
   return payload.about ?? null;
-}
+});
 
 /** 说说 */
-export async function getMoments(): Promise<MomentItem[]> {
+export const getMoments = cache(async function getMoments(): Promise<MomentItem[]> {
   const payload = await backendJson<{ moments?: MomentItem[] }>('/api/moments', { moments: [] });
   return payload.moments ?? [];
-}
+});
 
 /** 相册 */
-export async function getAlbums(): Promise<Album[]> {
+export const getAlbums = cache(async function getAlbums(): Promise<Album[]> {
   const payload = await backendJson<{ albums?: Album[] }>('/api/albums/list', { albums: [] });
   return payload.albums ?? [];
-}
+});

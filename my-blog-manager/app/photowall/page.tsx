@@ -242,7 +242,7 @@ export default function PhotoWallPage() {
                     <div className="columns-1 sm:columns-2 md:columns-4 gap-6 space-y-6">
                       {matchedPhotos.map((photo, i) => (
                         <div key={i} onClick={() => setSelectedImage(photo)} className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-lg hover:scale-[1.02] transition-transform">
-                          <img src={photo.url} className="w-full h-auto object-cover" />
+                          <img src={photo.url} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
                         </div>
                       ))}
                     </div>
@@ -268,13 +268,13 @@ export default function PhotoWallPage() {
 
                       <div onClick={() => { setSearchQuery(''); setCurrentAlbum(album); }} className="relative w-[85%] aspect-[4/3] mb-8">
                         <div className="absolute inset-0 bg-slate-300 dark:bg-slate-700 rounded-[4px] shadow-md transform rotate-6 translate-x-4 translate-y-2 group-hover:rotate-12 transition-all duration-500 border-[6px] border-white dark:border-slate-200 overflow-hidden opacity-60">
-                           {album.photos[2] && <img src={album.photos[2].url} className="w-full h-full object-cover grayscale blur-[2px]" alt="" />}
+                           {album.photos[2] && <img src={album.photos[2].url} loading="lazy" decoding="async" className="w-full h-full object-cover grayscale blur-[2px]" alt="" />}
                         </div>
                         <div className="absolute inset-0 bg-slate-200 dark:bg-slate-600 rounded-[4px] shadow-lg transform -rotate-3 -translate-x-2 -translate-y-1 group-hover:-rotate-6 transition-all duration-500 border-[6px] border-white dark:border-slate-200 overflow-hidden opacity-80 z-10">
-                           {album.photos[1] && <img src={album.photos[1].url} className="w-full h-full object-cover grayscale-[50%]" alt="" />}
+                           {album.photos[1] && <img src={album.photos[1].url} loading="lazy" decoding="async" className="w-full h-full object-cover grayscale-[50%]" alt="" />}
                         </div>
                         <div className="absolute inset-0 bg-white dark:bg-slate-200 rounded-[4px] shadow-2xl border-[6px] border-white dark:border-slate-200 overflow-hidden z-20 transform group-hover:-translate-y-2 group-hover:scale-105 transition-all duration-500">
-                          <img src={album.cover} alt={album.title} className="w-full h-full object-cover" />
+                          <img src={album.cover} alt={album.title} loading="lazy" decoding="async" className="w-full h-full object-cover" />
                         </div>
                       </div>
 
@@ -318,7 +318,7 @@ export default function PhotoWallPage() {
                       <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ isOpen: true, type: 'photo', photoIndex: index, title: '这张照片' }); }} className="w-7 h-7 rounded-lg bg-white/80 backdrop-blur-md text-red-500 flex items-center justify-center shadow-sm hover:bg-red-500 hover:text-white transition-all"><Trash2 size={12}/></button>
                     </div>
 
-                    <img onClick={() => setSelectedImage(photo)} src={photo.url} alt="" className="w-full h-auto object-cover transform transition-transform duration-700 group-hover:scale-105" />
+                    <img onClick={() => setSelectedImage(photo)} src={photo.url} loading="lazy" decoding="async" alt="" className="w-full h-auto object-cover transform transition-transform duration-700 group-hover:scale-105" />
                     {photo.caption && <div className="p-4 bg-white/30 dark:bg-black/20 backdrop-blur-sm text-xs font-bold dark:text-slate-200">{photo.caption}</div>}
                   </div>
                 ))}

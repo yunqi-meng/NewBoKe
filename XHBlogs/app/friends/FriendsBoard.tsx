@@ -76,7 +76,7 @@ export default function FriendsBoard({ friends }: { friends: Friend[] }) {
               <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-5 relative z-10 mb-2 md:mb-4">
 
                 <div className="w-10 h-10 md:w-16 md:h-16 rounded-full p-[2px] md:p-1 bg-gradient-to-tr from-indigo-500/50 to-purple-500/50 shadow-sm md:shadow-md group-hover:rotate-[360deg] transition-transform duration-1000 ease-in-out flex-shrink-0">
-                  <img src={friend.avatar} alt={friend.name} className="w-full h-full rounded-full object-cover bg-white" />
+                  <img src={friend.avatar} alt={friend.name} loading="lazy" decoding="async" className="w-full h-full rounded-full object-cover bg-white" />
                 </div>
 
                 <div className="flex-1 overflow-hidden w-full">

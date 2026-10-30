@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { siteConfig } from '../siteConfig';
 import { backendBaseUrl } from './backendPort';
 import { deepMerge } from './siteConfigMerge';
@@ -12,8 +13,12 @@ export type SiteConfig = typeof siteConfig;
  *
  * siteConfig.ts 仍然留着一份编译期快照当作兜底：
  * 后端暂时不可用时，控制台照常显示，不会整页空白。
+ *
+ * 外面套了一层 React.cache()：同一轮渲染里 generateMetadata、layout、
+ * page 都会读配置，以前各发一次请求（一次页面渲染能打出四五份
+ * /api/config/get），现在只打一次，结果在本次请求内复用。
  */
-export async function getLiveSiteConfig(): Promise<SiteConfig> {
+export const getLiveSiteConfig = cache(async (): Promise<SiteConfig> => {
   try {
     const base = await backendBaseUrl();
     const response = await fetch(`${base}/api/config/get`, {
@@ -28,4 +33,4 @@ export async function getLiveSiteConfig(): Promise<SiteConfig> {
     // 后端暂时不可达：用编译期快照兜底
   }
   return siteConfig;
-}
+});

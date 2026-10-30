@@ -124,9 +124,12 @@ async function getRecentPosts(currentSlug: string) {
 
 export default async function Post({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const siteConfig = await getLiveSiteConfig();
-  const postData = await getPostData(resolvedParams.slug);
-  const recentPosts = await getRecentPosts(resolvedParams.slug);
+  // 三件事互不依赖，一起发出去，别让页面排队等三个来回
+  const [siteConfig, postData, recentPosts] = await Promise.all([
+    getLiveSiteConfig(),
+    getPostData(resolvedParams.slug),
+    getRecentPosts(resolvedParams.slug),
+  ]);
 
   return (
     <div className="min-h-screen relative pb-20">
@@ -136,7 +139,7 @@ export default async function Post({ params }: { params: Promise<{ slug: string 
 
           <article className="flex-1 bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/40 dark:border-white/10 overflow-hidden transition-colors duration-700">
             <div className="w-full aspect-video bg-slate-200 dark:bg-slate-700 relative group">
-              <img src={postData.cover} alt="封面" className="w-full h-full object-cover opacity-90 transition-transform duration-1000 group-hover:scale-105" />
+              <img src={postData.cover} alt="封面" decoding="async" className="w-full h-full object-cover opacity-90 transition-transform duration-1000 group-hover:scale-105" />
             </div>
 
             <div className="p-5 md:p-12 relative">

@@ -7,7 +7,7 @@
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, Query
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from ..db import get_db
 from ..helpers import article_to_dict, dumps_list, loads_list, moment_to_dict, now_stamp
@@ -26,6 +26,9 @@ def list_articles(
 ):
     """文章列表。默认不返回正文，列表页只要元信息。"""
     query = db.query(Article)
+    if not include_content:
+        # 列表页不需要正文：不读这一列，文章多了也不会把正文全搬一遍
+        query = query.options(defer(Article.content))
     if type:
         query = query.filter(Article.type == type)
     rows = query.order_by(Article.date.desc(), Article.id.desc()).all()

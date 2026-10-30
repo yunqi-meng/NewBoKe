@@ -56,7 +56,7 @@ export default function TimelineNode({ post, index, onDelete }: Props) {
 
             {/* 封面图 */}
             <div className="w-full h-40 overflow-hidden relative">
-              <img src={post.cover} alt={post.title} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+              <img src={post.cover} alt={post.title} loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent opacity-80" />
 
               <div className="absolute bottom-4 left-6 flex items-center gap-2 text-[10px] font-black text-white/90 uppercase tracking-widest">

@@ -112,9 +112,12 @@ function generateCalendarMatrix(year: number, month: number, targetDay: number) 
 
 export default async function ChatterDetail({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const siteConfig = await getLiveSiteConfig();
-  const chatterData = await getChatterData(resolvedParams.slug);
-  const recentChatters = await getRecentChatters(resolvedParams.slug);
+  // 配置、正文、相邻杂谈互不依赖，并发取回
+  const [siteConfig, chatterData, recentChatters] = await Promise.all([
+    getLiveSiteConfig(),
+    getChatterData(resolvedParams.slug),
+    getRecentChatters(resolvedParams.slug),
+  ]);
 
   const dateObj = new Date(chatterData.date || '2026-03-24');
   const yearStr = dateObj.getFullYear();

@@ -17,10 +17,11 @@ export async function generateMetadata() {
 export const dynamic = 'force-dynamic';
 
 export default async function MomentsPage() {
-  const config = await getLiveSiteConfig();
-
-  // 说说直接来自数据库，公开站和控制台看到的是同一批。
-  const allMoments = await getMoments();
+  // 配置只决定标题、头像，跟说说列表没有依赖关系，并发取更省一个往返。
+  const [config, allMoments] = await Promise.all([
+    getLiveSiteConfig(),
+    getMoments(),
+  ]);
 
   return (
     <div className="min-h-screen relative pb-10 flex flex-col">

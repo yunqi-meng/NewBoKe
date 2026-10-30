@@ -8,11 +8,12 @@ import { getArticles } from '../../lib/contentApi';
 export const dynamic = 'force-dynamic';
 
 export default async function Timeline() {
-  const config = await getLiveSiteConfig();
+  // 配置与文章列表互不依赖，并行取。
+  const [config, articles] = await Promise.all([
+    getLiveSiteConfig(),
+    getArticles('post'),
+  ]);
   const tagCounts: Record<string, number> = {};
-
-  // 文章列表直接来自数据库，和公开站的时间轴是同一份数据。
-  const articles = await getArticles('post');
 
   const posts = articles.map((item) => {
     const postTags = item.tags && item.tags.length > 0 ? item.tags : ['未分类'];

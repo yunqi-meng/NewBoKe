@@ -36,10 +36,10 @@ function formatUpdateTime(dateString: string) {
 }
 
 export default async function Home() {
-  const config = await getLiveSiteConfig();
-
-  // 控制台首页读的是数据库里的内容，和公开站看到的是同一份数据。
-  const [postList, chatterList, albumList] = await Promise.all([
+  // 配置和内容互不依赖，一起发出去：以前是「等配置回来再去要内容」，
+  // 白白多串一次往返。
+  const [config, postList, chatterList, albumList] = await Promise.all([
+    getLiveSiteConfig(),
     getArticles('post'),
     getArticles('chatter'),
     getAlbums(),
@@ -100,7 +100,7 @@ export default async function Home() {
                 </div>
                 <div className="md:col-span-8 flex flex-col gap-6 h-full">
                   <Link href="/photowall" className="flex-1 rounded-3xl bg-white/40 dark:bg-slate-800/50 backdrop-blur-md border border-white/40 dark:border-white/10 shadow-xl overflow-hidden transition-all duration-700 hover:scale-[1.02] relative group min-h-[220px]">
-                    <img src={latestAlbum.cover} className="w-full h-full absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-105 opacity-90"/>
+                    <img src={latestAlbum.cover} loading="lazy" decoding="async" className="w-full h-full absolute inset-0 object-cover transition-transform duration-700 group-hover:scale-105 opacity-90"/>
                     <div className="absolute inset-0 bg-black/20 dark:bg-black/50 group-hover:bg-transparent transition-colors duration-500"></div>
                     <div className="absolute bottom-6 left-6 right-6">
                       <h3 className="text-3xl font-bold text-white mb-2 underline decoration-pink-400">{latestAlbum.title}</h3>

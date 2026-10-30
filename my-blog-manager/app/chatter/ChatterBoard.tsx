@@ -218,7 +218,7 @@ export default function ChatterBoard({ chatters: initialChatters }: { chatters: 
               >
                 {chatter.cover && (
                   <div className="w-full h-52 overflow-hidden relative">
-                    <img src={chatter.cover} alt="cover" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
+                    <img src={chatter.cover} alt="cover" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 via-transparent to-transparent"></div>
                   </div>
                 )}

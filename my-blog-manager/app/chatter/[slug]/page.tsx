@@ -27,7 +27,7 @@ import { getArticle, getArticles } from '../../../lib/contentApi';
 // 发布后不重建控制台，打开还是旧版本。
 export const dynamic = 'force-dynamic';
 
-async function getChatterData(slug: string, defaultCover: string) {
+async function getChatterData(slug: string) {
   const article = await getArticle(slug);
   if (!article) {
     notFound();
@@ -91,7 +91,8 @@ async function getChatterData(slug: string, defaultCover: string) {
     date: article.date,
     mood: article.mood,
     tags: article.tags && Array.isArray(article.tags) ? article.tags : [],
-    cover: article.cover || defaultCover
+    // 兜底封面交给页面：正文与配置可以同时请求
+    cover: article.cover || ''
   };
 }
 
@@ -119,9 +120,13 @@ function generateCalendarMatrix(year: number, month: number, targetDay: number) 
 
 export default async function ChatterDetail({ params }: { params: Promise<{ slug: string }> }) {
   const resolvedParams = await params;
-  const config = await getLiveSiteConfig();
-  const chatterData = await getChatterData(resolvedParams.slug, config.defaultPostCover);
-  const recentChatters = await getRecentChatters(resolvedParams.slug);
+  // 正文、最近杂谈、配置互不依赖，并行取。
+  const [config, chatterData, recentChatters] = await Promise.all([
+    getLiveSiteConfig(),
+    getChatterData(resolvedParams.slug),
+    getRecentChatters(resolvedParams.slug),
+  ]);
+  const cover = chatterData.cover || config.defaultPostCover;
 
   const dateObj = new Date(chatterData.date || '2026-03-24');
   const yearStr = dateObj.getFullYear();
@@ -139,9 +144,9 @@ export default async function ChatterDetail({ params }: { params: Promise<{ slug
         <main className="w-[95%] md:w-[90%] max-w-6xl mx-auto mt-24 md:mt-28 flex flex-col lg:flex-row gap-6 md:gap-8 relative z-10">
 
           <article className="flex-1 bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl rounded-[40px] shadow-2xl border border-white/40 dark:border-white/10 overflow-hidden transition-colors duration-700">
-            {chatterData.cover && (
+            {cover && (
               <div className="w-full aspect-video bg-slate-200 dark:bg-slate-700 relative group">
-                <img src={chatterData.cover} alt="封面" className="w-full h-full object-cover opacity-90 transition-transform duration-1000 group-hover:scale-105" />
+                <img src={cover} alt="封面" loading="lazy" decoding="async" className="w-full h-full object-cover opacity-90 transition-transform duration-1000 group-hover:scale-105" />
               </div>
             )}
 

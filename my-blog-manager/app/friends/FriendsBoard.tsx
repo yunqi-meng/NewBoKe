@@ -199,7 +199,7 @@ export default function FriendsBoard() {
 
               <div className="flex items-center gap-5 relative z-10 mb-4">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-indigo-500/50 to-purple-500/50 shadow-md group-hover:rotate-[360deg] transition-transform duration-1000 ease-in-out flex-shrink-0">
-                  <img src={friend.avatar} alt={friend.name} className="w-full h-full rounded-full object-cover bg-white" />
+                  <img src={friend.avatar} alt={friend.name} loading="lazy" decoding="async" className="w-full h-full rounded-full object-cover bg-white" />
                 </div>
                 <div className="flex-1 overflow-hidden">
                   <h2 className="text-xl font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">{friend.name}</h2>

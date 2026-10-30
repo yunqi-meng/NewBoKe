@@ -18,10 +18,15 @@ class Base(DeclarativeBase):
 
 def _build_engine():
     url = config.database_url()
-    kwargs = {"future": True, "pool_pre_ping": True}
+    kwargs = {"future": True}
     if url.startswith("sqlite"):
-        # SQLite 的连接参数与其它数据库不同：同一个连接会被多个线程复用
+        # SQLite 的连接参数与其它数据库不同：同一个连接会被多个线程复用。
+        # 也不必每次都 ping：本地文件库不存在「连接被服务器掐断」这回事，
+        # 每次取连接多探一次反而增加无谓开销。
+        kwargs["pool_pre_ping"] = False
         kwargs["connect_args"] = {"check_same_thread": False, "timeout": 30}
+    else:
+        kwargs["pool_pre_ping"] = True
     return create_engine(url, **kwargs)
 
 
@@ -39,6 +44,11 @@ def _sqlite_pragmas(dbapi_connection, _connection_record):
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA busy_timeout=30000")
+        # 读多写少的小站：把页缓存和内存映射调大，查询少走几次系统调用；
+        # 临时表放内存里，排序聚合不用落盘。
+        cursor.execute("PRAGMA cache_size=-32000")      # 约 32MB 页缓存
+        cursor.execute("PRAGMA mmap_size=268435456")    # 256MB 内存映射
+        cursor.execute("PRAGMA temp_store=MEMORY")
     finally:
         cursor.close()
 

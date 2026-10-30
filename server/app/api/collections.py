@@ -7,7 +7,7 @@
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Body, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
 from ..helpers import dumps_list, loads_list, now_stamp
@@ -36,7 +36,13 @@ def album_to_dict(album: Album) -> dict:
 @albums_router.get("/list")
 @albums_router.get("")
 def list_albums(db: Session = Depends(get_db)):
-    rows = db.query(Album).order_by(Album.sort_order, Album.id).all()
+    # 照片一次性预取：否则每个相册都会再查一次 album_photos（N+1）
+    rows = (
+        db.query(Album)
+        .options(selectinload(Album.photos))
+        .order_by(Album.sort_order, Album.id)
+        .all()
+    )
     albums = [album_to_dict(row) for row in rows]
     return {"success": True, "albums": albums, "count": len(albums)}
 
