@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import type { Project } from '../../lib/contentApi';
@@ -20,7 +21,7 @@ export default function ProjectsBoard() {
   // 现在只认引擎读回的工作副本数据，避免任何过期快照混进界面。
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/proxy/api/projects/list', { cache: 'no-store' })
+    fetch(withBasePath('/api/proxy/api/projects/list'), { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (cancelled) return;
@@ -60,7 +61,7 @@ export default function ProjectsBoard() {
         return;
       }
       showToast(`❌ 项目保存失败：${result.message}`, "error");
-      fetch('/api/proxy/api/projects/list', { cache: 'no-store' })
+      fetch(withBasePath('/api/proxy/api/projects/list'), { cache: 'no-store' })
         .then(res => res.json())
         .then(data => { if (data?.success && Array.isArray(data.projects)) setEditableProjects(data.projects as Project[]); })
         .catch(() => {});

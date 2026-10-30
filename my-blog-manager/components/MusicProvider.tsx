@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
+import { withBasePath } from '../lib/consoleBasePath';
 
 // 【增强版 LRC 歌词解析】
 function parseLrc(lrcText: string) {
@@ -61,7 +62,7 @@ interface MusicContextType {
 
 const MusicContext = createContext<MusicContextType | null>(null);
 
-const DEFAULT_COVER = '/music-default.svg';
+const DEFAULT_COVER = withBasePath('/music-default.svg');
 
 /**
  * 读取控制台工作区里的本地音乐（引擎是唯一数据源）。
@@ -70,7 +71,7 @@ const DEFAULT_COVER = '/music-default.svg';
  */
 async function loadLocalPlaylist(): Promise<any[]> {
   try {
-    const res = await fetch('/api/proxy/api/music/local', { cache: 'no-store' });
+    const res = await fetch(withBasePath('/api/proxy/api/music/local'), { cache: 'no-store' });
     if (!res.ok) return [];
 
     const payload = await res.json();
@@ -82,9 +83,9 @@ async function loadLocalPlaylist(): Promise<any[]> {
         id: track.id || track.file,
         title: track.title || '未知歌曲',
         artist: track.artist || '本地音乐',
-        cover: track.cover ? `/api/proxy/api/music/cover/${encodeURIComponent(track.id)}` : DEFAULT_COVER,
-        src: `/api/proxy/api/music/file/${encodeURIComponent(track.file)}`,
-        lrcUrl: track.lyrics ? `/api/proxy/api/music/lyrics/${encodeURIComponent(track.id)}` : null,
+        cover: track.cover ? withBasePath(`/api/proxy/api/music/cover/${encodeURIComponent(track.id)}`) : DEFAULT_COVER,
+        src: withBasePath(`/api/proxy/api/music/file/${encodeURIComponent(track.file)}`),
+        lrcUrl: track.lyrics ? withBasePath(`/api/proxy/api/music/lyrics/${encodeURIComponent(track.id)}`) : null,
         lyrics: [],
         source: 'local',
       }));

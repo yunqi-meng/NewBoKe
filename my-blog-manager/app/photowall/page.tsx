@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
 import type { Album } from '../../lib/contentApi';
@@ -44,7 +45,7 @@ export default function PhotoWallPage() {
   // 所以相册列表必须实时向内容引擎读盘，界面里不允许出现任何过期快照。
   const loadAlbums = useCallback(async () => {
     try {
-      const response = await fetch('/api/proxy/api/albums/list', { cache: 'no-store' });
+      const response = await fetch(withBasePath('/api/proxy/api/albums/list'), { cache: 'no-store' });
       const data = await response.json();
       if (data?.success && Array.isArray(data.albums)) {
         setEditableAlbums(data.albums);

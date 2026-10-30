@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useEffect } from 'react';
+import { stripBasePath } from '../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity } from 'lucide-react';
 import Comments from './Comments';
@@ -34,7 +35,8 @@ export default function AboutClient({
   const activeTab = searchParams.get('tab') || 'intro';
 
   const handleTabChange = (tab: string) => {
-    router.push(`${pathname}?tab=${tab}`, { scroll: false });
+    // router.push 会自己加 basePath，这里必须先把带前缀的 pathname 还原
+    router.push(`${stripBasePath(pathname)}?tab=${tab}`, { scroll: false });
   };
 
   const heatmapScrollRef = useRef<HTMLDivElement>(null);

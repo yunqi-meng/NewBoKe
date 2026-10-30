@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import { withBasePath, stripBasePath } from '../lib/consoleBasePath';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,7 +68,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
 
   // 🔐 公网访问时需要知道是否开启了密码登录，才决定要不要显示"退出登录"
   useEffect(() => {
-    fetch('/api/auth/login', { cache: 'no-store' })
+    fetch(withBasePath('/api/auth/login'), { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => setAuthOn(Boolean(data?.authEnabled)))
       .catch(() => setAuthOn(false));
@@ -75,11 +76,11 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      await fetch(withBasePath('/api/auth/logout'), { method: 'POST' });
     } catch {
       /* 忽略网络错误，本地 Cookie 也会随跳转失效 */
     }
-    window.location.href = '/login';
+    window.location.href = withBasePath('/login');
   };
 
   // 📤 推送流程：内容保存后已经在线上生效，这里只把当前内容导成快照，
@@ -115,7 +116,7 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
           <div className="flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <nav className="hidden lg:flex gap-8 text-sm font-bold">
               {(compact ? navLinks.filter(link => ['/', '/settings'].includes(link.href)) : navLinks).map((link) => (
-                <Link key={link.href} href={link.href} className={`relative whitespace-nowrap py-1 transition-colors ${pathname === link.href ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                <Link key={link.href} href={link.href} className={`relative whitespace-nowrap py-1 transition-colors ${stripBasePath(pathname) === link.href ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-200'}`}>
                   {link.name}
                 </Link>
               ))}

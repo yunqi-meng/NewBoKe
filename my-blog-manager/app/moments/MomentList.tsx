@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost, Plus, Image as ImageIcon, X, Link as LinkIcon, Zap, Trash2, AlertTriangle } from 'lucide-react';
 import MomentComments from '../../components/MomentComments';
@@ -140,7 +141,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     if (!deleteConfirmId) return;
     setIsDeleting(true);
     try {
-      const apiUrl = `/api/proxy/api/moments/${encodeURIComponent(deleteConfirmId)}`;
+      const apiUrl = withBasePath(`/api/proxy/api/moments/${encodeURIComponent(deleteConfirmId)}`);
 
       const res = await fetch(apiUrl, {
         method: 'DELETE',

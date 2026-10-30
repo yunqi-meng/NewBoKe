@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import DailyQuoteSection from '../../components/settings/DailyQuoteSection';
 import { AnimatePresence } from 'framer-motion';
 import { saveSiteConfig } from '../../lib/contentMutations';
@@ -76,7 +77,7 @@ function SettingsContent() {
       try {
         // backend_config.json 只是桌面版可选的本机连接提示：
         // 不存在不算错误（服务器部署就没有这个文件），存在且标明预览副本才拦下。
-        const configRes = await fetch(`/backend_config.json?t=${Date.now()}`, { signal: controller.signal });
+        const configRes = await fetch(withBasePath(`/backend_config.json?t=${Date.now()}`), { signal: controller.signal });
         if (configRes.ok) {
           const configData = await configRes.json().catch(() => ({}));
           if (configData.previewOnly === true) {
@@ -85,7 +86,7 @@ function SettingsContent() {
           }
         }
 
-        const res = await fetch(`/api/proxy/api/config/get`, { cache: 'no-store', signal: controller.signal });
+        const res = await fetch(withBasePath(`/api/proxy/api/config/get`), { cache: 'no-store', signal: controller.signal });
         if (!res.ok) throw new Error('网站设置服务尚未就绪');
         const data = await res.json();
 

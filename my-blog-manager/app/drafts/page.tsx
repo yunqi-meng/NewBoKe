@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../../components/Navbar';
@@ -26,7 +27,7 @@ function DraftsContent() {
   const fetchDrafts = async () => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/proxy/api/drafts/list`, {
+      const res = await fetch(withBasePath(`/api/proxy/api/drafts/list`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blog_path: blogPath })
@@ -55,7 +56,7 @@ function DraftsContent() {
     const id = deleteModal.id;
 
     try {
-      const res = await fetch(`/api/proxy/api/drafts/delete`, {
+      const res = await fetch(withBasePath(`/api/proxy/api/drafts/delete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blog_path: blogPath, id: id })

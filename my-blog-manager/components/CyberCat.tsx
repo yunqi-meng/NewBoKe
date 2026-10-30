@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
+import { withBasePath } from '../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CyberCat() {
@@ -41,7 +42,7 @@ export default function CyberCat() {
     speak("嗷呜！真好吃喵！本喵吃饱了要说两句...", 6000);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch(withBasePath('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: "我刚刚喂了你一条美味的小鱼干！你有什么表示？" }),
@@ -70,7 +71,7 @@ export default function CyberCat() {
     speak("让本喵想想喵...", 10000);
 
     try {
-      const res = await fetch('/api/chat', {
+      const res = await fetch(withBasePath('/api/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage }),
@@ -174,7 +175,7 @@ export default function CyberCat() {
             .cat-sprite {
               width: 100%;
               height: 100%;
-              background-image: url('/siamese-cat.png'); 
+              background-image: url('${withBasePath('/siamese-cat.png')}'); 
               background-size: 300% 300%; 
               background-repeat: no-repeat;
               image-rendering: pixelated; 

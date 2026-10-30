@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { withBasePath } from '../lib/consoleBasePath';
 import { usePathname } from 'next/navigation';
 import { MessageSquareText, Send, Heart, Reply, ShieldCheck, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 
@@ -191,7 +192,7 @@ export default function Comments({
       setError('');
       try {
         const query = `target=${encodeURIComponent(threadKey)}&page=${nextPage}&size=${PAGE_SIZE}`;
-        const response = await fetch(`/api/comments?${query}`, { cache: 'no-store' });
+        const response = await fetch(withBasePath(`/api/comments?${query}`), { cache: 'no-store' });
         const json = await response.json();
         if (!response.ok || !json.success) {
           throw new Error(json.message || '评论加载失败');
@@ -242,7 +243,7 @@ export default function Comments({
     setSubmitting(true);
     setFeedback('');
     try {
-      const response = await fetch('/api/comments', {
+      const response = await fetch(withBasePath('/api/comments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -287,7 +288,7 @@ export default function Comments({
     setLiked((prev) => [...prev, item.id]);
     writeStorage(LIKED_KEY, JSON.stringify([...liked, item.id]));
     try {
-      const response = await fetch('/api/comments', {
+      const response = await fetch(withBasePath('/api/comments'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

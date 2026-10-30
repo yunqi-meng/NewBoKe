@@ -11,8 +11,8 @@ if errorlevel 1 (
   echo Tunnel is already running.
 )
 
-start "" http://127.0.0.1:3001
-echo Manager console: http://127.0.0.1:3001
+start "" http://127.0.0.1:3001/console
+echo Manager console: http://127.0.0.1:3001/console
 echo Public site:     http://118.190.204.158:8080
 echo.
 echo Keep the minimized "XHBlogs Tunnel" window open. It reconnects automatically.

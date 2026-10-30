@@ -9,6 +9,10 @@
 #   xhblogs-manager-rebuild            重建控制台并重启控制台 + 统一后端
 #   xhblogs-manager-rebuild --skip-api 只重启控制台前端，不动统一后端
 #
+# 挂载前缀：服务器上控制台与公开站同域，挂在 /console（nginx 反代到 3001）。
+# basePath 是构建期常量，这里必须传进去；本地根路径预览时改成空字符串再构建。
+#   XHBlogs_CONSOLE_BASE_PATH= xhblogs-manager-rebuild
+#
 # 发布助手会带上 --skip-api：它自己就是统一后端 spawn 出来的，
 # 两者在同一条进程链上，后端的重启统一由发布助手排期，避免自己把自己重启掉。
 set -euo pipefail
@@ -21,7 +25,14 @@ for arg in "$@"; do
   esac
 done
 
+# 默认 /console；显式传空值（XHBlogs_CONSOLE_BASE_PATH=）时回到根路径模式
+CONSOLE_BASE_PATH="/console"
+if [ "${XHBlogs_CONSOLE_BASE_PATH+set}" = "set" ]; then
+  CONSOLE_BASE_PATH="$XHBlogs_CONSOLE_BASE_PATH"
+fi
+
 runuser -u xhblogs -- env HOME=/home/xhblogs PATH=/usr/bin:/bin NODE_OPTIONS=--max-old-space-size=1536 NEXT_TELEMETRY_DISABLED=1 \
+  NEXT_PUBLIC_CONSOLE_BASE_PATH="$CONSOLE_BASE_PATH" \
   bash -c "cd $REPO/my-blog-manager && npm run build \
     && mkdir -p .next/standalone/.next/static .next/standalone/public \
     && cp -a .next/static/. .next/standalone/.next/static/ \

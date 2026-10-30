@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import {
@@ -48,7 +49,7 @@ const DEFAULT_SETTINGS: CommentSettings = {
   allowLike: true,
 };
 
-const API = '/api/proxy/api/comments';
+const API = withBasePath('/api/proxy/api/comments');
 
 function Toggle({
   checked,

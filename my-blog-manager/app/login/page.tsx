@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from 'react';
+import { withBasePath, stripBasePath } from '../../lib/consoleBasePath';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, Lock, Loader2, AlertTriangle } from 'lucide-react';
 
@@ -13,7 +14,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     document.documentElement.classList.add('splash-seen');
-    fetch('/api/auth/login', { cache: 'no-store' })
+    fetch(withBasePath('/api/auth/login'), { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
         if (!data?.authEnabled) {
@@ -30,7 +31,7 @@ export default function LoginPage() {
     setBusy(true);
     setError('');
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch(withBasePath('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
@@ -41,7 +42,9 @@ export default function LoginPage() {
         return;
       }
       const next = new URLSearchParams(window.location.search).get('next');
-      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+      // 中间件带过来的 next 可能已经带了 /console 前缀，
+      // router.replace 又会自动补一次，所以先剥掉
+      const safeNext = next && next.startsWith('/') && !next.startsWith('//') ? stripBasePath(next) : '/';
       router.replace(safeNext);
       router.refresh();
     } catch {

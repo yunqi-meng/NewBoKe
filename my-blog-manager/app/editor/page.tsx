@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect, Suspense } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Navbar from '../../components/Navbar';
 import RichTextEditor, { RichTextEditorHandle } from '../../components/editor/RichTextEditor';
@@ -52,7 +53,7 @@ function EditorContent() {
     const fetchTags = async () => {
       setIsLoadingTags(true);
       try {
-        const res = await fetch(`/api/proxy/api/tags`);
+        const res = await fetch(withBasePath(`/api/proxy/api/tags`));
         const data = await res.json();
         if (data.success) {
           setHistoryPostTags(data.postTags || []);
@@ -68,7 +69,7 @@ function EditorContent() {
     if (initialDocId !== 'new') {
       const loadDraft = async () => {
         try {
-          const res = await fetch(`/api/proxy/api/drafts/get`, {
+          const res = await fetch(withBasePath(`/api/proxy/api/drafts/get`), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ id: initialDocId, type: docType })

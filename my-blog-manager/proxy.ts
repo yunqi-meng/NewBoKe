@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SESSION_COOKIE } from './lib/auth';
 import { backendBaseUrl } from './lib/backendPort';
+import { withBasePath, stripBasePath } from './lib/consoleBasePath';
 
 /**
  * Next.js 16 的全局请求拦截（proxy.ts，Node.js 运行时）。
@@ -44,7 +45,11 @@ async function checkSession(request: NextRequest): Promise<{ authEnabled: boolea
 }
 
 export async function proxy(request: NextRequest) {
-  const { pathname, search } = request.nextUrl;
+  const { search } = request.nextUrl;
+
+  // 挂到 /console 时 pathname 带着前缀，先还原成路由路径再判断，
+  // 否则登录页会被当成私有页，重定向也会少掉前缀（跳去公开站的 /login）
+  const pathname = stripBasePath(request.nextUrl.pathname);
 
   if (isPublic(pathname)) return NextResponse.next();
   if (pathname.startsWith('/_next/')) return NextResponse.next();
@@ -57,7 +62,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ detail: '未授权，请先登录管理后台' }, { status: 401 });
   }
 
-  const target = new URL('/login', request.url);
+  // next 参数只带路由路径（不含前缀），登录页交给 router.replace 补前缀
+  const target = new URL(withBasePath('/login'), request.url);
   target.searchParams.set('next', `${pathname}${search}`);
   return NextResponse.redirect(target);
 }

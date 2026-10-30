@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion } from 'framer-motion';
 import { useToast } from '../ToastProvider';
 import { pushToGitHub } from '../../lib/contentMutations';
@@ -95,7 +96,7 @@ export default function PublishSection() {
 
   const loadStatus = useCallback(async () => {
     try {
-      const res = await fetch('/api/proxy/api/deploy/status', { cache: 'no-store' });
+      const res = await fetch(withBasePath('/api/proxy/api/deploy/status'), { cache: 'no-store' });
       if (!res.ok) return;
       const data: PublishStatus = await res.json();
       setStatus(data);
@@ -111,7 +112,7 @@ export default function PublishSection() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const res = await fetch('/api/proxy/api/deploy/history', { cache: 'no-store' });
+      const res = await fetch(withBasePath('/api/proxy/api/deploy/history'), { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
       if (Array.isArray(data?.commits)) setHistory(data.commits);
@@ -131,7 +132,7 @@ export default function PublishSection() {
   const handleSavePath = async () => {
     setIsSaving(true);
     try {
-      const res = await fetch('/api/proxy/api/deploy/config', {
+      const res = await fetch(withBasePath('/api/proxy/api/deploy/config'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blogPath: pathInput }),
@@ -178,7 +179,7 @@ export default function PublishSection() {
 
     setRollingBack(commit.commit);
     try {
-      const res = await fetch('/api/proxy/api/deploy/rollback', {
+      const res = await fetch(withBasePath('/api/proxy/api/deploy/rollback'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commit: commit.commit }),

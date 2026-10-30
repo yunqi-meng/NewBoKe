@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion } from 'framer-motion';
 import {
   CalendarClock,
@@ -60,7 +61,7 @@ const DEFAULT_CONFIG: QuoteConfig = {
   sourceLabel: '煤球',
 };
 
-const API = '/api/proxy/api/daily-quote';
+const API = withBasePath('/api/proxy/api/daily-quote');
 
 function Toggle({
   checked,

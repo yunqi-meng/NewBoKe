@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from 'react';
+import { withBasePath } from '../lib/consoleBasePath';
 import TimelineNode from './TimelineNode';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Search, AlertTriangle, Sparkles, LayoutGrid, ListTree, Edit3, ArrowUp } from 'lucide-react';
@@ -55,7 +56,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
   const confirmDelete = async () => {
     if (!deleteModal.slug) return;
     try {
-      const res = await fetch(`/api/proxy/api/drafts/delete`, {
+      const res = await fetch(withBasePath(`/api/proxy/api/drafts/delete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: deleteModal.slug })

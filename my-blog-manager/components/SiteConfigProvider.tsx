@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { withBasePath } from '../lib/consoleBasePath';
 import { siteConfig as staticSiteConfig } from '../siteConfig';
 import { deepMerge } from '../lib/siteConfigMerge';
 
@@ -21,7 +22,7 @@ export function SiteConfigProvider({ initialConfig, children }: { initialConfig:
 
   const refresh = useCallback(async () => {
     try {
-      const response = await fetch('/api/proxy/api/config/get', { cache: 'no-store' });
+      const response = await fetch(withBasePath('/api/proxy/api/config/get'), { cache: 'no-store' });
       const payload = await response.json();
       if (payload?.success && payload.data) {
         setConfig(prev => deepMerge(prev as Record<string, any>, payload.data) as SiteConfig);

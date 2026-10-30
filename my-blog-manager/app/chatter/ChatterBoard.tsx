@@ -1,5 +1,6 @@
 "use client";
 import { useState, useMemo } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSiteConfig } from '../../components/SiteConfigProvider';
@@ -56,7 +57,7 @@ export default function ChatterBoard({ chatters: initialChatters }: { chatters: 
 
     try {
       // 调用全能删除接口
-      const res = await fetch(`/api/proxy/api/drafts/delete`, {
+      const res = await fetch(withBasePath(`/api/proxy/api/drafts/delete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: slug }) // 这里传的是 slug (即 md 的文件名)

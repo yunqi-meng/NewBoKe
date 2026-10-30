@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import type { Friend } from '../../lib/contentApi';
@@ -35,7 +36,7 @@ export default function FriendsBoard() {
   // 现在只认引擎读回的工作副本数据，避免任何过期快照混进界面。
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/proxy/api/friends/list', { cache: 'no-store' })
+    fetch(withBasePath('/api/proxy/api/friends/list'), { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (cancelled) return;
@@ -74,7 +75,7 @@ export default function FriendsBoard() {
         return;
       }
       showToast(`❌ 友链保存失败：${result.message}`, "error");
-      fetch('/api/proxy/api/friends/list', { cache: 'no-store' })
+      fetch(withBasePath('/api/proxy/api/friends/list'), { cache: 'no-store' })
         .then(res => res.json())
         .then(data => { if (data?.success && Array.isArray(data.friends)) setEditableFriends(data.friends as Friend[]); })
         .catch(() => {});

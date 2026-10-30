@@ -10,7 +10,10 @@
 #   my-blog-manager/*    → 重建控制台（standalone 产物 + 重启两个服务）
 #   server/app/*         → 只需重启统一后端（xhblogs-manager-api）
 #   server/requirements.txt → 装依赖 + 重启统一后端
-#   tools/*              → 重装 /usr/local/bin 下的运维脚本
+#   tools/*              → 重装 /usr/local/bin 下的运维脚本，同步 nginx 站点配置
+#
+# 控制台与公开站同域：/console 由 nginx 反代到 3001，
+# 控制台构建时需要 basePath=/console（xhblogs-manager-rebuild 默认就带）。
 #
 # 用法：sudo /usr/local/bin/xhblogs-deploy
 set -euo pipefail
@@ -81,6 +84,30 @@ if [ "$need_tools" = "1" ]; then
   done
   if ! cmp -s "$REPO/tools/xhblogs-deploy" /usr/local/bin/xhblogs-deploy; then
     echo "注意：xhblogs-deploy 自身也有改动，请执行一次 sudo install -m 755 $REPO/tools/xhblogs-deploy /usr/local/bin/xhblogs-deploy"
+  fi
+
+  # nginx 站点配置也只在 tools/ 改动时同步；校验不过就回滚，别把线上打挂
+  if [ -f "$REPO/tools/nginx-xhblogs.conf" ] && command -v nginx >/dev/null 2>&1; then
+    if ! cmp -s "$REPO/tools/nginx-xhblogs.conf" /etc/nginx/conf.d/xhblogs.conf; then
+      echo "更新 nginx 配置…"
+      backup="/etc/nginx/conf.d/xhblogs.conf.bak-$(date +%Y%m%d%H%M%S)"
+      if [ -f /etc/nginx/conf.d/xhblogs.conf ]; then
+        cp -a /etc/nginx/conf.d/xhblogs.conf "$backup"
+      fi
+      install -m 644 "$REPO/tools/nginx-xhblogs.conf" /etc/nginx/conf.d/xhblogs.conf
+      if nginx -t; then
+        systemctl reload nginx
+      else
+        echo "nginx 配置校验失败，回滚到上一份" >&2
+        if [ -f "$backup" ]; then
+          cp -a "$backup" /etc/nginx/conf.d/xhblogs.conf
+        else
+          rm -f /etc/nginx/conf.d/xhblogs.conf
+        fi
+        nginx -t || true
+        exit 1
+      fi
+    fi
   fi
 fi
 

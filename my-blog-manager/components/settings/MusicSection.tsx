@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { withBasePath } from '../../lib/consoleBasePath';
 import { motion } from 'framer-motion';
 import { CloudUpload, ListMusic, Trash2, Play, Pause, Disc3, Image as ImageIcon, FileText, RefreshCw } from 'lucide-react';
 
 const AUDIO_ACCEPT = '.mp3,.m4a,.aac,.ogg,.oga,.wav,.flac,.weba';
-const DEFAULT_COVER = '/music-default.svg';
+const DEFAULT_COVER = withBasePath('/music-default.svg');
 
 function formatSize(bytes: number) {
   if (!bytes) return '';
@@ -32,7 +33,7 @@ export default function MusicSection({ showToast }: any) {
   const loadLocalTracks = useCallback(async () => {
     setListLoading(true);
     try {
-      const res = await fetch('/api/proxy/api/music/local', { cache: 'no-store' });
+      const res = await fetch(withBasePath('/api/proxy/api/music/local'), { cache: 'no-store' });
       const payload = await res.json();
       setLocalTracks(Array.isArray(payload?.data?.tracks) ? payload.data.tracks : []);
     } catch {
@@ -78,7 +79,7 @@ export default function MusicSection({ showToast }: any) {
       form.append('title', title);
       form.append('artist', artist);
 
-      const res = await fetch('/api/proxy/api/music/upload', { method: 'POST', body: form });
+      const res = await fetch(withBasePath('/api/proxy/api/music/upload'), { method: 'POST', body: form });
       const payload = await res.json();
 
       if (!res.ok || !payload?.success) {
@@ -91,13 +92,13 @@ export default function MusicSection({ showToast }: any) {
       if (coverFile) {
         const coverForm = new FormData();
         coverForm.append('file', coverFile);
-        await fetch(`/api/proxy/api/music/cover/${encodeURIComponent(trackId)}`, { method: 'POST', body: coverForm });
+        await fetch(withBasePath(`/api/proxy/api/music/cover/${encodeURIComponent(trackId)}`), { method: 'POST', body: coverForm });
       }
 
       if (lyricFile) {
         const lyricForm = new FormData();
         lyricForm.append('file', lyricFile);
-        await fetch(`/api/proxy/api/music/lyrics/${encodeURIComponent(trackId)}`, { method: 'POST', body: lyricForm });
+        await fetch(withBasePath(`/api/proxy/api/music/lyrics/${encodeURIComponent(trackId)}`), { method: 'POST', body: lyricForm });
       }
 
       showToast('已加入本地歌单，别忘了点「线上发布」同步到网站', 'success');
@@ -114,14 +115,14 @@ export default function MusicSection({ showToast }: any) {
     if (!file) return;
     const form = new FormData();
     form.append('file', file);
-    const res = await fetch(`/api/proxy/api/music/${kind}/${encodeURIComponent(trackId)}`, { method: 'POST', body: form });
+    const res = await fetch(withBasePath(`/api/proxy/api/music/${kind}/${encodeURIComponent(trackId)}`), { method: 'POST', body: form });
     const payload = await res.json();
     showToast(payload?.success ? (kind === 'cover' ? '封面已更新' : '歌词已更新') : (payload?.message || '更新失败'), payload?.success ? 'success' : 'error');
     if (payload?.success) await loadLocalTracks();
   };
 
   const removeLocalTrack = async (trackId: string, titleText: string) => {
-    const res = await fetch(`/api/proxy/api/music/local/${encodeURIComponent(trackId)}`, { method: 'DELETE' });
+    const res = await fetch(withBasePath(`/api/proxy/api/music/local/${encodeURIComponent(trackId)}`), { method: 'DELETE' });
     const payload = await res.json();
     if (payload?.success) {
       if (playingId === trackId) setPlayingId(null);
@@ -133,7 +134,7 @@ export default function MusicSection({ showToast }: any) {
   };
 
   const togglePreview = (track: any) => {
-    const src = `/api/proxy/api/music/file/${encodeURIComponent(track.file)}`;
+    const src = withBasePath(`/api/proxy/api/music/file/${encodeURIComponent(track.file)}`);
     if (playingId === track.id) {
       audioRef.current?.pause();
       setPlayingId(null);
@@ -233,7 +234,7 @@ export default function MusicSection({ showToast }: any) {
                     title={playingId === track.id ? '暂停' : '试听'}
                   >
                     <img
-                      src={track.cover ? `/api/proxy/api/music/cover/${encodeURIComponent(track.id)}` : DEFAULT_COVER}
+                      src={track.cover ? withBasePath(`/api/proxy/api/music/cover/${encodeURIComponent(track.id)}`) : DEFAULT_COVER}
                       alt="cover"
                       className="w-full h-full object-cover"
                     />

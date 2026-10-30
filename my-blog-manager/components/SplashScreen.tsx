@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { stripBasePath } from '../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSiteConfig } from './SiteConfigProvider';
 
@@ -26,7 +27,7 @@ export default function SplashScreen() {
     const hasSeenSplash = sessionStorage.getItem('hasSeenSplash') === 'true';
 
     // 登录页要立刻可见，不能被开屏动画挡住
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/login')) {
+    if (typeof window !== 'undefined' && stripBasePath(window.location.pathname).startsWith('/login')) {
       document.documentElement.classList.add('splash-seen');
       return;
     }

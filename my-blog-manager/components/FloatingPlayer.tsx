@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from 'next/navigation';
+import { stripBasePath } from '../lib/consoleBasePath';
 import { useMusic } from './MusicProvider';
 import { motion } from 'framer-motion';
 import { useState, useEffect } from 'react';
@@ -18,7 +19,7 @@ export default function FloatingPlayer() {
   if (!isMounted || isLoading || !currentSong) return null;
 
   // 【核心修复】：判断是否在首页。在首页时我们让它隐身，但不销毁它！
-  const isHidden = pathname === '/';
+  const isHidden = stripBasePath(pathname) === '/';
 
   return (
     <div className="fixed bottom-6 right-6 z-[9999]" style={{ pointerEvents: 'none' }}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { withBasePath } from '../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MessageSquareText,
@@ -68,7 +69,7 @@ type TargetSummary = {
   last_at: string;
 };
 
-const API = '/api/proxy/api/comments';
+const API = withBasePath('/api/proxy/api/comments');
 
 const STATUS_TABS = [
   { key: '', label: '全部', tone: 'slate' },
@@ -310,7 +311,7 @@ export default function CommentManager() {
           </div>
           <div className="flex items-center gap-2">
             <a
-              href="/settings?tab=comment"
+              href={withBasePath('/settings?tab=comment')}
               className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-white/70 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 text-xs font-bold hover:border-indigo-400 transition"
             >
               <Settings2 size={14} />
