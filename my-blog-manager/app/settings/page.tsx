@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import DailyQuoteSection from '../../components/settings/DailyQuoteSection';
 import { AnimatePresence } from 'framer-motion';
-import { useOperations } from '../../context/OperationContext';
+import { saveSiteConfig } from '../../lib/contentMutations';
 import { useSiteConfig } from '../../components/SiteConfigProvider';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
@@ -20,7 +20,6 @@ import FooterSection from '../../components/settings/FooterSection';
 import AICatSection from '../../components/settings/AICatSection';
 
 function SettingsContent() {
-  const { addOperation } = useOperations();
   // 配置实时取自引擎：设置页填的永远是磁盘上的最新值
   const siteConfig = useSiteConfig();
   const [activeTab, setActiveTab] = useState('profile');
@@ -122,18 +121,18 @@ function SettingsContent() {
     setFormData((prev: any) => ({ ...prev, [field]: value }));
   };
 
-  const pushToQueue = (label: string, key?: string, value?: any) => {
-    addOperation({
-      id: Date.now().toString(),
-      type: 'CONFIG',
-      label: `配置暂存：${label}`,
-      description: `修改了系统的 ${label}，等待同步至 my-blog`,
-      timestamp: new Date().toLocaleTimeString().slice(0, 5),
-      payload: formData,
-      key: key,
-      value: value
+  // 保存即写库：整份表单一次提交（各栏目共用同一份配置）。
+  // 数据库一更新，公开站刷新就是新配置，不用再等一次发布。
+  const saveConfig = (label: string) => {
+    const updates = { ...formData };
+    showToast(`⏳ 正在保存【${label}】…`, "info");
+    saveSiteConfig(updates).then(result => {
+      if (result.ok) {
+        showToast(`✅ 【${label}】已保存，公开站实时生效`, "success");
+        return;
+      }
+      showToast(`❌ 【${label}】保存失败：${result.message}`, "error");
     });
-    showToast(`🎉 【${label}】已加入右上角操作队列！`, "success");
   };
 
   // 👇 🌟 在菜单里增加 AI 猫咪入口
@@ -146,7 +145,7 @@ function SettingsContent() {
     { id: 'danmaku', name: '全站弹幕设置', icon: '⚡' },
     { id: 'comment', name: '评论系统配置', icon: '💬' },
     { id: 'aicat', name: 'AI 煤球配置', icon: '🐾' }, // 👈 新增的小猫设置
-    { id: 'publish', name: '线上发布', icon: '🚀' },
+    { id: 'publish', name: '推送到 GitHub', icon: '📤' },
   ];
 
 
@@ -176,19 +175,19 @@ function SettingsContent() {
             {quoteVisited && <div hidden={activeTab !== 'quote'}><DailyQuoteSection /></div>}
             <fieldset disabled={backendMode !== 'live'} hidden={activeTab === 'quote'} className="min-w-0 w-full border-0 p-0">
             <AnimatePresence mode="wait">
-              {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
-              {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
+              {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
+              {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
               {activeTab === 'music' && <MusicSection key="music" showToast={showToast} />}
-              {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
-              {activeTab === 'danmaku' && <DanmakuSection key="danmaku" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
+              {activeTab === 'footer' && <FooterSection key="footer" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
+              {activeTab === 'danmaku' && <DanmakuSection key="danmaku" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
               {activeTab === 'comment' && <CommentSection key="comment" />}
               {/* 👇 🌟 挂载 AI 猫咪面板 */}
-              {activeTab === 'aicat' && <AICatSection key="aicat" formData={formData} handleUpdate={handleUpdate} pushToQueue={pushToQueue} />}
+              {activeTab === 'aicat' && <AICatSection key="aicat" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
 
               {activeTab === 'publish' && backendMode === 'live' && <PublishSection key="publish" />}
             </AnimatePresence>
             </fieldset>
-            {activeTab === 'publish' && backendMode !== 'live' && <section className="rounded-3xl border border-white/60 bg-white/60 p-8 text-sm leading-8 text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300"><h2 className="mb-3 text-lg font-semibold">线上发布</h2>发布功能需要连接网站通用后台。此副本尚未接通，接通后可以在这里查看线上状态并一键发布；当前不会执行任何发布动作。</section>}
+            {activeTab === 'publish' && backendMode !== 'live' && <section className="rounded-3xl border border-white/60 bg-white/60 p-8 text-sm leading-8 text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300"><h2 className="mb-3 text-lg font-semibold">推送到 GitHub</h2>推送功能需要连接网站通用后台。此副本尚未接通，接通后可以在这里查看线上状态并把内容快照推送到 GitHub 仓库；当前不会执行任何推送动作。</section>}
           </div>
 
         </main>

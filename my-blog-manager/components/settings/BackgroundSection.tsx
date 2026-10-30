@@ -10,7 +10,7 @@ interface BgGroup {
   images: string[];
 }
 
-export default function BackgroundSection({ formData, handleUpdate, pushToQueue }: any) {
+export default function BackgroundSection({ formData, handleUpdate, saveConfig }: any) {
   const { showToast } = useToast();
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -158,8 +158,8 @@ export default function BackgroundSection({ formData, handleUpdate, pushToQueue 
           <h2 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">🌌 视觉背景配置</h2>
           <p className="text-[10px] font-bold text-slate-400 mt-2 uppercase">壁纸分组管理 · 启用的分组将在前台轮播播放</p>
         </div>
-        <button onClick={() => pushToQueue('视觉背景分组', 'bgGroups', formData.bgGroups)} className="px-6 py-2 bg-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
-          暂存背景修改
+        <button onClick={() => saveConfig('视觉背景分组')} className="px-6 py-2 bg-indigo-500 text-white rounded-xl text-xs font-black shadow-lg shadow-indigo-500/20 active:scale-95 transition-all">
+          保存背景分组
         </button>
       </header>
 

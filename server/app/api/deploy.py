@@ -96,6 +96,12 @@ def _repo_root() -> str:
     return str(config.repo_root())
 
 
+def _github_remote(repo_root: str) -> str:
+    """仓库是否配置了 github 远端（推送按钮的最终目的地）"""
+    code, out, _ = _git(repo_root, ["remote", "get-url", "github"])
+    return out.strip() if code == 0 else ""
+
+
 def _status_file_path() -> str:
     return os.path.join(_repo_root(), PUBLISH_STATUS_FILE)
 
@@ -160,6 +166,7 @@ async def get_deploy_config():
         "snapshotDir": str(config.snapshots_dir()),
         "serverMode": _is_server_mode(),
         "publishHelper": SERVER_PUBLISH_HELPER if _is_server_mode() else "",
+        "githubRemote": _github_remote(_repo_root()),
     }
 
 
@@ -214,6 +221,7 @@ def _collect_status(blog_path: str, repo_root: str) -> Dict[str, Any]:
         changed = [line for line in out.splitlines() if line.strip()]
         status["git"]["dirty"] = len(changed) > 0
         status["git"]["changedFiles"] = changed[:20]
+        status["git"]["githubRemote"] = _github_remote(repo_root)
 
     # --- 构建产物状态 ---
     build_id_file = os.path.join(blog_path, ".next", "BUILD_ID")
@@ -447,7 +455,7 @@ async def rollback_to_commit(request: Request, _: None = Depends(require_admin))
 
         return {
             "success": True,
-            "message": "↩️ 回退请求已提交：内容已恢复到 %s 并同步到线上。" % commit[:8],
+            "message": "↩️ 回退请求已提交：内容已恢复到 %s，并会推送到服务器仓库与 GitHub 仓库。" % commit[:8],
             "commit": commit,
             "counts": counts,
             "serverMode": True,
@@ -457,15 +465,15 @@ async def rollback_to_commit(request: Request, _: None = Depends(require_admin))
 
 
 # --------------------------------------------------------------------------
-# 发布上线
+# 推送到 GitHub 仓库
 # --------------------------------------------------------------------------
 
 @router.post("/publish")
 async def publish_to_live(request: Request, _: None = Depends(require_admin)):
-    """把当前数据库里的内容发布成一份快照，并同步到线上。
+    """把当前数据库里的内容导成快照，提交并推送到 GitHub 仓库。
 
-    流程：导出快照 → 提交仓库 → 同步到线上。
-    公开站是实时渲染的，内容不需要重新构建站点，刷新即可见。
+    内容在控制台保存时就已经实时写入数据库、公开站刷新即见；
+    这里只负责留一份可追溯、可回退的版本：导出快照 → 提交 → 推送服务器仓库与 GitHub。
     """
     try:
         repo_root = _repo_root()
@@ -474,7 +482,7 @@ async def publish_to_live(request: Request, _: None = Depends(require_admin)):
         if _publish_in_progress(repo_root):
             return {
                 "success": False,
-                "message": "⏳ 上一次发布还在进行中，请等它结束后再发布。",
+                "message": "⏳ 上一次推送还在进行中，请等它结束后再推送。",
                 "serverMode": _is_server_mode(),
                 "busy": True,
             }
@@ -489,7 +497,7 @@ async def publish_to_live(request: Request, _: None = Depends(require_admin)):
         if not _is_server_mode():
             return {
                 "success": True,
-                "message": "✅ 内容快照已生成：%s。当前不是服务器部署环境，请手动同步到线上。" % snapshot.name,
+                "message": "✅ 内容快照已生成：%s。当前不是服务器部署环境，没有推送助手；到服务器上点推送即可提交并同步到 GitHub。" % snapshot.name,
                 "serverMode": False,
                 "snapshot": snapshot.name,
             }
@@ -498,7 +506,7 @@ async def publish_to_live(request: Request, _: None = Depends(require_admin)):
             "state": "requested",
             "startedAt": time.strftime("%Y-%m-%d %H:%M:%S"),
             "startedAtTimestamp": time.time(),
-            "message": "已提交发布请求，正在同步到线上…",
+            "message": "已提交推送请求，正在把内容快照推送到 GitHub…",
         })
 
         try:
@@ -510,14 +518,14 @@ async def publish_to_live(request: Request, _: None = Depends(require_admin)):
             )
             proc.poll()
         except Exception as e:
-            return {"success": False, "message": f"触发发布失败：{str(e)}"}
+            return {"success": False, "message": f"触发推送失败：{str(e)}"}
 
         return {
             "success": True,
-            "message": "🚀 发布请求已提交：内容快照已生成，正在同步到线上，刷新页面即可见。",
+            "message": "📤 推送请求已提交：内容快照已生成，正在推送到服务器仓库与 GitHub 仓库。",
             "serverMode": True,
             "snapshot": snapshot.name,
             "statusFile": _status_file_path(),
         }
     except Exception as e:
-        return {"success": False, "message": f"发布过程发生异常: {str(e)}"}
+        return {"success": False, "message": f"推送过程发生异常: {str(e)}"}

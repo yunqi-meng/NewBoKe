@@ -6,7 +6,7 @@ import PageTransition from '../../components/PageTransition';
 import type { Album } from '../../lib/contentApi';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Pencil, Trash2, Search, X, Save, AlertTriangle, Edit3, CloudUpload } from 'lucide-react';
-import { useOperations } from '../../context/OperationContext';
+import { syncAlbums } from '../../lib/contentMutations';
 import { useToast } from '../../components/ToastProvider';
 import FloatingImageTool from '../../components/editor/FloatingImageTool';
 
@@ -26,7 +26,6 @@ export default function PhotoWallPage() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const { addOperation } = useOperations();
   const { showToast } = useToast();
   const [editableAlbums, setEditableAlbums] = useState<Album[]>([]);
   const [isLoadingAlbums, setIsLoadingAlbums] = useState(true);
@@ -41,7 +40,7 @@ export default function PhotoWallPage() {
   // 🌟 实时读取磁盘上的相册数据
   //
   // data/albums.ts 会被 Next.js 打包进客户端 bundle，如果在这里直接 import，
-  // 页面拿到的永远是「构建那一刻」的快照：删掉的照片点完「发布上线」刷新后又会复活。
+  // 页面拿到的永远是「构建那一刻」的快照：删掉的照片刷新后又会复活。
   // 所以相册列表必须实时向内容引擎读盘，界面里不允许出现任何过期快照。
   const loadAlbums = useCallback(async () => {
     try {
@@ -63,14 +62,17 @@ export default function PhotoWallPage() {
     loadAlbums();
   }, [loadAlbums]);
 
-  const syncToQueue = (newAlbums: Album[]) => {
-    addOperation({
-      id: `photowall_sync_${Date.now()}`,
-      type: "sync_photowall",
-      label: "同步画廊数据变更",
-      value: newAlbums
+  // 每次增删改都立即写库：数据库一更新，公开站刷新就是新相册。
+  // 写失败时重新拉服务端数据，避免界面显示的和库里存的不一致。
+  const persistAlbums = (newAlbums: Album[]) => {
+    syncAlbums(newAlbums).then(result => {
+      if (result.ok) {
+        showToast("✅ 相册已保存，公开站实时生效", "success");
+        return;
+      }
+      showToast(`❌ 相册保存失败：${result.message}`, "error");
+      loadAlbums();
     });
-    showToast("📍 变更已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
   };
 
   // 🌟 所有变更统一走这里：用不可变更新写回 state，
@@ -78,7 +80,7 @@ export default function PhotoWallPage() {
   const commitAlbums = (next: Album[]) => {
     setEditableAlbums(next);
     setCurrentAlbum(prev => (prev ? next.find(album => album.id === prev.id) || null : null));
-    syncToQueue(next);
+    persistAlbums(next);
   };
 
   const { matchedAlbums, matchedPhotos } = useMemo(() => {
@@ -165,7 +167,7 @@ export default function PhotoWallPage() {
                   }
                   commitAlbums(next);
                   setAlbumModal({ ...albumModal, isOpen: false });
-                }} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 加入暂存</button>
+                }} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 保存相册</button>
               </div>
             </motion.div>
           </div>
@@ -203,7 +205,7 @@ export default function PhotoWallPage() {
                   });
                   commitAlbums(next);
                   setPhotoModal({ ...photoModal, isOpen: false });
-                }} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 加入暂存</button>
+                }} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 保存相册</button>
               </div>
             </motion.div>
           </div>

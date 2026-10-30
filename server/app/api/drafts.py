@@ -152,6 +152,7 @@ def publish_draft(payload: Dict[str, Any] = Body(...), db: Session = Depends(get
         operations = [{"type": "publish_article", "value": payload}]
 
     results = []
+    published_ids = []
     for operation in operations:
         if operation.get("type") not in ("publish_article", "publish"):
             continue
@@ -189,6 +190,13 @@ def publish_draft(payload: Dict[str, Any] = Body(...), db: Session = Depends(get
         if draft:
             db.delete(draft)
         results.append(f"✅ 已发布: {row.title or doc_id}")
+        published_ids.append(doc_id)
 
     db.commit()
-    return {"success": True, "message": "\n".join(results) or "没有需要发布的内容"}
+    return {
+        "success": True,
+        "message": "\n".join(results) or "没有需要发布的内容",
+        # 控制台拿到真实 id 后再保存就不会重复建文档
+        "id": published_ids[0] if published_ids else None,
+        "ids": published_ids,
+    }

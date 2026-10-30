@@ -5,11 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import type { Project } from '../../lib/contentApi';
 import { Plus, Trash2, AlertTriangle, Save, Edit3, Sparkles, Code2 } from 'lucide-react';
-import { useOperations } from '../../context/OperationContext';
+import { syncProjects } from '../../lib/contentMutations';
 import { useToast } from '../../components/ToastProvider';
 
 export default function ProjectsBoard() {
-  const { addOperation } = useOperations();
   const { showToast } = useToast();
 
   // 1. 核心状态
@@ -52,15 +51,20 @@ export default function ProjectsBoard() {
     );
   }, [searchQuery, editableProjects]);
 
-  // --- 核心逻辑：加入暂存队列 ---
-  const syncToQueue = (nextList: Project[]) => {
-    addOperation({
-      id: `sync_projects_${Date.now()}`,
-      type: "sync_projects",
-      label: "同步项目矩阵变更",
-      value: nextList
+  // 每次增删改都立即写库：数据库一更新，公开站刷新就是新项目矩阵。
+  // 写失败时把界面拉回服务端的真实数据，避免看起来保存成功、其实没落库。
+  const persistProjects = (nextList: Project[]) => {
+    syncProjects(nextList).then(result => {
+      if (result.ok) {
+        showToast("✅ 项目矩阵已保存，公开站实时生效", "success");
+        return;
+      }
+      showToast(`❌ 项目保存失败：${result.message}`, "error");
+      fetch('/api/proxy/api/projects/list', { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => { if (data?.success && Array.isArray(data.projects)) setEditableProjects(data.projects as Project[]); })
+        .catch(() => {});
     });
-    showToast("📍 变更已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
   };
 
   const handleSaveProject = () => {
@@ -85,7 +89,7 @@ export default function ProjectsBoard() {
       next = editableProjects.map(p => p.id === data.id ? { ...p, ...data } as Project : p);
     }
     setEditableProjects(next);
-    syncToQueue(next);
+    persistProjects(next);
     setProjectModal({ isOpen: false, mode: 'add', data: {} });
   };
 
@@ -93,7 +97,7 @@ export default function ProjectsBoard() {
     if (!deleteModal.id) return;
     const next = editableProjects.filter(p => p.id !== deleteModal.id);
     setEditableProjects(next);
-    syncToQueue(next);
+    persistProjects(next);
     setDeleteModal({ isOpen: false, id: null, name: null });
   };
 
@@ -143,7 +147,7 @@ export default function ProjectsBoard() {
                </div>
                <div className="mt-8 flex gap-3">
                  <button onClick={() => setProjectModal({ ...projectModal, isOpen: false })} className="flex-1 py-3 text-slate-500 font-bold uppercase text-xs">取消</button>
-                 <button onClick={handleSaveProject} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2"><Save size={18} /> 加入暂存</button>
+                 <button onClick={handleSaveProject} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2"><Save size={18} /> 保存项目</button>
                </div>
             </motion.div>
           </div>

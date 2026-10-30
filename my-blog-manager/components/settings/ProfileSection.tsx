@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 // 🌟 引入本机图片工具组件 (可从本机直接上传图片)
 import FloatingImageTool from '../editor/FloatingImageTool';
 
-export default function ProfileSection({ formData, handleUpdate, pushToQueue }: any) {
+export default function ProfileSection({ formData, handleUpdate, saveConfig }: any) {
   // 🌟 终极防崩溃兜底
   const safeData = formData || {};
   const safeSocial = safeData.social || {};
@@ -39,7 +39,7 @@ export default function ProfileSection({ formData, handleUpdate, pushToQueue }: 
 
   // 🌟🌟🌟 核心破局点：化繁为简！
   const handleSaveAll = () => {
-    pushToQueue('全量更新个人名片');
+    saveConfig('全量更新个人名片');
   };
 
   return (
@@ -162,7 +162,7 @@ export default function ProfileSection({ formData, handleUpdate, pushToQueue }: 
             </div>
 
             <button onClick={handleSaveAll} className="px-10 py-3 bg-indigo-500 text-white rounded-2xl text-sm font-black shadow-xl hover:bg-indigo-600 transition-all active:scale-95 w-full md:w-auto">
-              暂存修改至操作队列
+              保存名片设置
             </button>
           </div>
         </div>

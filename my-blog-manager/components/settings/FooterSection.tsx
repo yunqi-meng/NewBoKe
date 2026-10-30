@@ -6,10 +6,10 @@ import { useToast } from '../ToastProvider';
 interface FooterSectionProps {
   formData: any;
   handleUpdate: (field: string, value: any) => void;
-  pushToQueue: (label: string, key?: string, value?: any) => void;
+  saveConfig: (label: string) => void;
 }
 
-export default function FooterSection({ formData, handleUpdate, pushToQueue }: FooterSectionProps) {
+export default function FooterSection({ formData, handleUpdate, saveConfig }: FooterSectionProps) {
   const { showToast } = useToast();
 
   // 1. 初始化数据，如果 formData 还没加载到，提供默认回退
@@ -22,11 +22,7 @@ export default function FooterSection({ formData, handleUpdate, pushToQueue }: F
   const [newBadgeColor, setNewBadgeColor] = useState("text-indigo-500");
 
   const saveToQueue = () => {
-    pushToQueue('首页底部配置', 'footerConfig', {
-      buildDate,
-      icpConfig,
-      footerBadges
-    });
+    saveConfig('首页底部配置');
   };
 
   const handleAddBadge = () => {

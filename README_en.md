@@ -8,9 +8,10 @@
 - **Content no longer scattered across files**: articles, talks, moments, albums, friend links, projects, the about
   page and the site config all live in the database. The public site reads it at request time, so a refresh shows the
   latest; the console shows exactly what it just wrote.
-- **Publish = export a snapshot and commit it**: the database is the single source of truth, and Git stores *content
-  snapshots* (`snapshots/content-*.json`). One click on **Publish** exports the current content as JSON and commits
-  it - a traceable, rollback-able version.
+- **Saves apply instantly; pushing keeps the version**: the database is the single source of truth, and every save in
+  the console is written to it immediately, so the public site shows it on refresh. Git stores *content snapshots*
+  (`snapshots/content-*.json`). One click on **Push to GitHub** exports the current content as JSON, commits it to the
+  server repository and pushes it to GitHub - a traceable, rollback-able version.
 - **Rollback = load a historical snapshot back into the database**: pick any step in the publish history and the
   content is back to that state. A rollback is a new commit too, so the history never breaks and you can keep
   stepping backwards.
@@ -204,7 +205,7 @@ The updater preserves personal configuration, posts, the daily quote content, im
 
 This is a personal blog system built with Next.js, featuring a Glassmorphism design. This project includes a frontend display and an admin console, both talking to one shared backend and one shared database. It supports Markdown writing, draft management, and image hosting configuration.
 
-**The recommended deployment now is to run the public site and the console on your own Linux server** (systemd supervises the public site, the console frontend and the unified backend; Git keeps every revision). After editing in the console, one click on **Publish** exports the current content as a snapshot and commits it, so your changes show up online and can be rolled back later.
+**The recommended deployment now is to run the public site and the console on your own Linux server** (systemd supervises the public site, the console frontend and the unified backend; Git keeps every revision). Content changes apply as soon as you save. One click on **Push to GitHub** exports the current content as a snapshot, commits it to the server repository and pushes it to GitHub, so you keep a version that can be rolled back.
 
 This guide walks you through the server deployment and the day-to-day use of the console.
 
@@ -253,9 +254,10 @@ the "I changed it in the console but the site did not move" class of bugs is gon
 - **Content no longer scattered across files**: articles, talks, moments, albums, friend links, projects, the about
   page and the site config all live in the database. The public site reads it at request time, so a refresh shows the
   latest; the console shows exactly what it just wrote.
-- **Publish = export a snapshot and commit it**: the database is the single source of truth, and Git stores *content
-  snapshots* (`snapshots/content-*.json`). One click on **Publish** exports the current content as JSON and commits
-  it - a traceable, rollback-able version.
+- **Saves apply instantly; pushing keeps the version**: the database is the single source of truth, and every save in
+  the console is written to it immediately, so the public site shows it on refresh. Git stores *content snapshots*
+  (`snapshots/content-*.json`). One click on **Push to GitHub** exports the current content as JSON, commits it to the
+  server repository and pushes it to GitHub - a traceable, rollback-able version.
 - **Rollback = load a historical snapshot back into the database**: pick any step in the publish history and the
   content is back to that state. A rollback is a new commit too, so the history never breaks.
 - **Images, music, the daily quote and comments are unified too**: uploaded images live in the backend's data
@@ -357,11 +359,12 @@ cd ../server && python3.11 -m venv .venv
 > The import overwrites, and the script prints how many records of each kind were imported.
 
 > **Off-site backup**: the working tree also carries a `github` remote pointing at your own
-> backup repository (this project uses `yunqi-meng/NewBoKe`). Every publish pushes the same
-> commit there as well, so the live content is not only kept on the server but also archived
-> on GitHub. The backup authenticates with a repository-scoped SSH deploy key; the private key
-> stays in `/home/xhblogs/.ssh/` on the server and is never committed, scripted or documented.
-> A failing backup is only recorded in `/var/log/xhblogs-publish.log` and never blocks a publish.
+> backup repository (this project uses `yunqi-meng/NewBoKe`). Every push sends the same commit
+> there as well, so the live content is not only kept on the server but also archived on
+> GitHub. The push authenticates with a repository-scoped SSH deploy key; the private key stays
+> in `/home/xhblogs/.ssh/` on the server and is never committed, scripted or documented. A
+> failing GitHub push is recorded in the push status and the log, and never affects content
+> that is already live.
 
 ### 3. Register the systemd services
 
@@ -561,8 +564,9 @@ cd server
 .venv\Scripts\python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The local machine has no publish helper (`/usr/local/bin/xhblogs-publish` only exists on the server), so clicking
-**Publish** only exports the current content into `snapshots/`; building and deploying is up to you.
+The local machine has no publish helper (`/usr/local/bin/xhblogs-publish` only exists on the server), so saving still
+writes to the local database and **Push to GitHub** only exports the current content into `snapshots/`; committing
+and deploying is up to you.
 
 ### 8. Working together with the server
 
@@ -672,41 +676,37 @@ The smoke test goes through the main read and write endpoints and cleans up its 
 
 ---
 
-## II. Update Settings and Publish
+## II. Editing Content and Pushing to the GitHub Repository
 
-To protect data safety, this console uses an **"Operation Staging Area"** mechanism. **Please pay special attention!** Many settings must be actively published after modification to be truly written back and live. When this operation is required, there is usually a highlighted prompt at the top of the interface.
+The console no longer has an operation staging area: articles, moments, albums, friend links, projects and the site
+config are written to the database the moment you press **Save**, and a refresh of the public site shows them right
+away - no publish step in between.
 
-**Operation Example: Modifying Personal Profile**
+> If a save fails, the console tells you why on the spot and reloads the list from the server, so it never shows
+> "saved" for data that did not land in the database.
 
-![修改简介](picture/Pasted%20image%2020260427125314.png)
+**Pushing to the GitHub repository**
 
-After modifying the content, click **[Stage to Operation Queue]**:
+Content does not need a push to be live. The 📤 button in the top-right corner (and **Settings → Push to GitHub**)
+exports the current content as a snapshot, commits it to the server repository and pushes it to the GitHub
+repository, leaving a traceable, rollback-able version. Once confirmed, it does the following:
 
-![暂存队列](picture/Pasted%20image%2020260427125430.png)
-
-At this point, the top toolbox will prompt pending operations. You can undo at any time (clear all), then click **[🚀 Publish]** in the operation box at the top right (or the same button under **Settings → Publish**).
-
-> ⚠️ Note: the write-back happens as the first step of the publish. If it fails, the publish stops right there and tells you why — a half-written set of changes never ships.
-
-After you confirm, the system does four things on its own:
-
-1. **Write back to the database** — every staged change (albums / friend links / projects / site config / moments / articles) is written into the unified backend's database;
-2. **Export a content snapshot** — the current content of the database is exported as one JSON file (`snapshots/content-<timestamp>.json`);
-3. **Commit the repository** — the snapshot is committed in the server working tree, pushed to the bare repository and backed up to GitHub;
+1. **Export a content snapshot** — the whole content of the database becomes one JSON file (`snapshots/content-<timestamp>.json`);
+2. **Commit and push the server repository** — the snapshot is committed in the server working tree and pushed to the bare repository;
+3. **Push to the GitHub repository** — the same commit is pushed to the `github` remote; the outcome (pushed / failed / remote not configured) shows up in the push status, and a GitHub failure never affects content that is already live;
 4. **Rebuild only when the code changed** — changed public site code rebuilds the public site, changed console code rebuilds the console, changed backend code restarts the backend. A content-only change skips this step entirely.
 
-> **🌟 Content changes take effect immediately**: the public site reads the database at request time, so the front end
-> is already new the moment you press **Save** in the console - there is nothing to wait for. **Publish** is what
-> leaves a traceable, rollback-able version of your content.
+> **🌟 A push keeps a version, it never overwrites content**: it commits a snapshot of the current content and does
+> not roll anything back. The content has been live since you saved it.
 
-The whole cycle usually takes a few seconds. Build logs land in `/var/log/xhblogs-publish.log`.
+The whole cycle usually takes a few seconds. Push logs land in `/var/log/xhblogs-publish.log`.
 
 > If you edited the sources directly on the server, `sudo /usr/local/bin/xhblogs-deploy` pulls the latest code and
 > rebuilds according to the changed paths; `sudo /usr/local/bin/xhblogs-rebuild` rebuilds just the public site.
 
-The publishing and modification of all content, such as blog posts, moments, and talks, follow this process.
+Editing and publishing blog posts, moments, chatter and every other kind of content all follow this flow.
 
-> **💡 Golden Rule**: Staging Queue -> 🚀 Publish
+> **💡 Golden Rule**: Save is live, push keeps the version.
 
 ### What a content snapshot looks like
 
@@ -735,10 +735,10 @@ snapshot - they are visitor data, so back up the database file separately):
 }
 ```
 
-### Publish history and rollback
+### Push history and rollback
 
-The "4. 发布历史与回退" card under **Settings → Publish** lists the last 20 steps with commit id, subject and time;
-publishes are `chore(publish)` and rollbacks are `chore(rollback)`, so the two are easy to tell apart.
+The "4. Push History & Rollback" card under **Settings → Push to GitHub** lists the last 20 steps with commit id,
+subject and time; pushes are `chore(publish)` and rollbacks are `chore(rollback)`, so the two are easy to tell apart.
 
 Clicking **"回退到这里"** on any step loads the snapshot from that commit back into the database, so articles,
 moments, album / friend / project data, the about page, the site config, local music and the image metadata are back
@@ -752,10 +752,11 @@ itself is untouched. Rollback logs land in `/var/log/xhblogs-publish.log` as wel
 
 ### Online status panel
 
-**Settings → Publish** shows the live state of the public site in real time: whether the service is running, the time
-and build id of the last build, the newest commit in the source repository and the outcome of the previous publish.
-Content changes need no rebuild, so what decides whether a change is live is the **effective timestamp** in the
-publish status, not the build time.
+**Settings → Push to GitHub** shows the live state of the public site in real time: whether the service is running,
+the time and build id of the last build, the newest commit in the source repository, the outcome of the previous
+push (including whether it reached GitHub) and whether a change has been pushed yet. Content changes need no
+rebuild, so what decides whether a change is live is the **effective timestamp** in the push status, not the build
+time.
 
 > **Why "Sync Blog" used to change nothing online**: the public site is `next start` serving a prebuilt output, so
 > edits to files such as `siteConfig.ts` only reach the site after a `build` and a service restart. Now the site reads

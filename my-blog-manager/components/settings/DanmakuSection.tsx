@@ -6,10 +6,10 @@ import { useToast } from '../ToastProvider';
 interface DanmakuSectionProps {
   formData: any;
   handleUpdate: (field: string, value: any) => void;
-  pushToQueue: (label: string, key?: string, value?: any) => void;
+  saveConfig: (label: string) => void;
 }
 
-export default function DanmakuSection({ formData, handleUpdate, pushToQueue }: DanmakuSectionProps) {
+export default function DanmakuSection({ formData, handleUpdate, saveConfig }: DanmakuSectionProps) {
   const [newDanmaku, setNewDanmaku] = useState('');
   const { showToast } = useToast();
 
@@ -43,7 +43,7 @@ export default function DanmakuSection({ formData, handleUpdate, pushToQueue }: 
   };
 
   const saveToQueue = () => {
-    pushToQueue('背景弹幕矩阵', 'danmakuList', danmakuList);
+    saveConfig('背景弹幕矩阵');
   };
 
   return (

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Save, Bot, Sparkles, Sliders, MessageSquareText, Cpu, Globe, Brain } from 'lucide-react';
 
-export default function AICatSection({ formData, handleUpdate, pushToQueue }: any) {
+export default function AICatSection({ formData, handleUpdate, saveConfig }: any) {
   // 防止 undefined
   const config = formData.aiConfig || {
     modelId: 'deepseek-flash',
@@ -58,10 +58,10 @@ export default function AICatSection({ formData, handleUpdate, pushToQueue }: an
           </p>
         </div>
         <button
-          onClick={() => pushToQueue('AI 小猫配置')}
+          onClick={() => saveConfig('AI 小猫配置')}
           className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white font-black rounded-2xl shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2 text-sm"
         >
-          <Save size={16} /> 暂存至队列
+          <Save size={16} /> 保存小猫配置
         </button>
       </div>
 

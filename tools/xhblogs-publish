@@ -11,7 +11,7 @@
 #   1. 先与仓库最新版本合并（开发机也会推代码，不合并会被非快进拒绝）
 #   2. 提交本次内容快照（snapshots/ 下的 JSON）
 #   3. 推送回服务器上的裸仓库，保持源码仓库与线上同步
-#   4. 备份到 GitHub 仓库（异地存档，失败不影响发布）
+#   4. 推送到 GitHub 仓库（控制台按钮的最终目的地；结果写进发布状态）
 #   5. 按需重建：只有代码变了才重建前端 / 重启后端，内容变了不用动
 #
 # 用法：xhblogs-publish [仓库路径] [publish|rollback]
@@ -97,6 +97,7 @@ JSON
 }
 
 START_TS=$(date +%s)
+GITHUB_STATE="none"
 
 # --------------------------------------------------------------------------
 # 并发保护：同一时刻只允许一个发布助手在跑
@@ -207,13 +208,19 @@ if [ "$PUSH_OK" != "1" ]; then
   exit 1
 fi
 
-# 4. 备份到 GitHub（异地存档，失败不影响本次发布）
+# 4. 推送到 GitHub 仓库（控制台「推送到 GitHub 仓库」按钮的最终目的地）
+#    服务端仓库已经推成功，这里失败不影响内容在线，但要在状态里如实告诉控制台。
 if as_app_user git -C "$REPO" remote get-url github >/dev/null 2>&1; then
   if as_app_user git -C "$REPO" push github HEAD:main >> "$LOG" 2>&1; then
-    log "已备份到 GitHub"
+    GITHUB_STATE="pushed"
+    log "已推送到 GitHub 仓库"
   else
-    log "GitHub 备份失败（不影响本次发布）"
+    GITHUB_STATE="failed"
+    log "GitHub 推送失败（内容已在线、服务器仓库已同步）"
   fi
+else
+  GITHUB_STATE="none"
+  log "仓库未配置 github 远端，跳过 GitHub 推送"
 fi
 
 # 5. 按需重建
@@ -306,11 +313,20 @@ if [ -f "$BLOG_DIR/.next/BUILD_ID" ]; then
 fi
 
 EFFECTIVE_TS=$(date +%s)
+
+# 结尾文案按 GitHub 推送结果区分：按钮叫「推送到 GitHub」，
+# 就得如实说明 GitHub 这一步到底成没成。
+case "$GITHUB_STATE" in
+  pushed) PUSH_TEXT="已推送到 GitHub 仓库" ;;
+  failed) PUSH_TEXT="服务器仓库已同步，但 GitHub 推送失败，请查看 $LOG" ;;
+  *)      PUSH_TEXT="已同步服务器仓库（仓库未配置 github 远端）" ;;
+esac
+
 if [ "$SITE_CODE_CHANGED" = "1" ]; then
-  log "发布完成（已重新构建），构建号 $BUILD_ID"
-  write_status done "已发布并完成构建，构建号 ${BUILD_ID:-未知}" "$START_TS" "$EFFECTIVE_TS"
+  log "推送完成（已重新构建），构建号 $BUILD_ID；github=$GITHUB_STATE"
+  write_status done "$PUSH_TEXT；已重新构建，构建号 ${BUILD_ID:-未知}" "$START_TS" "$EFFECTIVE_TS" "$GITHUB_STATE"
 else
-  log "发布完成（仅内容改动，无需重新构建，站点已实时生效）"
-  write_status done "已发布，内容实时生效（本次无需重新构建站点）" "$START_TS" "$EFFECTIVE_TS"
+  log "推送完成（仅内容改动，无需重新构建，站点已实时生效）；github=$GITHUB_STATE"
+  write_status done "$PUSH_TEXT；内容实时生效（本次无需重新构建站点）" "$START_TS" "$EFFECTIVE_TS" "$GITHUB_STATE"
 fi
 exit 0

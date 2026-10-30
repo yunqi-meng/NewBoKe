@@ -2,11 +2,12 @@
 
 import { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost, Plus, Image as ImageIcon, X, Send, Link as LinkIcon, Zap, Trash2, AlertTriangle } from 'lucide-react';
+import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost, Plus, Image as ImageIcon, X, Link as LinkIcon, Zap, Trash2, AlertTriangle } from 'lucide-react';
 import MomentComments from '../../components/MomentComments';
 import { useToast } from '../../components/ToastProvider';
 import { uploadLocalImage } from '../../lib/media';
-import { useOperations } from '../../context/OperationContext';
+import { createMoment } from '../../lib/contentMutations';
+import { useRouter } from 'next/navigation';
 
 function timeAgo(dateStr: string) {
   const date = new Date(dateStr);
@@ -25,7 +26,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
   const [lightbox, setLightbox] = useState<{ images: string[], index: number } | null>(null);
 
   const { showToast } = useToast();
-  const { operations, addOperation, removeOperation } = useOperations();
+  const router = useRouter();
 
   const [isPublishOpen, setIsPublishOpen] = useState(false);
   const [newMoment, setNewMoment] = useState({ content: '', location: '', images: [] as string[] });
@@ -39,18 +40,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const processedMoments = useMemo(() => {
-    const baseMoments = moments ? [...moments] : [];
-
-    // 拦截并在顶层混合暂缓队列的数据
-    const pendingMoments = operations
-      .filter(op => op.type === 'create_moment')
-      .map(op => ({
-        ...op.payload,
-        opId: op.id,
-        isPending: true
-      }));
-
-    let result = [...pendingMoments, ...baseMoments];
+    let result = moments ? [...moments] : [];
 
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
@@ -66,7 +56,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
       return sortOrder === 'desc' ? timeB - timeA : timeA - timeB;
     });
     return result;
-  }, [moments, searchQuery, sortOrder, operations]);
+  }, [moments, searchQuery, sortOrder]);
 
   const nextImg = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -115,67 +105,32 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     }
   };
 
-  const handleQueueMoment = () => {
+  // 发布即写库：说说进数据库那一刻，公开站刷新就能看到，不存在「待写回」的中间状态。
+  const handlePublish = async () => {
     if (!newMoment.content.trim()) {
-      showToast("内容不能为空哦！", "warning");
-      return;
-    }
-    const payload = {
-      id: `moment-${Date.now()}`,
-      date: new Date().toISOString(),
-      content: newMoment.content,
-      location: newMoment.location,
-      images: newMoment.images
-    };
-    addOperation({
-      id: `op-moment-${Date.now()}`,
-      type: 'create_moment',
-      label: `[发布说说] ${newMoment.content.slice(0, 12)}...`,
-      payload: payload,
-      timestamp: new Date().toLocaleString()
-    });
-    showToast("✅ 队列保存成功！\n点右上角「🚀 发布上线」即可写回并上线", "success");
-    setIsPublishOpen(false);
-    setNewMoment({ content: '', location: '', images: [] });
-  };
-
-  const handleDirectPublish = async () => {
-    if (!newMoment.content.trim()) {
-      showToast("说说内容不能为空！", "error");
+      showToast("说说内容不能为空！", "warning");
       return;
     }
     setIsSubmitting(true);
-    showToast("🚀 正在强行直连 Python 引擎...", "info");
 
     try {
-      const payload = {
+      const result = await createMoment({
         id: `moment-${Date.now()}`,
         date: new Date().toISOString(),
         content: newMoment.content,
         location: newMoment.location,
         images: newMoment.images
-      };
-      const apiUrl = `/api/proxy/api/moments`;
-
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error(`后端返回 HTTP 状态码: ${res.status}`);
-
-      const data = await res.json();
-      if (data.success) {
-        showToast("🎉 发布成功！正在刷新...", "success");
-        setIsPublishOpen(false);
-        setNewMoment({ content: '', location: '', images: [] });
-        setTimeout(() => window.location.reload(), 1000);
-      } else {
-        showToast(`⚠️ 后端拒绝了请求：${data.message}`, "error");
+      if (!result.ok) {
+        showToast(`❌ 发布失败：${result.message}`, "error");
+        return;
       }
-    } catch (error: any) {
-      showToast(`🚨 请求彻底断裂：${error.message}`, "error");
+
+      showToast("🎉 发布成功，公开站实时生效", "success");
+      setIsPublishOpen(false);
+      setNewMoment({ content: '', location: '', images: [] });
+      router.refresh();
     } finally {
       setIsSubmitting(false);
     }
@@ -195,7 +150,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
       const data = await res.json();
       if (data.success) {
         showToast("🗑️ 说说已彻底删除", "success");
-        setTimeout(() => window.location.reload(), 1000);
+        router.refresh();
       } else {
         showToast(`删除失败: ${data.message}`, "error");
       }
@@ -208,12 +163,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
   };
 
   const handleDeleteClick = (moment: any) => {
-    if (moment.isPending) {
-      removeOperation(moment.opId);
-      showToast("已撤销暂缓的说说", "success");
-    } else {
-      setDeleteConfirmId(moment.id);
-    }
+    setDeleteConfirmId(moment.id);
   };
 
   const renderImages = (images: string[]) => {
@@ -265,22 +215,15 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
       transition={{ duration: 0.4, type: 'spring', stiffness: 100 }}
       className="flex flex-col bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl rounded-[40px] shadow-xl border border-white/40 dark:border-white/10 p-8 md:p-10 transition-shadow hover:shadow-2xl overflow-hidden relative group w-full"
     >
-      {/* 霓虹队列状态提示 */}
-      {moment.isPending && (
-        <div className="absolute top-0 left-0 w-full bg-amber-500/10 text-amber-600 dark:text-amber-400 py-1.5 flex justify-center items-center gap-2 text-[10px] font-black tracking-widest uppercase border-b border-amber-500/20 backdrop-blur-md z-10">
-          <Clock size={12} className="animate-pulse" /> 等待更新至本地
-        </div>
-      )}
-
       {/* 悬浮删除按钮 */}
       <button
         onClick={() => handleDeleteClick(moment)}
-        className={`absolute ${moment.isPending ? 'top-10' : 'top-6'} right-6 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm z-10`}
+        className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm z-10"
       >
         <Trash2 size={14} />
       </button>
 
-      <div className={`flex items-center gap-4 mb-8 pb-6 border-b border-slate-200/50 dark:border-slate-700/50 relative ${moment.isPending ? 'mt-4' : ''}`}>
+      <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-200/50 dark:border-slate-700/50 relative">
         <div className="w-14 h-14 shrink-0 rounded-2xl overflow-hidden shadow-md border-2 border-white dark:border-slate-700">
           <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
         </div>
@@ -491,15 +434,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
                 </button>
 
                 <button
-                  onClick={handleQueueMoment}
-                  disabled={isUploading || isSubmitting}
-                  className="flex-[1.5] py-4 px-2 rounded-2xl bg-slate-800 text-white font-black uppercase tracking-[0.1em] text-xs shadow-lg hover:bg-slate-900 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                >
-                  <Send size={16} /> 加入队列
-                </button>
-
-                <button
-                  onClick={handleDirectPublish}
+                  onClick={handlePublish}
                   disabled={isUploading || isSubmitting}
                   className="flex-[2] py-4 px-2 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black uppercase tracking-[0.2em] text-[13px] shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 hover:scale-[1.02] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                 >

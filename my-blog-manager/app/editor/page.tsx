@@ -9,7 +9,7 @@ import FloatingImageTool from '../../components/editor/FloatingImageTool';
 import PageTransition from '../../components/PageTransition';
 import { ArrowLeft, AlertTriangle, Save, LogOut } from 'lucide-react';
 import { useToast } from '../../components/ToastProvider';
-import { useOperations } from '../../context/OperationContext';
+import { publishArticle, saveDraft } from '../../lib/contentMutations';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // 🌟 核心修改 1：把原本暴露的主函数改名为 EditorContent（不带 export default）
@@ -17,7 +17,6 @@ function EditorContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { showToast } = useToast();
-  const { addOperation } = useOperations();
 
   const [docType, setDocType] = useState<string>(searchParams.get('type') || 'post');
   // 新建草稿第一次保存后，后端会分配一个真实 id。用 ref 记住它，
@@ -134,37 +133,29 @@ function EditorContent() {
       published: isPublish
     };
 
-    if (isPublish) {
-      addOperation({
-        id: `publish_${Date.now()}`,
-        type: "publish_article",
-        label: `发布: ${title || '无标题'}`,
-        value: payload
-      });
-      setHasUnsavedChanges(false);
-      showToast("🚀 已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
-      if (shouldExitAfterSave) router.back();
-      return;
-    }
-
+    // 保存即生效：存草稿只进草稿箱，正式发布直接写进文章表，公开站刷新就能看到。
+    // 不再攒「待处理操作」，也就不存在忘了点发布导致改动一直不上线的情况。
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/proxy/api/drafts/save`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (data.id) docIdRef.current = data.id;
-        setLastSaved(new Date().toLocaleTimeString());
-        setHasUnsavedChanges(false);
-        showToast("💾 草稿已落盘", "success");
-        if (shouldExitAfterSave) {
-          setExitModalOpen(false);
-          router.back();
-        }
+      const result = isPublish ? await publishArticle(payload) : await saveDraft(payload);
+      if (!result.ok) {
+        showToast(`❌ ${isPublish ? '发布' : '保存'}失败：${result.message}`, 'error');
+        return;
       }
-    } catch { showToast("❌ 保存失败", "error"); }
-    finally { setIsSaving(false); }
+
+      const nextId = result.data?.id;
+      if (typeof nextId === 'string' && nextId) docIdRef.current = nextId;
+      setLastSaved(new Date().toLocaleTimeString());
+      setHasUnsavedChanges(false);
+      showToast(isPublish ? '🚀 已发布，公开站实时生效' : '💾 草稿已落盘', 'success');
+
+      if (shouldExitAfterSave) {
+        setExitModalOpen(false);
+        router.back();
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

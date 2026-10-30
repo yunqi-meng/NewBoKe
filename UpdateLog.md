@@ -1,3 +1,13 @@
+## 0.5.3 - 2026-10-30
+
+- **控制台取消「暂存 + 统一发布」的审批队列**：删掉 `context/OperationContext.tsx` 与 `lib/pendingOperations.ts`，导航栏里的待办操作箱、待处理数量角标、各页面的「加入队列 / 暂存到操作队列」一并移除。此前改一项设置要先入队、再点发布才会写库，现在没有中间态——保存就是写库。
+- **所有写操作即时落库**：新增 `lib/contentMutations.ts` 作为唯一写入口（`publishArticle` / `saveDraft` / `createMoment` / `syncAlbums` / `syncFriends` / `syncProjects` / `saveSiteConfig` / `pushToGitHub`），页面直接拿到 `{ ok, message }` 并通过 Toast 告知真实结果，失败时把错误原因原样显示，不再出现「队列里成功、发布时才发现失败」。相册 / 友链 / 项目 / 站点配置这类整表同步接口在客户端按频道串行排队，连点两次也不会后发先至覆盖前一次。公开站本来就在请求时读库，所以保存后刷新前台立刻可见。
+- **编辑器保存与发布直接生效**：`handleSave` 直接调用后端，发布后把后端返回的真实 id 写进 ref，连续保存草稿不会再多出记录；后端 `publish_draft` 补返回 `id` / `ids`，供控制台接着编辑同一篇。
+- **按钮改为「推送到 GitHub 仓库」**：导航栏图标按钮与「设置 → 推送到 GitHub」面板统一改名，弹窗说明「保存已实时生效，这里只把当前内容导成快照提交并推送」；推送成功只意味着版本留档，不会覆盖或回滚任何已保存内容。面板新增推送结果状态（已推送到 GitHub / GitHub 推送失败（见日志）/ 仓库未配置 github 远端），仓库是否配置 `github` 远端由 `/api/deploy/config` 与 `/api/deploy/status` 一并返回。
+- **发布助手把 GitHub 推送单独记账**：`tools/xhblogs-publish` 在提交服务器仓库后单独执行 `git push github HEAD:main`，结果写入状态文件的 `github` 字段；失败只记录、不改变「内容已生效」的事实，结尾文案按 `pushed / failed / none` 分别说明。回退同样会同步到 GitHub。
+- **文档同步**：中英文 README 的发布章节改写为「保存即生效，推送留版本」，去掉暂存区说明。
+- **验证**：控制台 `tsc --noEmit` 0 错误，`next build` 成功（exit 0）；后端冒烟测试 27 通过 / 0 失败；本地起后端 + 控制台 + 公开站实测：改个人简介保存后公开站首页立即出现新文案、改回后立即消失；发一条说说后公开站立刻可见、删除后立即消失；点「推送到 GitHub 仓库」后端返回 200 并生成 `content-*.json` 快照，本地无发布助手时如实提示「到服务器上点推送」；连续两次用同一个 id 保存草稿，草稿表始终只有 1 条；浏览器控制台无报错。
+
 ## 0.5.2 - 2026-10-30
 
 - **删掉一整批已经没人引用的文件**：公开站与控制台的 `WeatherEffect.tsx`、`WeatherWidget.tsx`（天气小组件早已下线）、公开站的 `GlobalSnow.tsx`（控制台那份仍在用，公开站没有任何地方挂载）、控制台 `lib/managerApi.ts`、根目录的 `update.py` / `update.bat`（旧 GitHub 拉取更新器，早已被服务器发布助手取代）与 `scripts/checkConfig.mjs`（带硬编码片段的配置自检脚本，会改文件且无调用方）。公开站的 `/api/weather`（依赖未配置的 `QWEATHER_KEY`）、`/api/test` 与控制台的空目录 `app/api/ping` 一并删除。仓库不再跟踪 `.idea/`，`__pycache__/` 也清掉了。

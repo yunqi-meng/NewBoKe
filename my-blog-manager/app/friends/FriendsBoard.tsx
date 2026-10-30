@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import BackButton from '../../components/BackButton';
 import type { Friend } from '../../lib/contentApi';
 import { Plus, Trash2, AlertTriangle, Save, Edit3, CloudUpload, Sparkles } from 'lucide-react';
-import { useOperations } from '../../context/OperationContext';
+import { syncFriends } from '../../lib/contentMutations';
 import { useToast } from '../../components/ToastProvider';
 import FloatingImageTool from '../../components/editor/FloatingImageTool';
 
@@ -24,7 +24,6 @@ const itemVariants = {
 };
 
 export default function FriendsBoard() {
-  const { addOperation } = useOperations();
   const { showToast } = useToast();
   // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
   const siteConfig = useSiteConfig();
@@ -66,14 +65,20 @@ export default function FriendsBoard() {
     setTimeout(() => setIsCopied(false), 2000);
   };
 
-  const syncToQueue = (nextList: Friend[]) => {
-    addOperation({
-      id: `sync_friends_${Date.now()}`,
-      type: "sync_friends",
-      label: "同步友链数据变更",
-      value: nextList
+  // 每次增删改都立即写库：数据库一更新，公开站刷新就是新友链。
+  // 写失败时把界面拉回服务端的真实数据，避免看起来保存成功、其实没落库。
+  const persistFriends = (nextList: Friend[]) => {
+    syncFriends(nextList).then(result => {
+      if (result.ok) {
+        showToast("✅ 友链已保存，公开站实时生效", "success");
+        return;
+      }
+      showToast(`❌ 友链保存失败：${result.message}`, "error");
+      fetch('/api/proxy/api/friends/list', { cache: 'no-store' })
+        .then(res => res.json())
+        .then(data => { if (data?.success && Array.isArray(data.friends)) setEditableFriends(data.friends as Friend[]); })
+        .catch(() => {});
     });
-    showToast("📍 变更已加入待处理队列，点右上角「🚀 发布上线」即可写回并上线", "info");
   };
 
   const handleSaveFriend = () => {
@@ -95,14 +100,14 @@ export default function FriendsBoard() {
       next = editableFriends.map(f => f.id === data.id ? { ...f, ...data } as Friend : f);
     }
     setEditableFriends(next);
-    syncToQueue(next);
+    persistFriends(next);
     setFriendModal({ isOpen: false, mode: 'add', data: {} });
   };
 
   const confirmDelete = () => {
     const next = editableFriends.filter(f => f.id !== deleteModal.id);
     setEditableFriends(next);
-    syncToQueue(next);
+    persistFriends(next);
     setDeleteModal({ isOpen: false, id: null, name: null });
   };
 
@@ -160,7 +165,7 @@ export default function FriendsBoard() {
                </div>
                <div className="mt-8 flex gap-3">
                  <button onClick={() => setFriendModal({ ...friendModal, isOpen: false })} className="flex-1 py-3 text-slate-500 font-bold hover:text-slate-800 dark:hover:text-white transition-colors">取消</button>
-                 <button onClick={handleSaveFriend} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 加入暂存</button>
+                 <button onClick={handleSaveFriend} className="flex-1 py-4 bg-indigo-500 text-white rounded-2xl font-black shadow-lg shadow-indigo-500/30 flex items-center justify-center gap-2 hover:bg-indigo-600 transition-colors"><Save size={18} /> 保存友链</button>
                </div>
             </motion.div>
           </div>

@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useToast } from '../ToastProvider';
-import { useOperations } from '../../context/OperationContext';
-import { flushPendingOperations } from '../../lib/pendingOperations';
+import { pushToGitHub } from '../../lib/contentMutations';
 import {
-  Rocket,
+  CloudUpload,
   Server,
   GitCommitHorizontal,
   Clock,
@@ -57,6 +56,7 @@ type PublishStatus = {
     message?: string;
     startedAtTimestamp?: number;
     updatedAt?: string;
+    github?: 'pushed' | 'failed' | 'none' | string;
   };
   effective: boolean;
 };
@@ -83,7 +83,6 @@ const STATE_TEXT: Record<string, string> = {
 
 export default function PublishSection() {
   const { showToast } = useToast();
-  const { operations, clearOperations } = useOperations();
   const [status, setStatus] = useState<PublishStatus>(EMPTY_STATUS);
   const [blogPath, setBlogPath] = useState('');
   const [pathInput, setPathInput] = useState('');
@@ -151,41 +150,23 @@ export default function PublishSection() {
     setIsSaving(false);
   };
 
-  const handlePublish = async () => {
+  const handlePush = async () => {
     setIsPublishing(true);
     try {
-      // 先把收件箱里攒着的改动写回引擎，再一起发布，博客随之更新
-      if (operations.length > 0) {
-        showToast(`🔍 正在写回 ${operations.length} 项改动…`, 'info');
-        const flushed = await flushPendingOperations(operations);
-        if (!flushed.ok) {
-          showToast(`❌ 写入本地失败，已中止发布：${flushed.message}`, 'error');
-          setIsPublishing(false);
-          return;
-        }
-      }
-
-      const res = await fetch('/api/proxy/api/deploy/publish', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blogPath: pathInput || blogPath }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        clearOperations();
-        showToast(data.message, 'success');
+      const result = await pushToGitHub(pathInput || blogPath);
+      if (result.ok) {
+        showToast(result.message, 'success');
         setTimeout(loadStatus, 1500);
-      } else if (data.busy) {
-        // 上一轮发布还没结束：这是排队提示，不是发布失败
-        showToast(data.message, 'info');
+      } else if (result.data?.busy) {
+        // 上一次推送/回退还没结束：这是排队提示，不是失败
+        showToast(result.message, 'info');
         setTimeout(loadStatus, 1500);
       } else {
-        showToast(`❌ 发布失败：${data.message}`, 'error');
+        showToast(`❌ 推送失败：${result.message}`, 'error');
       }
-    } catch {
-      showToast('发布失败：无法连接内容引擎', 'error');
+    } finally {
+      setIsPublishing(false);
     }
-    setIsPublishing(false);
   };
 
   const handleRollback = async (commit: PublishCommit) => {
@@ -230,7 +211,7 @@ export default function PublishSection() {
     >
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-xl font-black text-slate-800 dark:text-white flex items-center gap-2">
-          🚀 线上发布
+          📤 推送到 GitHub
         </h2>
         <button
           onClick={loadStatus}
@@ -263,7 +244,7 @@ export default function PublishSection() {
             </button>
           </div>
           <p className="mt-3 text-[11px] leading-6 text-slate-400">
-            发布时，控制台会把文章、说说、动态与站点配置镜像覆盖到该目录，再提交仓库并重建公开站。
+            推送时，控制台会把当前内容导成一份快照提交进该目录，再推送到服务器仓库与 GitHub 仓库；只有代码改动才会触发重建。
           </p>
         </div>
 
@@ -318,7 +299,7 @@ export default function PublishSection() {
               <div className="min-w-0">
                 <p className="text-[10px] font-black text-slate-400 uppercase">改动生效</p>
                 <p className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
-                  {status.effective ? '已同步到线上' : '有待发布的改动'}
+                  {status.effective ? '已生效并推送' : '有改动未推送'}
                 </p>
               </div>
             </div>
@@ -326,7 +307,7 @@ export default function PublishSection() {
 
           {status.git?.dirty && (
             <p className="mt-4 text-[11px] leading-6 text-amber-600 dark:text-amber-400">
-              源码仓库存在 {status.git.changedFiles?.length || 0} 处未提交改动，点击下方「发布上线」即可一并提交。
+              源码仓库存在 {status.git.changedFiles?.length || 0} 处未提交的代码改动。推送只提交内容快照，代码改动请在本机提交后再部署。
             </p>
           )}
 
@@ -345,39 +326,43 @@ export default function PublishSection() {
               {status.publish.updatedAt && (
                 <span className="ml-2 opacity-60">{status.publish.updatedAt}</span>
               )}
+              {status.publish.github === 'pushed' && (
+                <span className="ml-2 rounded-full bg-emerald-500/15 px-2 py-0.5 font-black text-emerald-600 dark:text-emerald-400">GitHub 已同步</span>
+              )}
+              {status.publish.github === 'failed' && (
+                <span className="ml-2 rounded-full bg-red-500/15 px-2 py-0.5 font-black text-red-600 dark:text-red-400">GitHub 推送失败，见日志</span>
+              )}
+              {status.publish.github === 'none' && (
+                <span className="ml-2 rounded-full bg-slate-500/15 px-2 py-0.5 font-black text-slate-500">仓库未配置 github 远端</span>
+              )}
             </div>
           )}
         </div>
 
-        {/* 3. 发布动作 */}
+        {/* 3. 推送动作 */}
         <div className="pt-2">
           <label className="mb-3 block text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase flex items-center gap-1">
-            <Rocket size={14} className="text-indigo-500" /> 3. 发布上线
+            <CloudUpload size={14} className="text-indigo-500" /> 3. 推送到 GitHub 仓库
           </label>
           <button
-            onClick={handlePublish}
+            onClick={handlePush}
             disabled={isPublishing || inFlight}
             className="w-full flex items-center justify-center gap-2 py-5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-3xl text-sm font-black shadow-xl shadow-indigo-500/30 active:scale-95 transition-all hover:shadow-2xl disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {isPublishing || inFlight ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                {inFlight ? '正在同步发布…' : '正在提交发布…'}
+                {inFlight ? '正在推送…' : '正在提交快照…'}
               </>
             ) : (
               <>
-                <Rocket size={18} />
-                发布上线
-                {operations.length > 0 && (
-                  <span className="rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-black">
-                    含 {operations.length} 项待写入
-                  </span>
-                )}
+                <CloudUpload size={18} />
+                推送到 GitHub 仓库
               </>
             )}
           </button>
           <p className="mt-3 text-center text-[11px] leading-6 text-slate-400">
-            一次点击完成：写回本地改动 → 镜像内容 → 提交源码仓库 → 同步到线上，内容改动刷新即生效。
+            内容保存即生效，这里只把最新内容快照提交并推送一次，不会覆盖或回滚已保存的内容。
           </p>
         </div>
 
@@ -385,7 +370,7 @@ export default function PublishSection() {
         <div className="bg-slate-50 dark:bg-slate-800/30 p-5 rounded-3xl border border-slate-100 dark:border-slate-700/50">
           <div className="mb-4 flex items-center justify-between">
             <label className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase flex items-center gap-1">
-              <History size={14} className="text-indigo-500" /> 4. 发布历史与回退
+              <History size={14} className="text-indigo-500" /> 4. 推送历史与回退
             </label>
             <button
               onClick={loadHistory}
@@ -396,7 +381,7 @@ export default function PublishSection() {
           </div>
 
           {history.length === 0 ? (
-            <p className="py-6 text-center text-xs text-slate-400">还没有发布记录</p>
+            <p className="py-6 text-center text-xs text-slate-400">还没有推送记录</p>
           ) : (
             <div className="flex flex-col gap-2 max-h-72 overflow-y-auto custom-scrollbar">
               {history.map(item => {
@@ -440,7 +425,7 @@ export default function PublishSection() {
             </div>
           )}
           <p className="mt-3 text-[11px] leading-6 text-slate-400">
-            每一次发布与回退都会留下一个提交。点「回退到这里」会用那一步的内容覆盖当前版本，并重新构建上线，历史不会丢失。
+            每一次推送与回退都会留下一个提交。点「回退到这里」会把内容恢复到那一步并同步到线上，历史不会丢失。
           </p>
         </div>
       </div>

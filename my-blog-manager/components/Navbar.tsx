@@ -4,10 +4,9 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useOperations } from '../context/OperationContext';
 import { useToast } from './ToastProvider';
-import { flushPendingOperations } from '../lib/pendingOperations';
-import { AlertTriangle, LogOut } from 'lucide-react';
+import { pushToGitHub } from '../lib/contentMutations';
+import { CloudUpload, Loader2, LogOut } from 'lucide-react';
 import { useSiteConfig } from './SiteConfigProvider';
 
 export default function Navbar({ previewOnly = false, compact = false }: { previewOnly?: boolean; compact?: boolean }) {
@@ -16,35 +15,13 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
 
   const [showNav, setShowNav] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
-  const [isOpBoxOpen, setIsOpBoxOpen] = useState(false);
   const [authOn, setAuthOn] = useState(false);
 
-  const [syncModalOpen, setSyncModalOpen] = useState(false);
-  const [targetBlogPath, setTargetBlogPath] = useState("");
+  const [pushModalOpen, setPushModalOpen] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
 
   const pathname = usePathname();
-  const { operations, removeOperation, clearOperations } = useOperations();
   const { showToast } = useToast();
-
-  useEffect(() => {
-    if (previewOnly) return;
-    const fetchPath = async () => {
-      try {
-        const res = await fetch(`/api/proxy/api/deploy/config`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.blogPath) {
-            setTargetBlogPath(data.blogPath);
-            localStorage.setItem('targetBlogPath', data.blogPath);
-          }
-        }
-      } catch {
-        const path = localStorage.getItem('targetBlogPath') || "";
-        setTargetBlogPath(path);
-      }
-    };
-    fetchPath();
-  }, [previewOnly]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -105,55 +82,21 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     window.location.href = '/login';
   };
 
-  // 🌟 发布流程：先把待处理操作写回引擎，再触发发布（镜像 → 提交 → 构建 → 重启）
-  const publishEverything = async () => {
-    if (operations.length === 0) {
-      showToast("没有待处理的改动，直接发布当前内容", "info");
-    } else {
-      showToast(`🔍 正在写回 ${operations.length} 项改动…`, "info");
-      const flushed = await flushPendingOperations(operations);
-      if (!flushed.ok) {
-        showToast(`❌ 写入本地失败，已中止发布：${flushed.message}`, "error");
-        return;
-      }
-    }
-
+  // 📤 推送流程：内容保存后已经在线上生效，这里只把当前内容导成快照，
+  // 提交并推送到 GitHub 仓库（服务器仓库同步保留），留一份可追溯、可回退的版本。
+  const executePush = async () => {
+    setIsPushing(true);
     try {
-      showToast("🚀 正在发布到公开站，请稍候...", "info");
-
-      const res = await fetch(`/api/proxy/api/deploy/publish`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blogPath: targetBlogPath })
-      });
-
-      const data = await res.json();
-      if (data.success) {
-        clearOperations();
-        showToast(data.message, "success");
-      } else if (data.busy) {
-        // 上一轮发布还没结束：这是排队提示，不是发布失败
-        showToast(data.message, "info");
+      const result = await pushToGitHub();
+      if (result.ok) {
+        showToast(result.message, "success");
+        setPushModalOpen(false);
       } else {
-        showToast(`❌ 发布失败: ${data.message}`, "error");
+        showToast(`❌ 推送失败：${result.message}`, "error");
       }
-    } catch {
-      showToast("无法连接到内容引擎进行发布", "error");
+    } finally {
+      setIsPushing(false);
     }
-  };
-
-  const handleSyncBlogClick = () => {
-    if (!targetBlogPath) {
-       const fallback = localStorage.getItem('targetBlogPath') || "";
-       setTargetBlogPath(fallback);
-    }
-    setIsOpBoxOpen(false);
-    setSyncModalOpen(true);
-  };
-
-  const executeSyncBlog = async () => {
-    setSyncModalOpen(false);
-    await publishEverything();
   };
 
   return (
@@ -179,54 +122,14 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
             </nav>
 
             <div className="relative">
-              <button disabled={previewOnly} title={previewOnly ? '预览副本未连接网站同步与发布' : '待处理操作'} onClick={() => setIsOpBoxOpen(!isOpBoxOpen)} className="relative w-10 h-10 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center text-lg hover:scale-105 transition-all border border-white/20 shadow-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-40">
-                📥
-                {operations.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] font-black text-white items-center justify-center border-2 border-white dark:border-slate-900">
-                      {operations.length}
-                    </span>
-                  </span>
-                )}
+              <button
+                disabled={previewOnly || isPushing}
+                title={previewOnly ? '预览副本未连接仓库推送' : '推送到 GitHub 仓库'}
+                onClick={() => setPushModalOpen(true)}
+                className="relative w-10 h-10 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center hover:scale-105 transition-all border border-white/20 shadow-sm cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {isPushing ? <Loader2 size={18} className="animate-spin text-indigo-500" /> : <CloudUpload size={18} className="text-slate-600 dark:text-slate-300" />}
               </button>
-
-              <AnimatePresence>
-                {isOpBoxOpen && (
-                  <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 10, scale: 0.95 }} className="absolute right-0 mt-3 w-80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-4 z-50 cursor-default">
-                    <div className="flex justify-between items-center mb-4">
-                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">待处理操作</h3>
-                      <button onClick={clearOperations} className="text-[10px] text-red-500 font-bold hover:underline">清空全部</button>
-                    </div>
-
-                    <div className="flex flex-col gap-2 max-h-64 overflow-y-auto mb-4 custom-scrollbar">
-                      {operations.length === 0 ? (
-                        <p className="text-center py-6 text-sm text-slate-400 font-medium">暂无积攒的操作</p>
-                      ) : (
-                        operations.map(op => (
-                          <div key={op.id} className="bg-white/50 dark:bg-slate-800/50 p-3 rounded-xl border border-slate-100 dark:border-slate-700 flex justify-between items-center group">
-                            <div className="flex flex-col">
-                              <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">{op.label}</span>
-                              <span className="text-[10px] text-slate-400">{op.timestamp}</span>
-                            </div>
-                            <button onClick={() => removeOperation(op.id)} className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all text-lg">✕</button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-
-                    <button
-                      onClick={handleSyncBlogClick}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-xs font-black shadow-lg shadow-indigo-500/30 hover:from-indigo-600 hover:to-purple-600 transition-all"
-                    >
-                      🚀 发布上线
-                    </button>
-                    <p className="mt-2 text-[10px] leading-5 text-slate-400 text-center">
-                      点一次即可：写回本地改动 → 同步到博客，内容立即生效。
-                    </p>
-                  </motion.div>
-                )}
-              </AnimatePresence>
             </div>
 
             <div className="flex items-center gap-2 ml-2 pl-6 border-l border-slate-300/50 dark:border-slate-600/50">
@@ -251,29 +154,27 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
       </header>
 
       <AnimatePresence>
-        {syncModalOpen && (
+        {pushModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSyncModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isPushing && setPushModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
             <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[40px] shadow-2xl border border-white/50 p-10 text-center">
-              <div className="w-16 h-16 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <AlertTriangle className="text-amber-500" size={32} />
+              <div className="w-16 h-16 bg-indigo-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                <CloudUpload className="text-indigo-500" size={32} />
               </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">发布上线</h3>
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">推送到 GitHub 仓库</h3>
               <p className="text-sm text-slate-500 mb-8 leading-relaxed text-balance">
-                确认把控制台的最新内容发布到公开站吗？<br />
-                <span className="font-bold text-amber-500 break-all">{targetBlogPath || '（未配置源码目录）'}</span>
-                {operations.length > 0 && (
-                  <span className="block mt-2">
-                    队列里的 <strong>{operations.length}</strong> 项改动会先写回本地，再一起发布。
-                  </span>
-                )}
-                <span className="text-xs opacity-80 text-red-400 font-bold mt-2 block">
-                  发布会覆盖站点源码目录，内容改动刷新页面即可见（涉及代码改动时才重建站点）。
+                控制台里的每一次保存都已经实时写进数据库，公开站刷新即可见。<br />
+                这里会把当前内容导成一份快照，提交到服务器仓库并推送到 GitHub 仓库。
+                <span className="text-xs opacity-80 text-slate-400 font-bold mt-3 block">
+                  推送只同步版本记录，不会覆盖或回滚任何已保存的内容；代码改动才需要重新构建。
                 </span>
               </p>
               <div className="flex gap-3">
-                <button onClick={() => setSyncModalOpen(false)} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase transition-colors hover:bg-slate-200 dark:hover:bg-slate-700">取消</button>
-                <button onClick={executeSyncBlog} className="flex-1 py-4 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-amber-500/30 transition-all">确认覆盖</button>
+                <button onClick={() => setPushModalOpen(false)} disabled={isPushing} className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase transition-colors hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-50">取消</button>
+                <button onClick={executePush} disabled={isPushing} className="flex-1 py-4 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase shadow-lg shadow-indigo-500/30 transition-all disabled:opacity-60 flex items-center justify-center gap-2">
+                  {isPushing && <Loader2 size={14} className="animate-spin" />}
+                  {isPushing ? '推送中…' : '确认推送'}
+                </button>
               </div>
             </motion.div>
           </div>
