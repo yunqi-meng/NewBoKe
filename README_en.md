@@ -302,7 +302,7 @@ A Linux server is recommended (CentOS / Alibaba Cloud Linux / Ubuntu all work). 
 - **npm**
 - **Git**
 - **Python** (3.10 or newer; tested under 3.11)
-- *Optional: a domain and Nginx (for HTTPS and a custom domain)*
+- **Nginx** (public entry point: `/` for the public site, `/console` for the console — see section 5)
 
 ### 2. Directory and Repository
 
@@ -412,7 +412,8 @@ WorkingDirectory=/opt/xinghui-blog/my-blog-manager/.next/standalone
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
 Environment=PORT=3001
-Environment=HOSTNAME=0.0.0.0
+Environment=HOSTNAME=127.0.0.1
+Environment=NEXT_PUBLIC_CONSOLE_BASE_PATH=/console
 Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
 Environment=XHS_ENGINE_API_PORT=8000
 Environment=PATH=/usr/bin:/bin
@@ -456,7 +457,7 @@ WantedBy=multi-user.target
 | Service | Role | Listens on |
 | --- | --- | --- |
 | `xhblogs` | public site, `next start` serving the prebuilt output | `0.0.0.0:8080` |
-| `xhblogs-manager-web` | console frontend | `0.0.0.0:3001` |
+| `xhblogs-manager-web` | console frontend, mounted at `/console` | `127.0.0.1:3001`, exposed through nginx |
 | `xhblogs-manager-api` | **unified backend** (FastAPI), shared by the blog and the console | `127.0.0.1:8000`, local access only |
 
 > The backend only listens on `127.0.0.1`, so the browser cannot reach it directly. Every API call from the public
@@ -482,6 +483,14 @@ cp -a .next/static/. .next/standalone/.next/static/
 printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
 ```
 
+> The console is built to live under `/console`, so the prefix has to be present at build time (`basePath` is compiled in; changing it means rebuilding):
+>
+> ```bash
+> NEXT_PUBLIC_CONSOLE_BASE_PATH=/console npm run build
+> ```
+>
+> Leave the variable empty to run the console at the root path (for example when double-clicking `Start.bat` locally). `xhblogs-manager-rebuild` already sets `CONSOLE_BASE_PATH=/console`; override it with `XHBlogs_CONSOLE_BASE_PATH=`.
+
 > **Rebuild the console after every console code change**: `next start` serves the prebuilt output, source edits do not show up on their own.
 
 > The repository already turns these steps into scripts, so on the server you can just use them:
@@ -499,26 +508,101 @@ printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
 
 ### 5. Public access and domains
 
-Open the ports in the cloud provider's security group:
+In production nginx sits in front: the public site and the console share one host and are split by path.
+
+| Path | Upstream | Notes |
+| --- | --- | --- |
+| `/` | `127.0.0.1:8080` | public site (`next start`) |
+| `/console` | `127.0.0.1:3001` | console (built with `basePath=/console`) |
+
+The unified backend still listens on `127.0.0.1:8000` only; each frontend forwards to it, so the internet never reaches it directly. The console systemd unit also binds `HOSTNAME=127.0.0.1`, and its only public entry point is nginx.
+
+The security group only needs three ports:
 
 | Port | Purpose | Suggested source |
 | --- | --- | --- |
 | 22 | SSH | your office IP |
-| 8080 | public site | everyone |
-| 3001 | console | **your own public IP only** |
+| 80 | HTTP (nginx) | everyone |
+| 443 | HTTPS (nginx) | everyone |
 
-For a custom domain, let Nginx proxy to port 8080 and attach a certificate:
+`8080` / `3001` no longer need to be public — nginx calls them on localhost. The `3001` rule opened for the console can be removed.
+
+#### 5.1 Install and wire up nginx
+
+The dnf configuration on Alibaba Cloud Linux 3 carries an `exclude=` that hides nginx, so it has to be lifted explicitly:
+
+```bash
+dnf install -y --disableexcludes=all nginx
+```
+
+[tools/nginx-xhblogs.conf](tools/nginx-xhblogs.conf) in the repository is the configuration running in production. Install it as `/etc/nginx/conf.d/xhblogs.conf` and drop the distribution's default site:
+
+```bash
+install -m 644 /opt/xinghui-blog/tools/nginx-xhblogs.conf /etc/nginx/conf.d/xhblogs.conf
+rm -f /etc/nginx/conf.d/default.conf
+nginx -t && systemctl enable --now nginx
+```
+
+> If `nginx -t` reports `conflicting server name "_"`, the stock `server { listen 80 default_server; … }` block in `/etc/nginx/nginx.conf` is still there. Back the file up, comment that block out and reload; the site is unaffected.
+
+`xhblogs-deploy` keeps the configuration in sync afterwards: when the template changes it backs up the live file, reloads only if `nginx -t` passes and rolls back otherwise.
+
+> The console's `location` **must not** be `proxy_pass http://127.0.0.1:3001/;`. The trailing slash strips the `/console` prefix, and the console is built with prefixed routes — stripping it returns 404 everywhere.
+
+#### 5.2 DNS
+
+Add two A records at your DNS provider, both pointing at the server's public IP:
+
+| Host | Type | Value |
+| --- | --- | --- |
+| `@` | A | your server's public IP |
+| `www` | A | your server's public IP |
+
+Once they resolve (`dig +short your-domain`), set the real names in nginx:
 
 ```nginx
-server {
-    listen 80;
-    server_name www.example.com;
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
+server_name example.com www.example.com;
+```
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+`http://example.com/` now serves the blog and `http://example.com/console` serves the console, with all links and API calls on the same origin — no more IP and port to remember.
+
+#### 5.3 Certificates and HTTPS
+
+After issuing a certificate, uncomment the 443 block at the end of [tools/nginx-xhblogs.conf](tools/nginx-xhblogs.conf), fill in the certificate paths and turn the port 80 block into a redirect:
+
+```nginx
+location / { return 301 https://$host$request_uri; }
+```
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+Then add one line to `/etc/xhblogs-manager.env` so the login cookie carries `Secure`:
+
+```ini
+MANAGER_COOKIE_SECURE=1
+```
+
+```bash
+systemctl restart xhblogs-manager-api
+```
+
+The console frontend needs no change — it only cares about `basePath`, not the scheme.
+
+For issuance, pick whatever is at hand: download an nginx-format free DV certificate from the Alibaba Cloud console, or install acme.sh on the server and issue via DNS (no need to stop nginx), pointing the 443 block at the resulting `fullchain` / `key`. Include both names (apex and `www`) in the certificate, otherwise `www` will warn.
+
+#### 5.4 Post-launch checks
+
+```bash
+curl -I http://your-domain/                 # 200
+curl -I http://your-domain/console          # 307, Location: /console/login
+curl -I http://your-domain/console/login    # 200
+ss -ltnp | grep -E ':(3001|8080|8000)'      # 3001 and 8000 on 127.0.0.1 only
 ```
 
 ### 6. Password login for the console
@@ -536,12 +620,14 @@ The first command stores the scrypt hash of the password, the second generates a
 ```ini
 # [Service] section of /etc/systemd/system/xhblogs-manager-web.service
 EnvironmentFile=-/etc/xhblogs-manager.env
-Environment=HOSTNAME=0.0.0.0
+Environment=HOSTNAME=127.0.0.1
 ```
 
 The unified backend uses the same `MANAGER_SESSION_SECRET`, so the console and the backend recognise each other's session cookie.
 
-After the restart the console redirects to `/login`; the session lasts 7 days and the cookie is HttpOnly. There is also a log-out button in the top right corner.
+After the restart, `https://your-domain/console` redirects to `/console/login`; the session lasts 7 days and the cookie is HttpOnly. There is also a log-out button in the top right corner.
+
+> The console listens on localhost only. For remote debugging use an SSH tunnel: `ssh -L 3001:127.0.0.1:3001 xhblogs@server-ip`, then open `http://127.0.0.1:3001/console`.
 
 > **Security note**: over plain HTTP the password travels unencrypted, so restrict the source IP in the security group. Once you serve HTTPS, set `MANAGER_COOKIE_SECURE=1`.
 

@@ -1,3 +1,17 @@
+## 0.5.4 - 2026-10-30
+
+- **控制台可以挂在子路径上和公开站同域**：新增 `NEXT_PUBLIC_CONSOLE_BASE_PATH`（构建时读取，默认空），控制台按 `basePath=/console` 构建后所有页面、静态资源、路由跳转都落在 `/console` 下。公开站与控制台共用一个域名，用户不用再记 IP + 端口，浏览器里也不会因为跨端口/跨域丢会话。
+- **前缀只有一个来源**：新增 `lib/consoleBasePath.ts`，导出 `CONSOLE_BASE_PATH` / `withBasePath()` / `stripBasePath()`。`next.config.ts`、`proxy.ts` 与所有客户端代码都从这里取，改前缀只改环境变量。Next 的 `basePath` 只自动改写 `<Link>`、`router.push` 与 `_next` 资源，手写的 `fetch('/api/…')`、`window.location`、`<audio>`、`<img>` 和中间件里的重定向都不在其管辖范围内，因此这些位置逐个改成了 `withBasePath()`：25 个文件、45 处字面量。
+- **路径判断要用去掉前缀的值**：`usePathname()` 返回带 `/console` 的路径，导航高亮、退出登录、登录后的 `next` 参数、开屏判断、播放器只在首页显示等比较逻辑统一先 `stripBasePath()`，否则挂前缀后一条都不成立。
+- **静态资源漏网两处**：本地音乐默认封面 `/music-default.svg` 与煤球用的 `/siamese-cat.png` 在挂前缀后会从域名根路径请求、404；改为经过 `withBasePath()`（其中煤球那处是模板字符串里拼 CSS `background-image`）。
+- **修复：中间件漏掉 `/console` 根路径**。Next 16 给中间件 matcher 的源码自动前置 `basePath`，`/((?!_next/static…).*)` 编译出来是 `^\/console(?:\/…)$`，恰好不匹配裸的 `/console`，导致控制台首页不登录也能打开（子页面正常 307）。matcher 补上 `'/'` 后，裸路径与新版本 Next 的 isRoot 规则对齐，`/console` 也会先跳 `/console/login?next=%2F`。
+- **服务器装上 nginx 作为唯一公网入口**：阿里云 Linux 3 的 dnf 配置里有 `exclude=`，需要 `dnf install -y --disableexcludes=all nginx` 才能装。仓库新增 `tools/nginx-xhblogs.conf`：`/` → `127.0.0.1:8080`，`/console` → `127.0.0.1:3001`（**不带尾斜杠**，带了会剥掉前缀导致整站 404），`client_max_body_size 64m`、gzip、120s 读超时，另附注释好的 443 段与 HTTP 跳转写法。移除了发行版的 `default.conf`，并注释掉 `nginx.conf` 里自带的 80 端口 `server` 块（否则报 `conflicting server name "_"`，备份留在同目录）。
+- **控制台不再对公网监听**：systemd 单元改为 `HOSTNAME=127.0.0.1` 并加上 `NEXT_PUBLIC_CONSOLE_BASE_PATH=/console`，`ss` 确认 3001 只在本机；公网只能经 nginx 的 `/console` 进入，远程调试走 SSH 隧道。
+- **部署脚本自动同步 nginx 配置**：`xhblogs-deploy` 发现 `tools/nginx-xhblogs.conf` 与线上不一致时，先备份、再安装，`nginx -t` 通过才 reload，不通过自动还原旧文件。`xhblogs-manager-rebuild` 构建时默认带 `CONSOLE_BASE_PATH=/console`，可用 `XHBlogs_CONSOLE_BASE_PATH=` 覆盖成根路径。
+- **两种模式都验证过**：带前缀时 `tsc --noEmit` 0 错误、`next build` 成功，浏览器实测页面资源全部取自 `/console/_next/…`、接口走 `/console/api/proxy/…`、导航高亮与登录跳转正确；前缀留空时构建与运行同样正常（根路径、`/api`、静态资源均无异常），本地双击 `Start.bat` 不受影响。
+- **线上实测（2026-10-30）**：`http://服务器IP/` 200；`/console` 307 到 `/console/login?next=%2F`；`/console/login` 200；站内 `/console/settings` 未登录 307、`/console/api/auth/login` 可正常响应；公开站首页与静态资源未受影响。
+- **还差域名本身**：`server_name` 目前仍是占位 `_`。拿到域名后加根域与 `www` 两条 A 记录、改成真实域名、签发证书并打开 443，再把 `/etc/xhblogs-manager.env` 的 `MANAGER_COOKIE_SECURE` 设为 `1` 重启后端即可，步骤写进了中英文 README 第 5 节。
+
 ## 0.5.3 - 2026-10-30
 
 - **控制台取消「暂存 + 统一发布」的审批队列**：删掉 `context/OperationContext.tsx` 与 `lib/pendingOperations.ts`，导航栏里的待办操作箱、待处理数量角标、各页面的「加入队列 / 暂存到操作队列」一并移除。此前改一项设置要先入队、再点发布才会写库，现在没有中间态——保存就是写库。

@@ -161,7 +161,7 @@ tools/                   # 服务器上的发布与重建脚本
 
 ### 快速使用每日一句
 
-1. 启动控制台（服务器上访问 `http://服务器IP:3001`，本地则是双击 `my-blog-manager/Start.bat`）。
+1. 启动控制台（服务器上访问 `http://服务器IP/console`，本地则是双击 `my-blog-manager/Start.bat`）。
 2. 在设置侧栏打开 **每日一句 ☀️**。默认每天 07:00（北京时间）自动生成，模型与性格沿用「AI 煤球配置 🐾」里的设定。
 3. 想改说话时间、栏目名称、署名或给模型的话，改完点 **保存设置**，公开站立刻可见，不需要重新发布。
 4. 今天这句不满意，点 **换一句** 让 AI 重新说；想自己写就直接在「手写一句」里写，点 **保存这句** 顶掉今天的自动结果。
@@ -208,7 +208,7 @@ tools/                   # 服务器上的发布与重建脚本
 - **npm**
 - **Git**
 - **Python**（3.10 以上，本系统在 3.10 环境下测试通过）
-- *可选：域名与 Nginx（用于 HTTPS 与自定义域名）*
+- **Nginx**（公网入口：`/` 转发公开站、`/console` 转发控制台，见第 5 节）
 
 ### 2. 目录与仓库
 
@@ -313,7 +313,8 @@ WorkingDirectory=/opt/xinghui-blog/my-blog-manager/.next/standalone
 Environment=NODE_ENV=production
 Environment=NEXT_TELEMETRY_DISABLED=1
 Environment=PORT=3001
-Environment=HOSTNAME=0.0.0.0
+Environment=HOSTNAME=127.0.0.1
+Environment=NEXT_PUBLIC_CONSOLE_BASE_PATH=/console
 Environment=XHS_MANAGER_ROOT=/opt/xinghui-blog/my-blog-manager
 Environment=XHS_ENGINE_API_PORT=8000
 Environment=PATH=/usr/bin:/bin
@@ -359,7 +360,7 @@ WantedBy=multi-user.target
 | 服务 | 作用 | 监听 |
 | --- | --- | --- |
 | `xhblogs` | 公开站，`next start` 运行预构建产物 | `0.0.0.0:8080` |
-| `xhblogs-manager-web` | 控制台前端 | `0.0.0.0:3001` |
+| `xhblogs-manager-web` | 控制台前端，挂在 `/console` | `127.0.0.1:3001`，经 nginx 对外 |
 | `xhblogs-manager-api` | **统一后端**（FastAPI），博客与控制台共用 | `127.0.0.1:8000`，只允许本机访问 |
 
 > 后端只监听 `127.0.0.1`，浏览器直连不了它。公开站与控制台的每个 API 调用都走各自的
@@ -385,6 +386,14 @@ cp -a .next/static/. .next/standalone/.next/static/
 printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
 ```
 
+> 控制台默认构建成挂在 `/console`，所以构建前要带上前缀（`basePath` 是编译期写死的，改前缀必须重新构建）：
+>
+> ```bash
+> NEXT_PUBLIC_CONSOLE_BASE_PATH=/console npm run build
+> ```
+>
+> 想在根路径直接跑（比如本地双击 `Start.bat`），把这个变量留空即可。`xhblogs-manager-rebuild` 已经内置了 `CONSOLE_BASE_PATH=/console`，可以用 `XHBlogs_CONSOLE_BASE_PATH=` 覆盖。
+
 > **每次改过控制台代码，都要重新执行上面这段「构建与启动」**，因为 `next start` 跑的是预构建产物，源码改动不会自动生效。
 
 > 仓库里已经把这几步固化成脚本，服务器上直接用就行：
@@ -401,26 +410,101 @@ printf '%s\n' '{"api_port": 8000}' > .next/standalone/public/backend_config.json
 
 ### 5. 公网访问与域名
 
-云服务器的安全组需要放行对应端口（阿里云 / 腾讯云在控制台的「安全组规则」里添加）：
+线上是一台 nginx 兜在前面，公开站与控制台同域、按路径分流：
+
+| 路径 | 上游 | 说明 |
+| --- | --- | --- |
+| `/` | `127.0.0.1:8080` | 公开站（`next start`） |
+| `/console` | `127.0.0.1:3001` | 控制台（构建时 `basePath=/console`） |
+
+统一后端仍然只监听 `127.0.0.1:8000`，由两个前端各自转发，公网碰不到它。控制台的 systemd 单元也已改成 `HOSTNAME=127.0.0.1`，公网入口只有 nginx。
+
+安全组只需要放行三个端口：
 
 | 端口 | 用途 | 建议来源 |
 | --- | --- | --- |
 | 22 | SSH | 你的办公 IP |
-| 8080 | 公开站 | 全网 |
-| 3001 | 控制台 | **只放行你自己的公网 IP** |
+| 80 | HTTP（nginx） | 全网 |
+| 443 | HTTPS（nginx） | 全网 |
 
-给公开站绑域名时，用 Nginx 反向代理到 8080 并配置证书即可：
+`8080` / `3001` 不必再对公网开放——它们只被 nginx 在本机调用。此前直接开在公网上的 `3001` 可以关掉了。
+
+#### 5.1 安装并接入 nginx
+
+阿里云 Linux 3 的 dnf 配置里用 `exclude=` 挡了 nginx，安装时要显式解除，否则会提示「没有可用软件包」：
+
+```bash
+dnf install -y --disableexcludes=all nginx
+```
+
+仓库里的 [tools/nginx-xhblogs.conf](tools/nginx-xhblogs.conf) 就是线上在用的配置，装成 `/etc/nginx/conf.d/xhblogs.conf`，并移除发行版自带的默认站点：
+
+```bash
+install -m 644 /opt/xinghui-blog/tools/nginx-xhblogs.conf /etc/nginx/conf.d/xhblogs.conf
+rm -f /etc/nginx/conf.d/default.conf
+nginx -t && systemctl enable --now nginx
+```
+
+> 如果 `nginx -t` 报 `conflicting server name "_"`，是 `/etc/nginx/nginx.conf` 里自带的 `server { listen 80 default_server; … }` 还没删干净。把那段 `server` 块注释掉（先备份）再 reload，站点不受影响。
+
+之后 `xhblogs-deploy` 会自动同步这份配置：检测到仓库里的 nginx 模板有变化就先备份线上文件，`nginx -t` 通过才 reload，不通过自动回滚。
+
+> 控制台的 `location` **不能**写成 `proxy_pass http://127.0.0.1:3001/;`。末尾的斜杠会剥掉 `/console` 前缀，而控制台是按带前缀的路由构建的，剥掉等于整站 404。
+
+#### 5.2 域名解析
+
+在域名托管商的解析控制台加两条 A 记录，都指向服务器公网 IP：
+
+| 主机记录 | 类型 | 记录值 |
+| --- | --- | --- |
+| `@` | A | 你的服务器公网 IP |
+| `www` | A | 你的服务器公网 IP |
+
+生效后用 `dig +short 你的域名`（或 `ping 你的域名`）确认返回的是这个 IP。然后改 nginx 的 `server_name`：
 
 ```nginx
-server {
-    listen 80;
-    server_name www.example.com;
-    location / {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
+server_name example.com www.example.com;
+```
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+此时 `http://example.com/` 是博客，`http://example.com/console` 是控制台，两边的链接和接口都在同一个域名下，不用再记 IP 和端口。
+
+#### 5.3 证书与 HTTPS
+
+证书签好后，打开 [tools/nginx-xhblogs.conf](tools/nginx-xhblogs.conf) 末尾注释着的 443 段，填上证书路径，并把 80 段改成跳转：
+
+```nginx
+location / { return 301 https://$host$request_uri; }
+```
+
+```bash
+nginx -t && systemctl reload nginx
+```
+
+再在 `/etc/xhblogs-manager.env` 里补一行，让登录 Cookie 带上 `Secure`：
+
+```ini
+MANAGER_COOKIE_SECURE=1
+```
+
+```bash
+systemctl restart xhblogs-manager-api
+```
+
+控制台前端不用动——它只关心 `basePath`，与协议无关。
+
+签名方式按手头条件选：阿里云控制台可以申请免费的 DV 证书直接下载 nginx 格式；不想手动续期就在服务器上装 acme.sh，用 DNS 方式签发（不用停 nginx），把签出的 `fullchain` / `key` 指给 443 段即可。两条记录（根域与 `www`）都要签进去，否则从 `www` 打开会证书告警。
+
+#### 5.4 上线自检
+
+```bash
+curl -I http://你的域名/                 # 200
+curl -I http://你的域名/console          # 307，Location: /console/login
+curl -I http://你的域名/console/login    # 200
+ss -ltnp | grep -E ':(3001|8080|8000)'   # 3001 与 8000 只在 127.0.0.1
 ```
 
 ### 6. 控制台的密码登录
@@ -438,12 +522,14 @@ node scripts/manager-passwd.mjs --secret --env-file /etc/xhblogs-manager.env
 ```ini
 # /etc/systemd/system/xhblogs-manager-web.service 的 [Service] 段
 EnvironmentFile=-/etc/xhblogs-manager.env
-Environment=HOSTNAME=0.0.0.0
+Environment=HOSTNAME=127.0.0.1
 ```
 
 统一后端用的是同一个 `MANAGER_SESSION_SECRET`，所以控制台与后端互相认得对方的会话 Cookie。
 
-重启后访问控制台会先跳转到 `/login` 页面，输入刚才设置的密码即可进入，会话有效期 7 天，Cookie 为 HttpOnly。控制台右上角还有一个退出登录按钮。
+重启后访问 `https://你的域名/console` 会先跳到 `/console/login`，输入刚才设置的密码即可进入，会话有效期 7 天，Cookie 为 HttpOnly。控制台右上角还有一个退出登录按钮。
+
+> 控制台只监听本机，远程调试时用 SSH 隧道即可：`ssh -L 3001:127.0.0.1:3001 xhblogs@服务器IP`，再打开 `http://127.0.0.1:3001/console`。
 
 > **安全提醒**：用 IP + HTTP 访问时密码是明文传输的，务必在安全组里限制来源 IP；接入域名并配置 HTTPS 后，再把 `MANAGER_COOKIE_SECURE` 改成 `1`。
 
