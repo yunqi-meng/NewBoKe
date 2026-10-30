@@ -79,6 +79,7 @@ write_status() {
   local message="$2"
   local started_ts="${3:-0}"
   local effective_ts="${4:-0}"
+  local github_state="${5:-none}"
   local safe_message
   safe_message=$(echo "$message" | tr -d '"' | tr '\n' ' ')
   local tmp="$STATUS_FILE.tmp"
@@ -88,6 +89,7 @@ write_status() {
   "message": "$safe_message",
   "startedAtTimestamp": $started_ts,
   "effectiveAtTimestamp": $effective_ts,
+  "github": "$github_state",
   "updatedAt": "$(date '+%F %T')"
 }
 JSON
