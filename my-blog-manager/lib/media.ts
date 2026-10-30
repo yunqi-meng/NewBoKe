@@ -7,6 +7,8 @@
  * 由两端的同名路由转发到后端取回文件，不需要任何 URL 改写。
  */
 
+import { withBasePath } from './consoleBasePath';
+
 export interface UploadResult {
   success: boolean;
   url?: string;
@@ -25,7 +27,7 @@ export async function uploadLocalImage(file: File): Promise<UploadResult> {
   formData.append('file', file);
 
   try {
-    const response = await fetch('/api/proxy/api/media/upload', {
+    const response = await fetch(withBasePath('/api/proxy/api/media/upload'), {
       method: 'POST',
       body: formData,
     });

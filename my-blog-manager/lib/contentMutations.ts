@@ -9,13 +9,15 @@
  * 所以同类写请求在这里排成一条链，保证落库顺序与界面操作顺序一致。
  */
 
+import { withBasePath } from './consoleBasePath';
+
 export type WriteResult = {
   ok: boolean;
   message: string;
   data?: { id?: string; busy?: boolean; [key: string]: unknown };
 };
 
-const API_BASE = '/api/proxy';
+const API_BASE = withBasePath('/api/proxy');
 
 async function postJson(endpoint: string, body: unknown): Promise<WriteResult> {
   try {
