@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // 定义全局可以调用的方法
@@ -10,13 +10,34 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | null>(null);
 
+const TOAST_DURATIONS = {
+  success: 3000,
+  info: 3000,
+  warning: 3000,
+  error: 6000,
+} as const;
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toastMsg, setToastMsg] = useState<{ text: string, type: 'success' | 'warning' | 'error' | 'info' } | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 卸载时清掉挂起的定时器，避免 setState on unmounted
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   // 用 useCallback 固定引用：否则任何把它放进 useEffect 依赖数组的组件都会反复重取数据
   const showToast = useCallback((text: string, type: 'success' | 'warning' | 'error' | 'info' = 'success') => {
+    // 先清旧定时器：否则新 toast 会被上一条的 timer 提前杀掉
+    if (timerRef.current) clearTimeout(timerRef.current);
     setToastMsg({ text, type });
-    setTimeout(() => setToastMsg(null), 3000);
+    const duration = TOAST_DURATIONS[type] ?? TOAST_DURATIONS.success;
+    timerRef.current = setTimeout(() => {
+      setToastMsg(null);
+      timerRef.current = null;
+    }, duration);
   }, []);
 
   const contextValue = useMemo(() => ({ showToast }), [showToast]);

@@ -6,14 +6,23 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import { ToastProvider, useToast } from '../../components/ToastProvider';
+import { useToast } from '../../components/ToastProvider';
 import { AlertTriangle, Search, X, Sparkles, Pencil } from 'lucide-react';
+
+interface DraftItem {
+  id: string;
+  type?: string;
+  title?: string;
+  contentPreview?: string;
+  lastModified?: number;
+}
 
 function DraftsContent() {
   const { showToast } = useToast();
-  const [drafts, setDrafts] = useState<any[]>([]);
+  const [drafts, setDrafts] = useState<DraftItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // 👇 自定义弹窗状态管理
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; id: string | null; title: string | null }>({
@@ -22,15 +31,14 @@ function DraftsContent() {
     title: null
   });
 
-  const blogPath = "F:/Projects/my-blog";
-
   const fetchDrafts = async () => {
     setIsLoading(true);
     try {
+      // 后端 list/delete 只认 id，不读 blog_path，无需再传本机路径硬编码
       const res = await fetch(withBasePath(`/api/proxy/api/drafts/list`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blog_path: blogPath })
+        body: JSON.stringify({})
       });
 
       const data = await res.json();
@@ -52,32 +60,34 @@ function DraftsContent() {
 
   // 🗑️ 核心逻辑：执行真实的销毁操作
   const confirmDelete = async () => {
-    if (!deleteModal.id) return;
+    if (!deleteModal.id || isDeleting) return;
     const id = deleteModal.id;
+    setIsDeleting(true);
 
     try {
       const res = await fetch(withBasePath(`/api/proxy/api/drafts/delete`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ blog_path: blogPath, id: id })
+        body: JSON.stringify({ id })
       });
 
       const data = await res.json();
       if (data.success) {
         showToast("🗑️ 草稿已被彻底销毁", "success");
         setDrafts(prev => prev.filter(draft => draft.id !== id));
+        setDeleteModal({ isOpen: false, id: null, title: null });
       } else {
         showToast(`销毁失败: ${data.message}`, "error");
       }
     } catch {
       showToast("引擎连接失败", "error");
     } finally {
-      // 关闭弹窗并重置状态
-      setDeleteModal({ isOpen: false, id: null, title: null });
+      setIsDeleting(false);
     }
   };
 
-  const formatDate = (timestamp: number) => {
+  const formatDate = (timestamp?: number) => {
+    if (!timestamp) return '—';
     return new Date(timestamp).toLocaleString('zh-CN', {
       year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit'
@@ -101,7 +111,7 @@ function DraftsContent() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setDeleteModal({ isOpen: false, id: null, title: null })}
+              onClick={() => !isDeleting && setDeleteModal({ isOpen: false, id: null, title: null })}
               className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
             />
 
@@ -126,16 +136,20 @@ function DraftsContent() {
 
               <div className="flex gap-3">
                 <button
+                  type="button"
                   onClick={() => setDeleteModal({ isOpen: false, id: null, title: null })}
-                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95"
+                  disabled={isDeleting}
+                  className="flex-1 py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-all active:scale-95 disabled:opacity-50"
                 >
                   继续保留
                 </button>
                 <button
+                  type="button"
                   onClick={confirmDelete}
-                  className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-500/30 hover:bg-red-600 transition-all active:scale-95"
+                  disabled={isDeleting}
+                  className="flex-1 py-4 bg-red-500 text-white rounded-2xl text-xs font-black uppercase tracking-widest shadow-lg shadow-red-500/30 hover:bg-red-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  确认移除
+                  {isDeleting ? '销毁中…' : '确认移除'}
                 </button>
               </div>
             </motion.div>
@@ -206,14 +220,18 @@ function DraftsContent() {
                         </div>
 
                         <button
+                          type="button"
+                          aria-label="删除草稿"
+                          title="删除草稿"
                           onClick={() => setDeleteModal({ isOpen: true, id: draft.id, title: draft.title || "无标题草稿" })}
-                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700/50 text-slate-400 hover:bg-red-500 hover:text-white transition-all shadow-sm z-20"
+                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-700/50 text-slate-400 hover:bg-red-500 hover:text-white transition-all shadow-sm z-20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50"
                         >
                           <X size={14} />
                         </button>
                       </div>
 
-                      <Link href={`/editor?id=${draft.id}`} className="block">
+                      {/* type 随链接带给编辑器；后端 get 也会按 slug 兜底识别 chatter */}
+                      <Link href={`/editor?id=${encodeURIComponent(draft.id)}&type=${encodeURIComponent(draft.type || 'post')}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 rounded-xl">
                         <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 group-hover:text-indigo-600 transition-colors line-clamp-1">
                           {draft.title || "无标题草稿"}
                         </h3>
@@ -228,7 +246,11 @@ function DraftsContent() {
 
               {filteredDrafts.length === 0 && (
                 <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-3xl">
-                  <p className="text-slate-500 font-bold">搜索不到相关草稿，换个关键词试试？</p>
+                  {drafts.length === 0 ? (
+                    <p className="text-slate-500 font-bold">草稿箱还是空的，去写点什么吧 ✍️</p>
+                  ) : (
+                    <p className="text-slate-500 font-bold">搜索不到相关草稿，换个关键词试试？</p>
+                  )}
                 </div>
               )}
             </div>
@@ -241,9 +263,5 @@ function DraftsContent() {
 }
 
 export default function DraftsPage() {
-  return (
-    <ToastProvider>
-      <DraftsContent />
-    </ToastProvider>
-  );
+  return <DraftsContent />;
 }

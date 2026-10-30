@@ -8,7 +8,7 @@ import { saveSiteConfig } from '../../lib/contentMutations';
 import { useSiteConfig } from '../../components/SiteConfigProvider';
 import Navbar from '../../components/Navbar';
 import PageTransition from '../../components/PageTransition';
-import { ToastProvider, useToast } from '../../components/ToastProvider';
+import { useToast } from '../../components/ToastProvider';
 
 import ProfileSection from '../../components/settings/ProfileSection';
 import BackgroundSection from '../../components/settings/BackgroundSection';
@@ -26,6 +26,7 @@ function SettingsContent() {
   const [activeTab, setActiveTab] = useState('profile');
   const [quoteVisited, setQuoteVisited] = useState(false);
   const [backendMode, setBackendMode] = useState<'checking' | 'preview' | 'live' | 'offline'>('checking');
+  const [isSaving, setIsSaving] = useState(false);
   const { showToast } = useToast();
   useEffect(() => {
     const readTab = () => {
@@ -47,15 +48,15 @@ function SettingsContent() {
     window.history.replaceState(null, '', url);
   }
 
-  const [formData, setFormData] = useState<any>({
+  const [formData, setFormData] = useState<Record<string, unknown>>({
     authorName: siteConfig.authorName || "",
     bio: siteConfig.bio || "",
     avatarUrl: siteConfig.avatarUrl || "",
     social: siteConfig.social || {},
     bgImages: [...(siteConfig.bgImages || [])],
     // 👇 🌟 壁纸分组系统初始化
-    bgGroups: ((siteConfig as any).bgGroups || []).map((g: any) => ({ ...g, images: [...(g.images || [])] })),
-    activeBgGroup: (siteConfig as any).activeBgGroup || 'default',
+    bgGroups: (((siteConfig as Record<string, unknown>).bgGroups as Array<Record<string, unknown>> | undefined) || []).map((g) => ({ ...g, images: [...((g.images as string[] | undefined) || [])] })),
+    activeBgGroup: (siteConfig as Record<string, unknown>).activeBgGroup || 'default',
     danmakuList: [...(siteConfig.danmakuList || [])],
     buildDate: siteConfig.buildDate || "2026-03-23T00:00:00",
     icpConfig: siteConfig.icpConfig || { name: "", link: "" },
@@ -91,10 +92,10 @@ function SettingsContent() {
         const data = await res.json();
 
         if (data.success && data.data) {
-          setFormData((prev: any) => ({
+          setFormData((prev: Record<string, unknown>) => ({
             ...prev,
             ...data.data,
-            social: { ...(prev.social || {}), ...(data.data.social || {}) },
+            social: { ...((prev.social as Record<string, string>) || {}), ...(data.data.social || {}) },
             // 👇 🌟 合并后端发来的壁纸分组数据
             bgGroups: data.data.bgGroups?.length ? data.data.bgGroups : prev.bgGroups,
             activeBgGroup: data.data.activeBgGroup || prev.activeBgGroup,
@@ -103,7 +104,7 @@ function SettingsContent() {
             icpConfig: data.data.icpConfig || prev.icpConfig,
             footerBadges: data.data.footerBadges ? [...data.data.footerBadges] : prev.footerBadges,
             // 👇 🌟 合并后端发来的小猫配置
-            aiConfig: { ...(prev.aiConfig || {}), ...(data.data.aiConfig || {}) }
+            aiConfig: { ...((prev.aiConfig as Record<string, unknown>) || {}), ...(data.data.aiConfig || {}) }
           }));
           setBackendMode('live');
         } else {
@@ -118,22 +119,28 @@ function SettingsContent() {
     return () => controller.abort();
   }, []);
 
-  const handleUpdate = (field: string, value: any) => {
-    setFormData((prev: any) => ({ ...prev, [field]: value }));
+  const handleUpdate = (field: string, value: unknown) => {
+    setFormData((prev: Record<string, unknown>) => ({ ...prev, [field]: value }));
   };
 
   // 保存即写库：整份表单一次提交（各栏目共用同一份配置）。
   // 数据库一更新，公开站刷新就是新配置，不用再等一次发布。
-  const saveConfig = (label: string) => {
+  const saveConfig = async (label: string) => {
+    // 防连点：上一次还在飞时直接忽略，避免队列里堆多份保存
+    if (isSaving) return;
     const updates = { ...formData };
+    setIsSaving(true);
     showToast(`⏳ 正在保存【${label}】…`, "info");
-    saveSiteConfig(updates).then(result => {
+    try {
+      const result = await saveSiteConfig(updates);
       if (result.ok) {
         showToast(`✅ 【${label}】已保存，公开站实时生效`, "success");
         return;
       }
       showToast(`❌ 【${label}】保存失败：${result.message}`, "error");
-    });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // 👇 🌟 在菜单里增加 AI 猫咪入口
@@ -174,7 +181,8 @@ function SettingsContent() {
           <div className="min-w-0 flex-1 w-full">
             {backendMode !== 'live' && <div role="status" className="mb-6 rounded-2xl border border-amber-200/60 bg-amber-50/80 px-5 py-4 text-xs leading-7 text-amber-800 dark:border-amber-400/20 dark:bg-amber-950/40 dark:text-amber-200">{backendMode === 'checking' ? '正在检查本机连接…' : backendMode === 'preview' ? '当前是统一控制台的本地预览：每日一句可以保存；其他原有栏目可只读查看。网站同步、发布和现有每日任务保持原样。' : '网站通用设置后台尚未连接，暂时只读。每日一句使用自己的本机连接，可在该栏目检查状态。'}{backendMode === 'offline' && <button className="ml-3 underline" onClick={() => window.location.reload()}>重新检测</button>}</div>}
             {quoteVisited && <div hidden={activeTab !== 'quote'}><DailyQuoteSection /></div>}
-            <fieldset disabled={backendMode !== 'live'} hidden={activeTab === 'quote'} className="min-w-0 w-full border-0 p-0">
+            {/* disabled 同时覆盖后端未连接与保存中，避免双击排队多次提交 */}
+            <fieldset disabled={backendMode !== 'live' || isSaving} hidden={activeTab === 'quote'} className="min-w-0 w-full border-0 p-0">
             <AnimatePresence mode="wait">
               {activeTab === 'profile' && <ProfileSection key="profile" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
               {activeTab === 'background' && <BackgroundSection key="background" formData={formData} handleUpdate={handleUpdate} saveConfig={saveConfig} />}
@@ -198,9 +206,5 @@ function SettingsContent() {
 }
 
 export default function SettingsPage() {
-  return (
-    <ToastProvider>
-      <SettingsContent />
-    </ToastProvider>
-  );
+  return <SettingsContent />;
 }

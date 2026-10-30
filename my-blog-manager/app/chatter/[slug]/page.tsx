@@ -13,6 +13,7 @@ import rehypeKatex from 'rehype-katex';
 
 // 🌟 引入神仙代码高亮主题（Atom One Dark）
 import 'highlight.js/styles/atom-one-dark.css';
+import 'katex/dist/katex.min.css';
 
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';

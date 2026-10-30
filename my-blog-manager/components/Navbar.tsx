@@ -10,7 +10,13 @@ import { pushToGitHub } from '../lib/contentMutations';
 import { CloudUpload, Loader2, LogOut } from 'lucide-react';
 import { useSiteConfig } from './SiteConfigProvider';
 
-export default function Navbar({ previewOnly = false, compact = false }: { previewOnly?: boolean; compact?: boolean }) {
+export default function Navbar({ previewOnly = false, compact = false, unsavedGuard = false, onGuardClick }: {
+  previewOnly?: boolean;
+  compact?: boolean;
+  /** 编辑器未保存时只拦截导航链接，不挡主题/推送等操作按钮 */
+  unsavedGuard?: boolean;
+  onGuardClick?: () => void;
+}) {
   // 配置实时取自引擎，发布后无需重建控制台也能立刻生效
   const siteConfig = useSiteConfig();
 
@@ -50,20 +56,23 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
     { name: '⚙️ 设置', href: '/settings' },
   ];
 
+  // 桌面壳（pywebview）注入的窗口控制接口；浏览器环境没有则静默忽略
+  type PyWebviewApi = {
+    minimize_window?: () => void;
+    maximize_window?: () => void;
+    close_window?: () => void;
+  };
+  const getPyWebviewApi = (): PyWebviewApi | undefined =>
+    (window as Window & { pywebview?: { api?: PyWebviewApi } }).pywebview?.api;
+
   const handleMinimize = () => {
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api) {
-      (window as any).pywebview.api.minimize_window();
-    }
+    getPyWebviewApi()?.minimize_window?.();
   };
   const handleMaximize = () => {
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api) {
-      (window as any).pywebview.api.maximize_window();
-    }
+    getPyWebviewApi()?.maximize_window?.();
   };
   const handleClose = () => {
-    if (typeof window !== 'undefined' && (window as any).pywebview?.api) {
-      (window as any).pywebview.api.close_window();
-    }
+    getPyWebviewApi()?.close_window?.();
   };
 
   // 🔐 公网访问时需要知道是否开启了密码登录，才决定要不要显示"退出登录"
@@ -116,7 +125,17 @@ export default function Navbar({ previewOnly = false, compact = false }: { previ
           <div className="flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <nav className="hidden lg:flex gap-8 text-sm font-bold">
               {(compact ? navLinks.filter(link => ['/', '/settings'].includes(link.href)) : navLinks).map((link) => (
-                <Link key={link.href} href={link.href} className={`relative whitespace-nowrap py-1 transition-colors ${stripBasePath(pathname) === link.href ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-200'}`}>
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  onClick={(e) => {
+                    if (!unsavedGuard) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onGuardClick?.();
+                  }}
+                  className={`relative whitespace-nowrap py-1 transition-colors ${stripBasePath(pathname) === link.href ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-200'}`}
+                >
                   {link.name}
                 </Link>
               ))}

@@ -45,13 +45,18 @@ export async function GET(
       return new Response('图片不存在', { status: response.status });
     }
 
-    const body = await response.arrayBuffer();
+    // 流式转发，避免 arrayBuffer() 把整张大图读进内存
     const extension = name.slice(name.lastIndexOf('.')).toLowerCase();
-    return new Response(body, {
-      headers: {
-        'Content-Type': MIME_TYPES[extension] || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
+    const headers = new Headers({
+      'Content-Type': MIME_TYPES[extension] || response.headers.get('Content-Type') || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    });
+    const contentLength = response.headers.get('content-length');
+    if (contentLength) headers.set('Content-Length', contentLength);
+
+    return new Response(response.body, {
+      status: response.status,
+      headers,
     });
   } catch {
     return new Response('图片暂时读不到', { status: 502 });

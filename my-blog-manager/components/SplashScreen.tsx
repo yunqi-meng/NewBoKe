@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { stripBasePath } from '../lib/consoleBasePath';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSiteConfig } from './SiteConfigProvider';
 
@@ -12,35 +11,25 @@ export default function SplashScreen() {
   const [show, setShow] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
-  const exitSplash = () => {
-    setShow(false);
-    sessionStorage.setItem('hasSeenSplash', 'true');
-
-    // 【核心解封】：动画快结束时，给 html 加上类名，CSS 会自动把内容显示出来
-    setTimeout(() => {
-      document.documentElement.classList.add('splash-seen');
-    }, 500);
-  };
-
   useEffect(() => {
+    // SSR/首帧无 sessionStorage，挂载后再决定是否播开屏
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
     const hasSeenSplash = sessionStorage.getItem('hasSeenSplash') === 'true';
 
-    // 登录页要立刻可见，不能被开屏动画挡住
-    if (typeof window !== 'undefined' && stripBasePath(window.location.pathname).startsWith('/login')) {
-      document.documentElement.classList.add('splash-seen');
+    // 登录页不播开屏，直接跳过
+    // （挂了 basePath 时 pathname 可能带前缀；此处用 startsWith 兼容两种部署）
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/login')) {
       return;
     }
 
     if (!hasSeenSplash) {
       setShow(true);
       const timer = setTimeout(() => {
-        exitSplash();
+        setShow(false);
+        try { sessionStorage.setItem('hasSeenSplash', 'true'); } catch { /* 隐私模式忽略 */ }
       }, 2200);
       return () => clearTimeout(timer);
-    } else {
-      // 容错处理：确保直接访问时类名存在
-      document.documentElement.classList.add('splash-seen');
     }
   }, []);
 

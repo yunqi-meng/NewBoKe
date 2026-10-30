@@ -12,6 +12,7 @@ import rehypeKatex from 'rehype-katex';
 
 // 引入高亮主题
 import 'highlight.js/styles/atom-one-dark.css';
+import 'katex/dist/katex.min.css';
 
 import Navbar from '../../../components/Navbar';
 import PageTransition from '../../../components/PageTransition';

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { useToast } from '../ToastProvider';
 import { uploadLocalImage } from '../../lib/media';
 
@@ -19,6 +19,8 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
   const [externalUrl, setExternalUrl] = useState(''); // 🌟 新增：外链输入状态
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 只有标题栏能拖动面板，避免正文选字时把浮层拖走
+  const dragControls = useDragControls();
 
   // 处理文件上传逻辑：从本机直接上传到控制台自带的图片仓库
   const handleFileUpload = async (file: File) => {
@@ -59,10 +61,13 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
     showToast("预览已生成", "success");
   };
 
-  const copyUrlToClipboard = () => {
-    if (uploadedUrl) {
-      navigator.clipboard.writeText(uploadedUrl);
+  const copyUrlToClipboard = async () => {
+    if (!uploadedUrl) return;
+    try {
+      await navigator.clipboard.writeText(uploadedUrl);
       showToast("链接已复制到剪贴板！", "success");
+    } catch {
+      showToast("复制失败，请手动选中链接复制", "error");
     }
   };
 
@@ -71,20 +76,25 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
       {isOpen && (
         <motion.div
           drag
+          dragControls={dragControls}
+          dragListener={false}
           dragMomentum={false}
           dragElastic={0}
           initial={{ opacity: 0, scale: 0.9, y: -20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.9, y: 20 }}
           style={{ position: 'fixed', top: '15vh', right: '5vw', zIndex: 99999 }}
-          className="w-80 bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden flex flex-col cursor-move"
+          className="w-80 bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl rounded-[32px] shadow-2xl border border-white/50 dark:border-white/10 overflow-hidden flex flex-col"
         >
-          {/* 标题栏 */}
-          <div className="flex justify-between items-center p-5 border-b border-white/30 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50">
+          {/* 标题栏：仅此处可拖动 */}
+          <div
+            onPointerDown={(e) => dragControls.start(e)}
+            className="flex justify-between items-center p-5 border-b border-white/30 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/50 cursor-move select-none touch-none"
+          >
             <h3 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
               <span className="text-emerald-500 text-lg">📁</span> 图片工作台
             </h3>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-700/50 flex items-center justify-center text-slate-500 hover:bg-red-500 hover:text-white transition-all cursor-pointer shadow-sm">✕</button>
+            <button type="button" aria-label="关闭图片工作台" title="关闭" onClick={onClose} className="w-8 h-8 rounded-full bg-white/50 dark:bg-slate-700/50 flex items-center justify-center text-slate-500 hover:bg-red-500 hover:text-white transition-all cursor-pointer shadow-sm">✕</button>
           </div>
 
           <div className="p-6 cursor-default bg-white/20 dark:bg-slate-900/20">
@@ -92,14 +102,16 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
             {!uploadedUrl && (
               <div className="flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-2xl mb-5">
                 <button
+                  type="button"
                   onClick={() => setActiveTab('upload')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'upload' ? 'bg-white dark:bg-slate-700 text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${activeTab === 'upload' ? 'bg-white dark:bg-slate-700 text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   本地上传
                 </button>
                 <button
+                  type="button"
                   onClick={() => setActiveTab('url')}
-                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${activeTab === 'url' ? 'bg-white dark:bg-slate-700 text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 ${activeTab === 'url' ? 'bg-white dark:bg-slate-700 text-emerald-500 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
                   外链插入
                 </button>
@@ -134,8 +146,9 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
                     />
                   </div>
                   <button
+                    type="button"
                     onClick={handleConfirmExternalUrl}
-                    className="w-full py-3 bg-slate-800 dark:bg-white dark:text-slate-900 text-white rounded-xl text-xs font-black shadow-lg hover:opacity-90 transition-all active:scale-95"
+                    className="w-full py-3 bg-slate-800 dark:bg-white dark:text-slate-900 text-white rounded-xl text-xs font-black shadow-lg hover:opacity-90 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60"
                   >
                     确认图片链接
                   </button>
@@ -148,6 +161,7 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
                   <img src={uploadedUrl} alt="preview" className="max-w-full max-h-full object-contain rounded-xl drop-shadow-md" />
                   {/* 🌟 重新选择按钮 */}
                   <button
+                    type="button"
                     onClick={() => { setUploadedUrl(''); setExternalUrl(''); }}
                     className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold"
                   >
@@ -155,8 +169,8 @@ export default function FloatingImageTool({ isOpen, onClose, onInsert }: Floatin
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={copyUrlToClipboard} className="py-2.5 rounded-xl bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm">🔗 复制链接</button>
-                  <button onClick={() => { onInsert(uploadedUrl); setUploadedUrl(''); setExternalUrl(''); }} className="py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-600 transition-all active:scale-95">✨ 嵌入正文</button>
+                  <button type="button" onClick={copyUrlToClipboard} className="py-2.5 rounded-xl bg-white/60 dark:bg-slate-800/60 text-slate-700 dark:text-slate-200 font-bold text-xs hover:bg-white dark:hover:bg-slate-700 transition-all shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">🔗 复制链接</button>
+                  <button type="button" onClick={() => { onInsert(uploadedUrl); setUploadedUrl(''); setExternalUrl(''); }} className="py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-black text-xs shadow-lg shadow-emerald-500/30 hover:from-emerald-600 hover:to-teal-600 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60">✨ 嵌入正文</button>
                 </div>
               </div>
             )}

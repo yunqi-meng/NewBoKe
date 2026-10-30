@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useImperativeHandle, forwardRef, useEffect, useRef } from 'react';
-import { useEditor, EditorContent, Extension } from '@tiptap/react';
+import { useEditor, useEditorState, EditorContent, Extension } from '@tiptap/react';
 import { DOMParser as PMDOMParser } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -25,9 +25,9 @@ import TableRow from '@tiptap/extension-table-row';
 import TableCell from '@tiptap/extension-table-cell';
 import TableHeader from '@tiptap/extension-table-header';
 
-// 🌟 引入满血版 C++ 语法高亮
+// 🌟 引入语法高亮（只挂常用语言，避免 all 全量 ~190 种拖垮包体）
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
-import { createLowlight, all } from 'lowlight';
+import { createLowlight, common } from 'lowlight';
 
 import {
   Undo2, Redo2, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
@@ -37,7 +37,7 @@ import {
   Pipette, Hash, Check, Link2, Superscript as SupIcon, Subscript as SubIcon, Palette, Lock
 } from 'lucide-react';
 
-const lowlight = createLowlight(all);
+const lowlight = createLowlight(common);
 
 const CustomImage = Image.extend({
   addAttributes() {
@@ -69,7 +69,7 @@ const MarkdownTableRule = Extension.create({
     return {
       markdown: {
         parse: {
-          setup(md: any) { md.enable('table'); },
+          setup(md: { enable: (name: string) => void }) { md.enable('table'); },
         },
       },
     };
@@ -78,7 +78,13 @@ const MarkdownTableRule = Extension.create({
 
 // 🌟 终极修复：彻底废弃 absolute 下拉框，升级为 Fixed 居中模态框 (Modal)！
 // 这样就能 100% 逃脱父级容器的 overflow 限制，绝对不可能再被遮挡！
-const CustomColorPicker = ({ activeColor, onSelect, onConfirm, recentColors, onClose }: any) => {
+const CustomColorPicker = ({ activeColor, onSelect, onConfirm, recentColors, onClose }: {
+  activeColor: string;
+  onSelect: (color: string) => void;
+  onConfirm: (color: string) => void;
+  recentColors?: string[];
+  onClose: () => void;
+}) => {
   const presets = ['#000000', '#6366F1', '#EC4899', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#8B5CF6'];
   const [hex, setHex] = useState(activeColor);
   return (
@@ -149,9 +155,12 @@ interface EditorProps {
 function Btn({ onClick, active, children, title }: { onClick: () => void; active?: boolean; children: React.ReactNode; title?: string }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       title={title}
-      className={`p-2.5 rounded-xl transition-all duration-300 ease-out flex items-center justify-center 
+      aria-label={title}
+      aria-pressed={active}
+      className={`p-2.5 rounded-xl transition-all duration-300 ease-out flex items-center justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60
         ${active ? 'bg-indigo-500 text-white shadow-md shadow-indigo-500/40 scale-110' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'}`}
     >
       {children}
@@ -166,7 +175,6 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
   const [showHighlightPicker, setShowHighlightPicker] = useState(false);
 
   const loadedContentRef = useRef<string | null>(null);
-  const [, setRenderTrigger] = useState(0);
 
   const editor = useEditor({
     extensions: [
@@ -208,15 +216,42 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
     ],
     content: initialContent || '',
     immediatelyRender: false,
+    // 默认 false；显式声明，避免旧版 onTransaction 整棵工具栏重渲染
+    shouldRerenderOnTransaction: false,
     onUpdate: () => {
       if (onChange) onChange();
-    },
-    onTransaction: () => {
-      setRenderTrigger(v => v + 1);
     },
     editorProps: {
       attributes: { class: 'prose prose-slate dark:prose-invert prose-lg max-w-none w-full focus:outline-none min-h-full pb-60 font-serif leading-relaxed px-4 editor-content-area' }
     },
+  });
+
+  // 仅订阅工具栏 active 状态；selector 结果不变则不重渲染整棵树
+  const editorState = useEditorState({
+    editor,
+    selector: ({ editor: e }) => (e ? {
+      isParagraph: e.isActive('paragraph') && !e.isActive('heading'),
+      isHeading1: e.isActive('heading', { level: 1 }),
+      isHeading2: e.isActive('heading', { level: 2 }),
+      isHeading3: e.isActive('heading', { level: 3 }),
+      isBold: e.isActive('bold'),
+      isItalic: e.isActive('italic'),
+      isUnderline: e.isActive('underline'),
+      isStrike: e.isActive('strike'),
+      isCodeBlock: e.isActive('codeBlock'),
+      isLeft: e.isActive({ textAlign: 'left' }),
+      isCenter: e.isActive({ textAlign: 'center' }),
+      isRight: e.isActive({ textAlign: 'right' }),
+      isBulletList: e.isActive('bulletList'),
+      isOrderedList: e.isActive('orderedList'),
+      isTaskList: e.isActive('taskList'),
+      isBlockquote: e.isActive('blockquote'),
+      isSuperscript: e.isActive('superscript'),
+      isSubscript: e.isActive('subscript'),
+      isLink: e.isActive('link'),
+      isImage: e.isActive('image'),
+      fontSize: (e.getAttributes('textStyle').fontSize as string) || 'default',
+    } : null),
   });
 
   useImperativeHandle(ref, () => ({
@@ -254,7 +289,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
         const wrapper = document.createElement('div');
         wrapper.innerHTML = initialContent;
         const doc = parser.parse(wrapper);
-        editor.commands.setContent(doc.toJSON() as any, { emitUpdate: false });
+        editor.commands.setContent(doc.toJSON() as Parameters<typeof editor.commands.setContent>[0], { emitUpdate: false });
       } else {
         // 纯 markdown 文本（粘贴场景下不太可能到这里，但保留这条路径以防万一）
         editor.commands.setContent(initialContent, { emitUpdate: false });
@@ -263,9 +298,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
     }
   }, [editor, initialContent]);
 
-  if (!editor) return null;
+  if (!editor || !editorState) return null;
 
-  const currentFontSize = editor.getAttributes('textStyle').fontSize || "default";
+  const currentFontSize = editorState.fontSize;
 
   const toggleLink = () => {
     if (editor.isActive('link')) {
@@ -349,7 +384,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
           onChange={(e) => !isTitleLocked && setTitle(e.target.value)}
           readOnly={isTitleLocked}
           placeholder="文章大标题..."
-          className={`flex-1 text-5xl font-black bg-transparent border-none outline-none transition-all tracking-tighter 
+          className={`flex-1 text-3xl md:text-5xl font-black bg-transparent border-none outline-none transition-all tracking-tighter focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/40 rounded-lg
             ${isTitleLocked ? 'text-slate-400 dark:text-slate-600 cursor-default select-none' : 'text-slate-900 dark:text-white placeholder:text-slate-200 dark:placeholder:text-slate-800'}
           `}
         />
@@ -380,40 +415,40 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, EditorProps>(({ title, s
         </div>
 
         <div className="flex items-center gap-1">
-          <Btn onClick={() => editor.chain().focus().setParagraph().run()} active={editor.isActive('paragraph') && !editor.isActive('heading')} title="正文"><Type size={18}/></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editor.isActive('heading', { level: 1 })} title="一级标题 (#)">
+          <Btn onClick={() => editor.chain().focus().setParagraph().run()} active={editorState.isParagraph} title="正文"><Type size={18}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} active={editorState.isHeading1} title="一级标题 (#)">
             <div className="flex items-center gap-1 font-black"><Heading1 size={16}/><span className="text-[10px] opacity-60">#</span></div>
           </Btn>
-          <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="二级标题 (##)">
+          <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editorState.isHeading2} title="二级标题 (##)">
             <div className="flex items-center gap-1 font-black"><Heading2 size={16}/><span className="text-[10px] opacity-60">##</span></div>
           </Btn>
-          <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="三级标题 (###)">
+          <Btn onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editorState.isHeading3} title="三级标题 (###)">
             <div className="flex items-center gap-1 font-black"><Heading3 size={16}/><span className="text-[10px] opacity-60">###</span></div>
           </Btn>
         </div>
 
         <div className="w-px h-6 bg-slate-400/20 mx-1" />
         <div className="flex items-center gap-1">
-          <Btn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')}><Bold size={16}/></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')}><Italic size={16}/></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')}><UnderlineIcon size={16}/></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')}><Strikethrough size={16}/></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')}><Code2 size={16}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleBold().run()} active={editorState.isBold} title="加粗 (Ctrl+B)"><Bold size={16}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleItalic().run()} active={editorState.isItalic} title="斜体 (Ctrl+I)"><Italic size={16}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleUnderline().run()} active={editorState.isUnderline} title="下划线 (Ctrl+U)"><UnderlineIcon size={16}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleStrike().run()} active={editorState.isStrike} title="删除线"><Strikethrough size={16}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editorState.isCodeBlock} title="代码块"><Code2 size={16}/></Btn>
         </div>
         <div className="w-px h-6 bg-slate-400/20 mx-1" />
-        <div className="flex items-center gap-1"><Btn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editor.isActive({ textAlign: 'left' })}><AlignLeft size={16}/></Btn><Btn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editor.isActive({ textAlign: 'center' })}><AlignCenter size={16}/></Btn><Btn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editor.isActive({ textAlign: 'right' })}><AlignRight size={16}/></Btn></div>
+        <div className="flex items-center gap-1"><Btn onClick={() => editor.chain().focus().setTextAlign('left').run()} active={editorState.isLeft} title="左对齐"><AlignLeft size={16}/></Btn><Btn onClick={() => editor.chain().focus().setTextAlign('center').run()} active={editorState.isCenter} title="居中对齐"><AlignCenter size={16}/></Btn><Btn onClick={() => editor.chain().focus().setTextAlign('right').run()} active={editorState.isRight} title="右对齐"><AlignRight size={16}/></Btn></div>
         <div className="w-px h-6 bg-slate-400/20 mx-1" />
-        <div className="flex items-center gap-1"><Btn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editor.isActive('bulletList')}><List size={16}/></Btn><Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editor.isActive('orderedList')}><ListOrdered size={16}/></Btn><Btn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editor.isActive('taskList')}><ListTodo size={16}/></Btn><Btn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')}><Quote size={16}/></Btn></div>
+        <div className="flex items-center gap-1"><Btn onClick={() => editor.chain().focus().toggleBulletList().run()} active={editorState.isBulletList} title="无序列表"><List size={16}/></Btn><Btn onClick={() => editor.chain().focus().toggleOrderedList().run()} active={editorState.isOrderedList} title="有序列表"><ListOrdered size={16}/></Btn><Btn onClick={() => editor.chain().focus().toggleTaskList().run()} active={editorState.isTaskList} title="任务列表"><ListTodo size={16}/></Btn><Btn onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editorState.isBlockquote} title="引用"><Quote size={16}/></Btn></div>
         <div className="w-px h-6 bg-slate-400/20 mx-1" />
 
         <div className="flex items-center gap-1">
-          <Btn onClick={() => editor.chain().focus().toggleSuperscript().run()} active={editor.isActive('superscript')}><SupIcon size={16}/></Btn>
-          <Btn onClick={() => editor.chain().focus().toggleSubscript().run()} active={editor.isActive('subscript')}><SubIcon size={16}/></Btn>
-          <Btn onClick={toggleLink} active={editor.isActive('link')}><Link2 size={16}/></Btn>
-          <Btn onClick={onOpenImageTool}><ImageIcon size={16} className="text-indigo-500"/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleSuperscript().run()} active={editorState.isSuperscript} title="上标"><SupIcon size={16}/></Btn>
+          <Btn onClick={() => editor.chain().focus().toggleSubscript().run()} active={editorState.isSubscript} title="下标"><SubIcon size={16}/></Btn>
+          <Btn onClick={toggleLink} active={editorState.isLink} title="插入链接"><Link2 size={16}/></Btn>
+          <Btn onClick={onOpenImageTool} title="插入图片"><ImageIcon size={16} className="text-indigo-500"/></Btn>
         </div>
 
-        {editor.isActive('image') && <div className="flex items-center gap-1 ml-4 bg-indigo-500/10 p-1 px-3 rounded-2xl border border-indigo-500/20 border-dashed animate-in slide-in-from-left">{['25%', '50%', '75%', '100%'].map(s => <button key={s} onClick={() => editor.chain().focus().updateAttributes('image', { width: s }).run()} className="px-2 py-1 text-[9px] font-bold hover:bg-white rounded-lg transition-all">{s}</button>)}</div>}
+        {editorState.isImage && <div className="flex items-center gap-1 ml-4 bg-indigo-500/10 p-1 px-3 rounded-2xl border border-indigo-500/20 border-dashed animate-in slide-in-from-left">{['25%', '50%', '75%', '100%'].map(s => <button type="button" key={s} onClick={() => editor.chain().focus().updateAttributes('image', { width: s }).run()} className="px-2 py-1 text-[9px] font-bold hover:bg-white rounded-lg transition-all">{s}</button>)}</div>}
         <div className="flex-1" />
         <div className="flex items-center gap-4">
           <div className="relative">
