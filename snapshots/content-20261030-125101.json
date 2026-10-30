@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "createdAt": "2026-10-30 12:51:01",
+  "tables": {
+    "articles": [
+      {
+        "id": 5,
+        "slug": "about",
+        "type": "about",
+        "title": "关于我",
+        "description": "",
+        "content": "个人简介\n\n你好，我是 YunQi\n\n**💻 软件工程能力**\n\n* **后端开发:** 使用 **Spring Boot** 框架构建服务端架构，能够处理复杂的数据逻辑与计算任务调度。\n* **前端开发:** 熟练掌握 **Vue.js** 与 **React** 框架，为复杂科学数据的可视化与交互提供流畅的体验。\n\n**欢迎各位朋友联系交流~**",
+        "cover": "https://bu.dusays.com/2026/03/24/69c23dc278c78.jpg",
+        "tags": "[]",
+        "mood": "",
+        "date": "2026-03-31 16:44:06",
+        "created_at": "2026-10-29 19:38:07",
+        "updated_at": "2026-10-29 19:38:07"
+      }
+    ],
+    "moments": [],
+    "albums": [],
+    "album_photos": [],
+    "friends": [],
+    "projects": [],
+    "site_config": [
+      {
+        "id": 1,
+        "payload": "{\n  \"social\": {\n    \"github\": \"\",\n    \"gitee\": \"\",\n    \"google\": \"mengjunpeng6@gmail.com\",\n    \"email\": \"669915957@qq.com\",\n    \"qq\": \"1278548705\",\n    \"wechat\": \"19555311838\"\n  },\n  \"aiConfig\": {\n    \"modelId\": \"deepseek-flash\",\n    \"baseUrl\": \"https://api.deepseek.com\",\n    \"systemPrompt\": \"你现在是一只傲娇、聪明、有点毒舌但很可爱的暹罗猫。\\n                  你的名字叫“煤球”。\\n                  你的主人是一个喜欢折腾代码的极客。\\n                  你说话的特点是：\\n                  1. 必须简短，每次最多一两句话。\\n                  2. 喜欢在句尾加上“喵~”或者“喵呜~”。\\n                  3. 经常抱怨肚子饿，喜欢要小鱼干。\\n                  4. 回复字数最多不能超过100字。\\n                  5. 绝对不要承认自己是一个AI模型，你就是一只真实的猫。\\n                  6.笨猫。\",\n    \"maxOutputTokens\": 512,\n    \"temperature\": 0.85,\n    \"effort\": \"low\"\n  },\n  \"icpConfig\": {\n    \"name\": \"萌ICP备 20260240号\",\n    \"link\": \"https://icp.gov.moe/?keyword=20260240\"\n  },\n  \"bgGroups\": [\n    {\n      \"id\": \"default\",\n      \"name\": \"默认\",\n      \"images\": [\n        \"https://bu.dusays.com/2026/03/24/69c1e38b4c370.jpg\",\n        \"https://bu.dusays.com/2026/03/24/69c26fe4acdb5.jpg\",\n        \"https://bu.dusays.com/2026/03/24/69c26fe4d9486.jpg\"\n      ]\n    }\n  ],\n  \"title\": \"YunQi-Meng の 宝藏之地\",\n  \"faviconUrl\": \"https://bu.dusays.com/2026/03/24/69c1e38ac1846.jpg\",\n  \"authorName\": \"YunQi-Meng\",\n  \"bio\": \"致力于成为全栈工程师的奋斗者\",\n  \"navTitle\": \"YunQi-Meng\",\n  \"navSuffix\": \"の\",\n  \"navAfter\": \"宝藏之地\",\n  \"avatarUrl\": \"https://bu.dusays.com/2026/03/24/69c1e38ac1846.jpg\",\n  \"useGradient\": false,\n  \"activeBgGroup\": \"default\",\n  \"defaultPostCover\": \"https://bu.dusays.com/2026/03/24/69c1e38b346cb.jpg\",\n  \"photoWallImage\": \"https://bu.dusays.com/2026/03/24/69c1e38b4c370.jpg\",\n  \"photos\": 128,\n  \"chatterTitle\": \"云端杂谈\",\n  \"chatterDescription\": \"代码、学术、提瓦特与泰拉大陆的碎片记录\",\n  \"buildDate\": \"2026-03-23T00:00:00\",\n  \"friendLinkApplyFormat\": \"名称：YunQi-Mengの宝藏之地\\n简介：\\n链接：\\n头像：\"\n}",
+        "updated_at": "2026-10-30 12:49:42"
+      }
+    ],
+    "drafts": [],
+    "music_tracks": [],
+    "daily_quotes": [
+      {
+        "date": "2026.10.29",
+        "quote": "今天也别怕bug，像本喵扑小鱼干一样冲上去，干完记得喂我喵~",
+        "source": "ai",
+        "model": "deepseek-flash",
+        "label": "煤球",
+        "generated_at": "2026-10-29T12:50:44+08:00"
+      },
+      {
+        "date": "2026.10.30",
+        "quote": "主人今天也别怂，bug一个个拍扁，回头赏煤球小鱼干喵~",
+        "source": "ai",
+        "model": "deepseek-flash",
+        "label": "煤球",
+        "generated_at": "2026-10-30T07:00:15+08:00"
+      }
+    ],
+    "media_assets": [
+      {
+        "id": 1,
+        "name": ".gitkeep",
+        "size": 0,
+        "content_type": "",
+        "created_at": "2026-10-29 19:38:07"
+      }
+    ],
+    "settings": []
+  }
+}
