@@ -85,3 +85,24 @@ def init_db() -> None:
 
     config.data_dir().mkdir(parents=True, exist_ok=True)
     Base.metadata.create_all(engine)
+    _ensure_indexes()
+
+
+def _ensure_indexes() -> None:
+    """给已有库补上 create_all 不会追加的索引。
+
+    create_all 只建缺的表，不会给已存在的表补索引；上线新索引时
+    老库要在这里手工补一遍。已存在时跳过，重复启动不会报错。
+    """
+    statements = [
+        "CREATE INDEX IF NOT EXISTS ix_comments_list ON comments (target, parent_id, status, created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_comments_visitor_time ON comments (visitor_id, created_at)",
+    ]
+    with engine.begin() as connection:
+        for statement in statements:
+            try:
+                connection.exec_driver_sql(statement)
+            except Exception:
+                # 非 SQLite（如 MySQL 不支持 IF NOT EXISTS）或权限不足时静默跳过：
+                # 索引缺失只是查询慢一点，不能让服务起不来
+                pass

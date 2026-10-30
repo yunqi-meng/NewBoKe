@@ -53,9 +53,13 @@ def _safe_file_name(name: str) -> str:
 
 
 @router.post("/upload")
-async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_db),
-                       _: None = Depends(require_admin)):
-    """接收本机上传的图片，写入本地图片仓库"""
+def upload_image(file: UploadFile = File(...), db: Session = Depends(get_db),
+                 _: None = Depends(require_admin)):
+    """接收本机上传的图片，写入本地图片仓库。
+
+    用同步 def：拷贝落盘属于阻塞 I/O，交给线程池跑，不占事件循环；
+    落盘用流式拷贝，大图不会整张读进内存。
+    """
     try:
         original_name = os.path.basename(file.filename or "")
         extension = os.path.splitext(original_name)[1].lower()
@@ -67,26 +71,44 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
         if content_type and not content_type.startswith("image/"):
             return {"success": False, "message": "只能上传图片文件"}
 
-        content = await file.read()
-        if not content:
-            return {"success": False, "message": "文件内容为空"}
-
-        if len(content) > MAX_UPLOAD_BYTES:
-            return {"success": False, "message": "图片太大了，单张上限 12MB"}
-
-        digest = hashlib.sha256(content).hexdigest()[:12]
-        file_name = "{0}-{1}{2}".format(time.strftime("%Y%m%d-%H%M%S"), digest, extension)
-
         target_dir = uploads_dir()
         os.makedirs(target_dir, exist_ok=True)
-        with open(os.path.join(target_dir, file_name), "wb") as target:
-            target.write(content)
+
+        # 文件名要嵌内容哈希，先流式拷到临时文件、边拷边算哈希，再改名定稿
+        temp_path = os.path.join(target_dir, ".uploading-{0}".format(int(time.time() * 1000)))
+        hasher = hashlib.sha256()
+        size = 0
+        try:
+            with open(temp_path, "wb") as target:
+                while True:
+                    chunk = file.file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    if size > MAX_UPLOAD_BYTES:
+                        return {"success": False, "message": "图片太大了，单张上限 12MB"}
+                    hasher.update(chunk)
+                    target.write(chunk)
+
+            if not size:
+                return {"success": False, "message": "文件内容为空"}
+
+            file_name = "{0}-{1}{2}".format(
+                time.strftime("%Y%m%d-%H%M%S"), hasher.hexdigest()[:12], extension
+            )
+            os.replace(temp_path, os.path.join(target_dir, file_name))
+        finally:
+            if os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
 
         row = db.query(MediaAsset).filter(MediaAsset.name == file_name).first()
         if row is None:
             row = MediaAsset(name=file_name)
             db.add(row)
-        row.size = len(content)
+        row.size = size
         row.content_type = MIME_TYPES.get(extension, "")
         row.created_at = now_stamp()
         db.commit()
@@ -96,7 +118,7 @@ async def upload_image(file: UploadFile = File(...), db: Session = Depends(get_d
             "message": "上传成功",
             "url": "/uploads/{0}".format(file_name),
             "name": file_name,
-            "size": len(content),
+            "size": size,
         }
     except Exception as error:
         return {"success": False, "message": "上传失败：{0}".format(error)}

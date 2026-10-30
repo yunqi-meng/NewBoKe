@@ -49,13 +49,12 @@ curl -s -o /dev/null -w '发布接口自身耗时 %{time_total}s\n' \
   -X POST http://127.0.0.1:3001/api/proxy/api/deploy/publish \
   -H 'Content-Type: application/json' \
   -H "Cookie: xh_mgr_session=$TOKEN" -d '{}'
-unset TOKEN
 echo "点击时刻 T_CLICK=$T_CLICK"
 
 echo "=== 4. 等待发布（快照提交）结束 ==="
 FOUND=0
 for i in $(seq 1 180); do
-  OUT=$(curl -s http://127.0.0.1:8000/api/deploy/status)
+  OUT=$(curl -s -H "X-Admin-Token: $TOKEN" http://127.0.0.1:8000/api/deploy/status)
   STATE=$(printf '%s' "$OUT" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("publish",{}).get("state",""))')
   if [ "$STATE" = "done" ] || [ "$STATE" = "failed" ]; then
     T1=$(date +%s%3N)
@@ -71,7 +70,8 @@ if [ "$FOUND" = "0" ]; then
 fi
 
 echo "=== 5. 发布状态 ==="
-curl -s http://127.0.0.1:8000/api/deploy/status | python3 -c 'import sys,json; d=json.load(sys.stdin); print(json.dumps({"build": d.get("build"), "publish": d.get("publish"), "effective": d.get("effective"), "git": d.get("git")}, ensure_ascii=False, indent=2))'
+curl -s -H "X-Admin-Token: $TOKEN" http://127.0.0.1:8000/api/deploy/status | python3 -c 'import sys,json; d=json.load(sys.stdin); print(json.dumps({"build": d.get("build"), "publish": d.get("publish"), "effective": d.get("effective"), "git": d.get("git")}, ensure_ascii=False, indent=2))'
+unset TOKEN
 
 echo "=== 6. 快照是否已入库 ==="
 ls -t /opt/xinghui-blog/snapshots/content-*.json 2>/dev/null | head -3

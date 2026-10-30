@@ -11,10 +11,10 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import config
+from . import config, httpcache, revalidate
 from .api import (
     auth,
     chat,
@@ -59,12 +59,21 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def optimize_response(request: Request, call_next):
+    """JSON 压缩 + 公开读接口 ETag 缓存；内容写入成功后通知公开站刷新页面缓存。"""
+    response = await call_next(request)
+    response = await httpcache.apply(request, response)
+    if response.status_code < 400 and revalidate.should_revalidate(request.method, request.url.path):
+        revalidate.schedule()
+    return response
+
+
 @app.get("/api/status")
 def get_status():
     return {
         "status": "online",
         "message": "统一后端已连接",
-        "database": config.database_url(),
     }
 
 

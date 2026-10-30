@@ -18,18 +18,18 @@ TOKEN=$(MANAGER_SESSION_SECRET="$SECRET" node -e 'const c=require("crypto");cons
 unset SECRET
 curl -s -X POST http://127.0.0.1:3001/api/proxy/api/deploy/publish \
   -H 'Content-Type: application/json' -H "Cookie: xh_mgr_session=$TOKEN" -d '{}'
-unset TOKEN
 echo
 
 echo "=== 3. 等待发布完成 ==="
 for i in $(seq 1 60); do
-  STATE=$(curl -s http://127.0.0.1:8000/api/deploy/status | python3 -c 'import sys,json; print(json.load(sys.stdin).get("publish",{}).get("state",""))')
+  STATE=$(curl -s -H "X-Admin-Token: $TOKEN" http://127.0.0.1:8000/api/deploy/status | python3 -c 'import sys,json; print(json.load(sys.stdin).get("publish",{}).get("state",""))')
   if [ "$STATE" = "done" ] || [ "$STATE" = "failed" ]; then
     echo "发布状态：$STATE"
     break
   fi
   sleep 1
 done
+unset TOKEN
 
 echo "=== 4. 校验公开站已无测试内容 ==="
 BODY=$(curl -s http://127.0.0.1:8080/moments)

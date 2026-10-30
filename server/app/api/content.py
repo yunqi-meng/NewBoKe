@@ -149,18 +149,19 @@ def delete_moment(moment_id: str, db: Session = Depends(get_db),
 # ------------------------------------------------------- 兼容旧控制台的别名
 @router.get("/tags")
 def all_tags(db: Session = Depends(get_db)):
-    """历史上用过的标签（编辑器补全用）。"""
+    """历史上用过的标签（编辑器补全用）。
+
+    只查 type 与 tags 两列：正文可能有几百 KB 一列，
+    整表扫正文只为拼标签补全，不划算。
+    """
     post_tags = set()
     chatter_tags = set()
-    for row in db.query(Article).all():
-        if row.type == "post":
-            target = post_tags
-        elif row.type == "chatter":
-            target = chatter_tags
-        else:
-            # 关于页不参与标签补全
-            continue
-        for tag in loads_list(row.tags):
+    rows = db.query(Article.type, Article.tags).filter(
+        Article.type.in_(["post", "chatter"])
+    ).all()
+    for doc_type, raw_tags in rows:
+        target = post_tags if doc_type == "post" else chatter_tags
+        for tag in loads_list(raw_tags):
             target.add(str(tag))
     return {
         "success": True,

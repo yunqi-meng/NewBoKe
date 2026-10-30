@@ -16,7 +16,7 @@ import subprocess
 import time
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Body, Depends
 
 from .. import config
 from ..security import require_admin
@@ -157,8 +157,12 @@ def _resolve_blog_path() -> str:
 # --------------------------------------------------------------------------
 
 @router.get("/config")
-async def get_deploy_config():
-    """当前部署方式用到的字段：仓库根目录、快照目录、发布助手。"""
+def get_deploy_config(_: None = Depends(require_admin)):
+    """当前部署方式用到的字段：仓库根目录、快照目录、发布助手。
+
+    刻意用同步 def：里面要跑多条 git 命令，交给线程池执行，
+    不会把整个服务的事件循环卡住。
+    """
     return {
         "success": True,
         "blogPath": _resolve_blog_path(),
@@ -171,10 +175,11 @@ async def get_deploy_config():
 
 
 @router.post("/config")
-async def save_deploy_config(request: Request, _: None = Depends(require_admin)):
+def save_deploy_config(payload: Optional[Dict[str, Any]] = Body(default=None),
+                       _: None = Depends(require_admin)):
     try:
-        payload = await request.json()
-        blog_path = (payload.get("blogPath") or "").strip()
+        body = payload or {}
+        blog_path = (body.get("blogPath") or "").strip()
 
         if blog_path and not os.path.exists(blog_path):
             return {"success": False, "message": f"路径不存在：{blog_path}"}
@@ -275,7 +280,7 @@ def _collect_status(blog_path: str, repo_root: str) -> Dict[str, Any]:
 
 
 @router.get("/status")
-async def get_publish_status():
+def get_publish_status(_: None = Depends(require_admin)):
     """返回当前线上状态：Git、构建产物、服务、最近一次发布"""
     try:
         return _collect_status(_resolve_blog_path(), _repo_root())
@@ -288,7 +293,7 @@ async def get_publish_status():
 # --------------------------------------------------------------------------
 
 @router.get("/snapshots")
-async def list_snapshots():
+def list_snapshots(_: None = Depends(require_admin)):
     """本地的内容快照列表（文件名 + 大小 + 时间）。"""
     directory = config.snapshots_dir()
     files = []
@@ -330,7 +335,7 @@ def _commit_history(repo_root: str, limit: int = 20) -> List[Dict[str, Any]]:
 
 
 @router.get("/history")
-async def get_publish_history():
+def get_publish_history(_: None = Depends(require_admin)):
     """发布历史：每一次发布与回退都是一次提交，可以回到其中任意一步"""
     try:
         repo_root = _repo_root()
@@ -373,14 +378,15 @@ def _find_snapshot_in_commit(repo_root: str, commit: str) -> Optional[str]:
 # --------------------------------------------------------------------------
 
 @router.post("/rollback")
-async def rollback_to_commit(request: Request, _: None = Depends(require_admin)):
+def rollback_to_commit(payload: Optional[Dict[str, Any]] = Body(default=None),
+                       _: None = Depends(require_admin)):
     """把内容回退到指定提交（发布历史里的前几步）。
 
     回退 = 把那次提交里的快照灌回数据库，内容立刻回到当时的样子。
     """
     try:
-        payload = await request.json()
-        commit = (payload.get("commit") or "").strip()
+        body = payload or {}
+        commit = (body.get("commit") or "").strip()
 
         if not commit:
             return {"success": False, "message": "请选择要回退到的那一步"}
@@ -469,7 +475,7 @@ async def rollback_to_commit(request: Request, _: None = Depends(require_admin))
 # --------------------------------------------------------------------------
 
 @router.post("/publish")
-async def publish_to_live(request: Request, _: None = Depends(require_admin)):
+def publish_to_live(_: None = Depends(require_admin)):
     """把当前数据库里的内容导成快照，提交并推送到 GitHub 仓库。
 
     内容在控制台保存时就已经实时写入数据库、公开站刷新即见；

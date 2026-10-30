@@ -394,9 +394,12 @@ def stop_scheduler() -> None:
 # --------------------------------------------------------------------------
 # 接口
 # --------------------------------------------------------------------------
-def _payload(db: Session) -> dict:
-    config = read_config(db)
-    current = _today_quote(db)
+def _payload(db: Session, config: Optional[dict] = None, current: Optional[DailyQuote] = None) -> dict:
+    # 配置和今天的句子由调用方带进来：get_daily_quote 刚查过一遍，别再查第二次
+    if config is None:
+        config = read_config(db)
+    if current is None:
+        current = _today_quote(db)
     return {
         "success": True,
         "enabled": bool(config["enabled"]),
@@ -430,11 +433,12 @@ def get_daily_quote(db: Session = Depends(get_db)):
     fresh = bool(current and current.quote)
     if not fresh and config.get("enabled", True) and config.get("autoGenerate", True):
         start_background_generation()
-    return _payload(db)
+    return _payload(db, config, current)
 
 
 @router.get("/config")
-def get_daily_quote_config(db: Session = Depends(get_db)):
+def get_daily_quote_config(db: Session = Depends(get_db), _: None = Depends(require_admin)):
+    # 配置里带着生成用的提示词，只给管理后台看（公开站走的是 GET /）
     return {"success": True, "config": read_config(db)}
 
 

@@ -9,12 +9,11 @@ unset SECRET
 echo "=== 接口返回 ==="
 curl -s -X POST http://127.0.0.1:3001/api/proxy/api/deploy/publish \
   -H 'Content-Type: application/json' -H "Cookie: xh_mgr_session=$TOKEN" -d '{}'
-unset TOKEN
 echo
 
 echo "=== 等待发布结束 ==="
 for i in $(seq 1 120); do
-  OUT=$(curl -s http://127.0.0.1:8000/api/deploy/status | python3 -c 'import sys,json; d=json.load(sys.stdin); p=d.get("publish",{}); print(p.get("state",""), "|", p.get("message",""), "|", "effective=" + str(d.get("effective")), "|", "build=" + str(d.get("build",{}).get("id")), "|", "head=" + str(d.get("git",{}).get("head")))')
+  OUT=$(curl -s -H "X-Admin-Token: $TOKEN" http://127.0.0.1:8000/api/deploy/status | python3 -c 'import sys,json; d=json.load(sys.stdin); p=d.get("publish",{}); print(p.get("state",""), "|", p.get("message",""), "|", "effective=" + str(d.get("effective")), "|", "build=" + str(d.get("build",{}).get("id")), "|", "head=" + str(d.get("git",{}).get("head")))')
   STATE=$(echo "$OUT" | awk '{print $1}')
   if [ "$STATE" = "done" ] || [ "$STATE" = "failed" ]; then
     echo "$OUT"
@@ -22,6 +21,7 @@ for i in $(seq 1 120); do
   fi
   sleep 1
 done
+unset TOKEN
 
 echo "=== 发布助手日志尾部 ==="
 sudo -n tail -12 /var/log/xhblogs-publish.log

@@ -20,9 +20,24 @@ _attempts = defaultdict(list)
 
 
 def _client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for", "")
+    """取真实客户端 IP，用于登录限流。
+
+    信任顺序：x-real-ip（nginx 会用 $remote_addr 覆写，客户端伪造不了）
+    → x-forwarded-for 的最后一段（反代链上最近一跳追加的就是真实来源）
+    → 直连地址。
+
+    以前取 X-Forwarded-For 的第一段：nginx 的 $proxy_add_x_forwarded_for
+    只是把客户端带来的旧值原样保留在前面，攻击者自带一个假 IP 就能
+    每次换身份，限流形同虚设。
+    """
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip[:64]
+    forwarded = (request.headers.get("x-forwarded-for") or "").strip()
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        last = forwarded.split(",")[-1].strip()
+        if last:
+            return last[:64]
     return request.client.host if request.client else "unknown"
 
 

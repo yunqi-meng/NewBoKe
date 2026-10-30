@@ -102,8 +102,7 @@ def _remove_file(relative_path: str) -> None:
         pass
 
 
-def track_to_dict(row: MusicTrack) -> Dict[str, Any]:
-    audio_path = os.path.join(music_dir(), row.file or "")
+def track_to_dict(row: MusicTrack, existing: set) -> Dict[str, Any]:
     return {
         "id": row.id,
         "title": row.title,
@@ -113,7 +112,7 @@ def track_to_dict(row: MusicTrack) -> Dict[str, Any]:
         "lyrics": row.lyrics,
         "size": row.size,
         "addedAt": row.added_at,
-        "available": os.path.isfile(audio_path),
+        "available": row.file in existing,
     }
 
 
@@ -122,7 +121,14 @@ def track_to_dict(row: MusicTrack) -> Dict[str, Any]:
 def list_local_music(db: Session = Depends(get_db)):
     """本地音乐播放列表（控制台与公开站共用的元数据）"""
     rows = db.query(MusicTrack).order_by(MusicTrack.sort_order, MusicTrack.id).all()
-    tracks = [track_to_dict(row) for row in rows]
+    # 目录扫一遍拿文件名集合：几百首歌逐首 isfile 就是几百次系统调用
+    existing = set()
+    try:
+        with os.scandir(music_dir()) as entries:
+            existing = {entry.name for entry in entries if entry.is_file()}
+    except OSError:
+        pass
+    tracks = [track_to_dict(row, existing) for row in rows]
     return {
         "success": True,
         "data": {
@@ -134,14 +140,18 @@ def list_local_music(db: Session = Depends(get_db)):
 
 
 @router.post("/upload")
-async def upload_local_music(
+def upload_local_music(
     file: UploadFile = File(...),
     title: str = Form(""),
     artist: str = Form(""),
     db: Session = Depends(get_db),
     _: None = Depends(require_admin),
 ):
-    """上传本地音频文件，自动追加进播放列表"""
+    """上传本地音频文件，自动追加进播放列表。
+
+    同步 def + 流式落盘：音频动辄几十 MB，不能整份读进内存，
+    阻塞 I/O 也不该占着事件循环。
+    """
     original_name = file.filename or ""
     ext = os.path.splitext(original_name)[1].lower()
 
@@ -149,20 +159,32 @@ async def upload_local_music(
         return {"success": False,
                 "message": "只支持音频文件（{}）".format("、".join(sorted(AUDIO_EXTS)))}
 
-    content = await file.read()
-    if not content:
-        return {"success": False, "message": "文件内容为空"}
-    if len(content) > MAX_AUDIO_BYTES:
-        return {"success": False, "message": "单个音频不能超过 100MB"}
-
     _ensure_music_dir()
 
     stem = _safe_stem(title or original_name)
     file_name = _unique_name(music_dir(), stem, ext)
+    size = 0
     with open(os.path.join(music_dir(), file_name), "wb") as f:
-        f.write(content)
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_AUDIO_BYTES:
+                f.close()
+                _remove_file(file_name)
+                return {"success": False, "message": "单个音频不能超过 100MB"}
+            f.write(chunk)
+    if not size:
+        _remove_file(file_name)
+        return {"success": False, "message": "文件内容为空"}
 
     track_id = "t{0}".format(int(time.time() * 1000))
+    suffix = 1
+    while db.query(MusicTrack).filter(MusicTrack.id == track_id).first():
+        # 同一毫秒并发上传时给 id 追加序号，避免主键撞车
+        track_id = "t{0}-{1}".format(int(time.time() * 1000), suffix)
+        suffix += 1
     row = MusicTrack(
         id=track_id,
         title=(title or stem).strip(),
@@ -170,7 +192,7 @@ async def upload_local_music(
         file=file_name,
         cover="",
         lyrics="",
-        size=len(content),
+        size=size,
         added_at=now_stamp(),
         sort_order=db.query(MusicTrack).count(),
     )
@@ -182,19 +204,13 @@ async def upload_local_music(
 
 
 @router.post("/cover/{track_id}")
-async def upload_local_cover(track_id: str, file: UploadFile = File(...),
-                              db: Session = Depends(get_db),
-                              _: None = Depends(require_admin)):
+def upload_local_cover(track_id: str, file: UploadFile = File(...),
+                       db: Session = Depends(get_db),
+                       _: None = Depends(require_admin)):
     """给已上传的曲目补一张封面"""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in COVER_EXTS:
         return {"success": False, "message": "封面只支持图片文件"}
-
-    content = await file.read()
-    if not content:
-        return {"success": False, "message": "封面内容为空"}
-    if len(content) > MAX_COVER_BYTES:
-        return {"success": False, "message": "封面不能超过 8MB"}
 
     row = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
     if not row:
@@ -202,8 +218,21 @@ async def upload_local_cover(track_id: str, file: UploadFile = File(...),
 
     _ensure_music_dir()
     cover_name = _unique_name(cover_dir(), track_id, ext)
+    size = 0
     with open(os.path.join(cover_dir(), cover_name), "wb") as f:
-        f.write(content)
+        while True:
+            chunk = file.file.read(1024 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > MAX_COVER_BYTES:
+                f.close()
+                _remove_file("covers/{0}".format(cover_name))
+                return {"success": False, "message": "封面不能超过 8MB"}
+            f.write(chunk)
+    if not size:
+        _remove_file("covers/{0}".format(cover_name))
+        return {"success": False, "message": "封面内容为空"}
 
     old_cover = row.cover
     row.cover = "covers/{0}".format(cover_name)
@@ -228,21 +257,21 @@ def get_local_cover(track_id: str, db: Session = Depends(get_db)):
         return JSONResponse({"success": False, "message": "封面文件不存在"}, status_code=404)
 
     ext = os.path.splitext(target)[1].lower()
-    return FileResponse(target, media_type=CONTENT_TYPES.get(ext, "application/octet-stream"))
+    return FileResponse(
+        target,
+        media_type=CONTENT_TYPES.get(ext, "application/octet-stream"),
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @router.post("/lyrics/{track_id}")
-async def upload_local_lyrics(track_id: str, file: UploadFile = File(...),
-                               db: Session = Depends(get_db),
-                               _: None = Depends(require_admin)):
+def upload_local_lyrics(track_id: str, file: UploadFile = File(...),
+                        db: Session = Depends(get_db),
+                        _: None = Depends(require_admin)):
     """给已上传的曲目补一份 LRC 歌词"""
     ext = os.path.splitext(file.filename or "")[1].lower()
     if ext not in LYRIC_EXTS:
         return {"success": False, "message": "歌词只支持 .lrc 文件"}
-
-    content = await file.read()
-    if not content:
-        return {"success": False, "message": "歌词内容为空"}
 
     row = db.query(MusicTrack).filter(MusicTrack.id == track_id).first()
     if not row:
@@ -251,8 +280,21 @@ async def upload_local_lyrics(track_id: str, file: UploadFile = File(...),
     _ensure_music_dir()
     audio_stem = os.path.splitext(row.file or "track")[0]
     lrc_name = _unique_name(music_dir(), audio_stem, ".lrc")
+    size = 0
     with open(os.path.join(music_dir(), lrc_name), "wb") as f:
-        f.write(content)
+        while True:
+            chunk = file.file.read(64 * 1024)
+            if not chunk:
+                break
+            size += len(chunk)
+            if size > 1024 * 1024:
+                f.close()
+                _remove_file(lrc_name)
+                return {"success": False, "message": "歌词文件不能超过 1MB"}
+            f.write(chunk)
+    if not size:
+        _remove_file(lrc_name)
+        return {"success": False, "message": "歌词内容为空"}
 
     row.lyrics = lrc_name
     db.commit()
@@ -270,8 +312,12 @@ def get_local_lyrics(track_id: str, db: Session = Depends(get_db)):
     if not _is_inside(music_dir(), target) or not os.path.isfile(target):
         return PlainTextResponse("", status_code=404)
 
-    with open(target, "r", encoding="utf-8", errors="replace") as f:
-        return PlainTextResponse(f.read(), media_type="text/plain; charset=utf-8")
+    # 交给 FileResponse 流式返回，不用把整份歌词读进内存
+    return FileResponse(
+        target,
+        media_type="text/plain; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 @router.delete("/local/{track_id}")
@@ -302,4 +348,8 @@ def get_local_music_file(filename: str):
         return JSONResponse({"success": False, "message": "文件不存在"}, status_code=404)
 
     ext = os.path.splitext(target)[1].lower()
-    return FileResponse(target, media_type=CONTENT_TYPES.get(ext, "application/octet-stream"))
+    return FileResponse(
+        target,
+        media_type=CONTENT_TYPES.get(ext, "application/octet-stream"),
+        headers={"Cache-Control": "public, max-age=86400"},
+    )

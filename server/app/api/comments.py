@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, Request
-from sqlalchemy import func
+from sqlalchemy import case, func, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -118,17 +119,18 @@ def save_settings(patch: Dict[str, Any], db: Session) -> Dict[str, Any]:
 def _client_ip(request: Request) -> str:
     """尽量拿到真实访客 IP。
 
-    公开站没有反向代理时拿不到 socket 地址，所以主要依赖反代补充的
-    x-forwarded-for / x-real-ip；都没有时返回空串，限流改用访客标识兜底。
+    信任顺序与登录限流一致：x-real-ip（nginx 覆写，伪造不了）
+    → x-forwarded-for 的最后一段（反代追加的才是真实来源）→ 直连地址。
+    公开站没有反向代理时拿不到 socket 地址，限流改用访客标识兜底。
     """
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip and real_ip.strip():
+        return real_ip.strip()[:64]
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        first = forwarded.split(",")[0].strip()
-        if first:
-            return first[:64]
-    real_ip = request.headers.get("x-real-ip")
-    if real_ip:
-        return real_ip.strip()[:64]
+        last = forwarded.split(",")[-1].strip()
+        if last:
+            return last[:64]
     client = request.client
     if client and client.host and client.host not in ("127.0.0.1", "::1"):
         return client.host[:64]
@@ -194,15 +196,18 @@ def _check_rate_limit(identity: str, db: Session) -> Optional[str]:
     now = datetime.now()
     window_start = (now - timedelta(minutes=RATE_WINDOW_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
     hour_start = (now - timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
-    recent = db.query(Comment).filter(
-        Comment.visitor_id == identity, Comment.created_at >= window_start
-    ).count()
-    hourly = db.query(Comment).filter(
-        Comment.visitor_id == identity, Comment.created_at >= hour_start
-    ).count()
-    if recent >= RATE_LIMIT_WINDOW:
+    # 两个窗口一条查询搞定：访客刚发完一条时，这里跟着插入一起走，越快越好
+    recent, hourly = (
+        db.query(
+            func.sum(case((Comment.created_at >= window_start, 1), else_=0)),
+            func.sum(case((Comment.created_at >= hour_start, 1), else_=0)),
+        )
+        .filter(Comment.visitor_id == identity)
+        .one()
+    )
+    if int(recent or 0) >= RATE_LIMIT_WINDOW:
         return f"留言太频繁啦，{RATE_WINDOW_MINUTES} 分钟内最多发表 {RATE_LIMIT_WINDOW} 条"
-    if hourly >= RATE_LIMIT_HOUR:
+    if int(hourly or 0) >= RATE_LIMIT_HOUR:
         return "留言太频繁啦，1 小时内最多发表 20 条，请稍后再试"
     return None
 
@@ -302,16 +307,16 @@ def read_settings(db: Session = Depends(get_db)):
 
 
 @router.post("/create")
-async def create_comment(request: Request, db: Session = Depends(get_db)):
-    """访客发表留言。"""
+def create_comment(request: Request, payload: Dict[str, Any] = Body(...),
+                   db: Session = Depends(get_db)):
+    """访客发表留言。
+
+    同步 def：里面全是数据库读写，交给线程池执行，不占事件循环。
+    """
     settings = get_settings(db)
     if not settings.get("enabled", True):
         return {"success": False, "message": "评论功能已关闭"}
 
-    try:
-        payload = await request.json()
-    except Exception:
-        return {"success": False, "message": "请求格式不正确"}
     if not isinstance(payload, dict):
         return {"success": False, "message": "请求格式不正确"}
 
@@ -392,8 +397,8 @@ async def create_comment(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/like")
-async def like_comment(request: Request, payload: Dict[str, Any] = Body(...),
-                       db: Session = Depends(get_db)):
+def like_comment(request: Request, payload: Dict[str, Any] = Body(...),
+                 db: Session = Depends(get_db)):
     """给评论点赞。同一个访客对同一条评论只计一次。"""
     try:
         comment_id = int(payload.get("id") or 0)
@@ -417,10 +422,25 @@ async def like_comment(request: Request, payload: Dict[str, Any] = Body(...),
         if existing:
             return {"success": True, "data": {"likes": row.likes, "duplicated": True}}
         db.add(CommentLike(comment_id=comment_id, visitor_id=visitor_id, created_at=now_stamp()))
+        try:
+            db.flush()
+        except IntegrityError:
+            # 两个请求同时点赞：主键冲突说明已经计过了，按重复处理
+            db.rollback()
+            fresh = db.query(Comment).filter(Comment.id == comment_id).first()
+            return {"success": True, "data": {"likes": fresh.likes if fresh else 0, "duplicated": True}}
 
-    row.likes = (row.likes or 0) + 1
+    # 原子自增：读-改-写换成一条 UPDATE，并发下计数不会丢；
+    # synchronize_session="fetch" 让随后读回的就是加完后的新值
+    db.execute(
+        update(Comment)
+        .where(Comment.id == comment_id)
+        .values(likes=Comment.likes + 1)
+        .execution_options(synchronize_session="fetch")
+    )
     db.commit()
-    return {"success": True, "data": {"likes": row.likes, "duplicated": False}}
+    fresh = db.query(Comment).filter(Comment.id == comment_id).first()
+    return {"success": True, "data": {"likes": fresh.likes if fresh else 0, "duplicated": False}}
 
 
 # =========================================================
@@ -469,14 +489,14 @@ def admin_list(
     items = [_row_to_comment(row, admin_view=True) for row in rows]
     if items:
         ids = [item["id"] for item in items]
-        reply_rows = (
-            db.query(Comment)
+        # 只取分组计数，不把回复整行读出来
+        count_rows = (
+            db.query(Comment.parent_id, func.count(Comment.id))
             .filter(Comment.parent_id.in_(ids))
+            .group_by(Comment.parent_id)
             .all()
         )
-        counts: Dict[int, int] = {}
-        for row in reply_rows:
-            counts[row.parent_id] = counts.get(row.parent_id, 0) + 1
+        counts: Dict[int, int] = {parent_id: count for parent_id, count in count_rows}
         for item in items:
             item["reply_count"] = counts.get(item["id"], 0)
 
@@ -503,11 +523,16 @@ def admin_stats(db: Session = Depends(get_db), _: None = Depends(require_admin))
         row[0]: row[1]
         for row in db.query(Comment.status, func.count(Comment.id)).group_by(Comment.status).all()
     }
-
-    total = db.query(Comment).count()
-    today = db.query(Comment).filter(Comment.created_at >= today_start).count()
-    week = db.query(Comment).filter(Comment.created_at >= week_start).count()
-    targets = db.query(Comment.target).distinct().count()
+    # 各状态之和就是总数；今天的、近 7 天的、去重主题数合成一条查询
+    total = sum(by_status.values())
+    today, week, targets = (
+        db.query(
+            func.sum(case((Comment.created_at >= today_start, 1), else_=0)),
+            func.sum(case((Comment.created_at >= week_start, 1), else_=0)),
+            func.count(func.distinct(Comment.target)),
+        )
+        .one()
+    )
 
     return {
         "success": True,
@@ -517,9 +542,9 @@ def admin_stats(db: Session = Depends(get_db), _: None = Depends(require_admin))
             "approved": by_status.get(STATUS_APPROVED, 0),
             "spam": by_status.get(STATUS_SPAM, 0),
             "hidden": by_status.get(STATUS_HIDDEN, 0),
-            "today": today,
-            "week": week,
-            "targets": targets,
+            "today": int(today or 0),
+            "week": int(week or 0),
+            "targets": int(targets or 0),
         },
     }
 

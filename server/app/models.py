@@ -14,7 +14,7 @@
     Setting      其它零散设置（每日一句配置等）
 """
 
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from .db import Base
@@ -190,6 +190,11 @@ class Comment(Base):
     """
 
     __tablename__ = "comments"
+    # 前台按主题拉评论、后台按状态翻页都走这条复合索引
+    __table_args__ = (
+        Index("ix_comments_list", "target", "parent_id", "status", "created_at"),
+        Index("ix_comments_visitor_time", "visitor_id", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     target = Column(String(200), index=True, default="")  # 评论主题标识（文章 slug 等）

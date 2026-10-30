@@ -40,7 +40,7 @@ def draft_to_dict(row: Draft, include_content: bool = True) -> dict:
 
 @router.get("")
 @router.post("/list")
-def list_drafts(db: Session = Depends(get_db)):
+def list_drafts(db: Session = Depends(get_db), _: None = Depends(require_admin)):
     rows = db.query(Draft).order_by(Draft.last_modified.desc()).all()
     return {"success": True, "drafts": [draft_to_dict(row, False) for row in rows]}
 
@@ -73,13 +73,15 @@ def save_draft(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_db
 
 
 @router.post("/get")
-def get_draft_by_body(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_db)):
+def get_draft_by_body(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_db),
+                      _: None = Depends(require_admin)):
     """读草稿；草稿不存在时回落到已发布的内容（文章 / 杂谈 / 关于页）。"""
     return _load_draft(str(payload.get("id") or "").strip(), db)
 
 
 @router.get("/{draft_id}")
-def get_draft(draft_id: str, db: Session = Depends(get_db)):
+def get_draft(draft_id: str, db: Session = Depends(get_db),
+              _: None = Depends(require_admin)):
     return _load_draft(draft_id, db)
 
 
