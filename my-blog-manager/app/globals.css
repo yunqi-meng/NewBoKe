@@ -111,3 +111,20 @@ input[type="number"] {
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.2); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(99, 102, 241, 0.4); }
+
+/* ========================================================
+   7. 移动端基础层
+   ======================================================== */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; overscroll-behavior-y: contain; }
+a, button, input, select, textarea { touch-action: manipulation; }
+
+@media (max-width: 767px) {
+  input, textarea, select { font-size: 16px !important; }
+  .glass-heavy { backdrop-filter: blur(12px) !important; }
+}
+
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.bottom-safe { bottom: calc(env(safe-area-inset-bottom, 0px) + var(--safe-offset, 0px)); }
+.scrollbar-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; width: 0; height: 0; }

@@ -232,13 +232,13 @@ function EditorContent() {
   });
 
   return (
-    <div className="h-screen w-screen overflow-hidden relative flex flex-col">
+    <div className="h-[100dvh] w-full overflow-hidden relative flex flex-col">
 
       <AnimatePresence>
         {exitModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setExitModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[40px] shadow-2xl border border-white/50 dark:border-white/10 p-10 text-center overflow-hidden">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] shadow-2xl border border-white/50 dark:border-white/10 p-6 sm:p-10 text-center overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-yellow-500 to-transparent opacity-50" />
               <div className="w-20 h-20 bg-yellow-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6"><AlertTriangle className="w-10 h-10 text-yellow-500" /></div>
               <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2">存在未保存的数据</h3>
@@ -270,7 +270,7 @@ function EditorContent() {
       </div>
 
       <PageTransition className="flex-1 min-h-0">
-        <main className="mx-auto w-[96%] max-w-[1750px] flex flex-col lg:flex-row gap-6 relative mt-[100px] lg:mt-[144px] h-auto lg:h-[calc(100vh-144px-32px)] lg:mb-8 overflow-y-auto lg:overflow-hidden pb-8">
+        <main className="mx-auto w-[96%] max-w-[1750px] flex flex-col lg:flex-row gap-6 relative mt-[72px] md:mt-[100px] lg:mt-[144px] h-auto lg:h-[calc(100vh-144px-32px)] lg:mb-8 overflow-y-auto lg:overflow-hidden pb-8">
 
           <button
             onClick={handleBackClick}
@@ -280,9 +280,9 @@ function EditorContent() {
             返回上一级
           </button>
 
-          <section className="flex-1 min-h-[50vh] lg:min-h-0 bg-white/30 dark:bg-slate-800/40 backdrop-blur-[60px] rounded-[50px] shadow-2xl border border-white/30 dark:border-white/10 flex flex-col overflow-hidden">
+          <section className="flex-1 min-h-[50vh] lg:min-h-0 bg-white/30 dark:bg-slate-800/40 backdrop-blur-[60px] rounded-3xl lg:rounded-[50px] shadow-2xl border border-white/30 dark:border-white/10 flex flex-col overflow-hidden">
             {isLoadingDraft ? (
-              <div className="flex flex-col h-full w-full p-12 gap-6 animate-pulse" aria-busy="true" aria-label="正在加载草稿">
+              <div className="flex flex-col h-full w-full p-4 sm:p-8 gap-6 animate-pulse" aria-busy="true" aria-label="正在加载草稿">
                 <div className="h-14 w-3/4 bg-slate-200/50 dark:bg-slate-700/40 rounded-2xl" />
                 <div className="h-10 w-full bg-slate-200/40 dark:bg-slate-700/30 rounded-2xl" />
                 <div className="space-y-4 flex-1">
@@ -304,7 +304,7 @@ function EditorContent() {
             )}
           </section>
 
-          <aside className="w-full lg:w-[360px] shrink-0 bg-white/30 dark:bg-slate-800/40 backdrop-blur-[60px] rounded-[50px] shadow-2xl border border-white/30 dark:border-white/10 flex flex-col overflow-hidden max-h-[70vh] lg:max-h-none">
+          <aside className="w-full lg:w-[360px] shrink-0 bg-white/30 dark:bg-slate-800/40 backdrop-blur-[60px] rounded-3xl lg:rounded-[50px] shadow-2xl border border-white/30 dark:border-white/10 flex flex-col overflow-hidden max-h-[62vh] overflow-y-auto overscroll-contain lg:max-h-none lg:overflow-hidden">
             <MetaMatrix
               type={docType} tags={tags} setTags={setTags} cover={cover} setCover={setCover} summary={summary} setSummary={setSummary} mood={mood} setMood={setMood}
               allHistoryPostTags={historyPostTags} allHistoryChatterTags={historyChatterTags} isLoadingTags={isLoadingTags}

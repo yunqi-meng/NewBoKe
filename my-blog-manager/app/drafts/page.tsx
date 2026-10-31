@@ -119,7 +119,7 @@ function DraftsContent() {
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-white/50 dark:border-white/10 p-10 text-center overflow-hidden"
+              className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.3)] border border-white/50 dark:border-white/10 p-6 sm:p-10 text-center overflow-hidden"
             >
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50" />
 
@@ -158,11 +158,11 @@ function DraftsContent() {
       </AnimatePresence>
 
       <PageTransition>
-        <main className="w-[90%] max-w-5xl mx-auto mt-28 relative z-10">
+        <main className="w-[90%] max-w-5xl mx-auto mt-[72px] md:mt-28 relative z-10">
 
           <header className="mb-12 flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
-              <h1 className="text-4xl font-black text-slate-800 dark:text-white mb-3 tracking-wider flex items-center gap-3">
+              <h1 className="text-2xl sm:text-4xl font-black text-slate-800 dark:text-white mb-3 tracking-wider flex flex-wrap items-center gap-3">
                 📝 创作草稿箱
                 <span className="text-sm font-bold bg-indigo-500 text-white px-3 py-1 rounded-full">{drafts.length}</span>
               </h1>
@@ -183,11 +183,11 @@ function DraftsContent() {
             </div>
           </header>
 
-          <div className="mb-8 flex gap-4">
-            <Link href="/editor?id=new&type=post" className="px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center gap-2">
+          <div className="mb-8 flex flex-wrap items-center gap-3">
+            <Link href="/editor?id=new&type=post" className="min-h-[44px] px-6 py-3 bg-indigo-500 hover:bg-indigo-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-indigo-500/30 transition-all active:scale-95 flex items-center gap-2">
               <Pencil size={16} /> 新建文章草稿
             </Link>
-            <Link href="/editor?id=new&type=chatter" className="px-6 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-pink-500/30 transition-all active:scale-95 flex items-center gap-2">
+            <Link href="/editor?id=new&type=chatter" className="min-h-[44px] px-6 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-2xl font-black text-sm shadow-lg shadow-pink-500/30 transition-all active:scale-95 flex items-center gap-2">
               <Sparkles size={16} /> 新建杂谈草稿
             </Link>
           </div>
@@ -207,9 +207,9 @@ function DraftsContent() {
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
                     key={draft.id}
                   >
-                    <div className="group bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden relative">
+                    <div className="group bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl border border-white/40 dark:border-white/10 rounded-3xl p-4 sm:p-6 shadow-xl hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 overflow-hidden relative">
 
-                      <div className="flex justify-between items-start mb-4 relative z-10">
+                      <div className="flex flex-wrap justify-between items-start gap-2 mb-4 relative z-10">
                         <div className="flex items-center gap-2">
                           <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${draft.type === 'chatter' ? 'bg-pink-500/10 text-pink-600 border-pink-500/20' : 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'}`}>
                             {draft.type === 'chatter' ? '杂谈' : '文章'}
@@ -232,7 +232,7 @@ function DraftsContent() {
 
                       {/* type 随链接带给编辑器；后端 get 也会按 slug 兜底识别 chatter */}
                       <Link href={`/editor?id=${encodeURIComponent(draft.id)}&type=${encodeURIComponent(draft.type || 'post')}`} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/50 rounded-xl">
-                        <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2 group-hover:text-indigo-600 transition-colors line-clamp-1">
+                        <h3 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white mb-2 group-hover:text-indigo-600 transition-colors line-clamp-1">
                           {draft.title || "无标题草稿"}
                         </h3>
                         <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed h-10">

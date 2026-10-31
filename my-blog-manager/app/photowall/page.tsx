@@ -152,7 +152,7 @@ export default function PhotoWallPage() {
 
                 <div className="relative group">
                    <input type="text" value={albumModal.data.cover || ''} onChange={e => setAlbumModal({...albumModal, data: {...albumModal.data, cover: e.target.value}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3.5 pr-14 dark:text-white outline-none border border-transparent focus:border-indigo-500" placeholder="封面图片 URL" />
-                   <button onClick={() => { setImgToolTarget('album'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="从本机上传封面">
+                   <button onClick={() => { setImgToolTarget('album'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="从本机上传封面">
                       <CloudUpload size={18} />
                    </button>
                 </div>
@@ -185,7 +185,7 @@ export default function PhotoWallPage() {
                 {photoModal.mode === 'add' && (
                   <div className="relative group">
                     <input type="text" value={photoModal.data.url || ''} onChange={e => setPhotoModal({...photoModal, data: {...photoModal.data, url: e.target.value}})} className="w-full bg-slate-100 dark:bg-black/20 rounded-2xl px-5 py-3.5 pr-14 dark:text-white outline-none border border-transparent focus:border-indigo-500" placeholder="照片直链 URL" />
-                    <button onClick={() => { setImgToolTarget('photo'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="从本机上传照片">
+                    <button onClick={() => { setImgToolTarget('photo'); setIsImgToolOpen(true); }} className="absolute right-2 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center rounded-xl bg-indigo-500 text-white hover:bg-indigo-600 transition-colors shadow-md" title="从本机上传照片">
                         <CloudUpload size={18} />
                     </button>
                   </div>
@@ -214,13 +214,13 @@ export default function PhotoWallPage() {
       </AnimatePresence>
 
       <PageTransition>
-        <div className="w-full max-w-7xl mx-auto mt-28 px-4 sm:px-10 relative z-10">
+        <div className="w-full max-w-7xl mx-auto mt-[72px] md:mt-28 px-4 sm:px-10 relative z-10">
 
           {!currentAlbum && (
             <div className="animate-fade-in-up">
-              <div className="flex flex-col md:flex-row justify-between items-center mb-16 gap-6">
+              <div className="flex flex-col md:flex-row justify-between items-center mb-8 sm:mb-16 gap-4 sm:gap-6">
                 <div>
-                  <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-widest mb-2 transition-colors duration-700">光影画廊</h1>
+                  <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-widest mb-2 transition-colors duration-700">光影画廊</h1>
                   <p className="text-slate-600 dark:text-slate-400 font-medium tracking-wider transition-colors duration-700">定格时间，封存泰拉与现实的每一次心跳</p>
                 </div>
 
@@ -240,9 +240,9 @@ export default function PhotoWallPage() {
 
               <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                 {activeQuery && matchedPhotos.length > 0 && (
-                  <div className="mb-16">
+                  <div className="mb-8 sm:mb-16">
                     <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-6 flex items-center gap-2">匹配单张 ({matchedPhotos.length})</h3>
-                    <div className="columns-1 sm:columns-2 md:columns-4 gap-6 space-y-6">
+                    <div className="columns-2 md:columns-4 gap-3 sm:gap-6 space-y-3 sm:space-y-6">
                       {matchedPhotos.map((photo, i) => (
                         <div key={i} onClick={() => setSelectedImage(photo)} className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-lg hover:scale-[1.02] transition-transform">
                           <img src={photo.url} loading="lazy" decoding="async" className="w-full h-auto object-cover" />
@@ -252,7 +252,7 @@ export default function PhotoWallPage() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-20 mt-10">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-3 gap-y-10 sm:gap-x-8 sm:gap-y-20 mt-10">
                   {!activeQuery && (
                     <div onClick={() => setAlbumModal({ isOpen: true, mode: 'add', data: {} })} className="group cursor-pointer flex flex-col items-center">
                         <div className="relative w-[85%] aspect-[4/3] mb-8 border-4 border-dashed border-slate-300 dark:border-slate-700 rounded-[32px] flex flex-col items-center justify-center bg-white/10 dark:bg-white/5 hover:border-indigo-500 transition-all duration-500">
@@ -264,7 +264,7 @@ export default function PhotoWallPage() {
 
                   {matchedAlbums.map((album) => (
                     <div key={album.id} className="group cursor-pointer flex flex-col items-center relative">
-                      <div className="absolute top-0 right-0 z-50 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all -translate-x-4 group-hover:translate-x-0">
+                      <div className="absolute top-0 right-0 z-50 flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all translate-x-0 md:-translate-x-4 md:group-hover:translate-x-0">
                          <button onClick={(e) => { e.stopPropagation(); setAlbumModal({ isOpen: true, mode: 'edit', data: album }); }} className="p-2.5 bg-indigo-500 text-white rounded-xl shadow-lg hover:scale-110 transition-transform"><Edit3 size={16}/></button>
                          <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ isOpen: true, type: 'album', id: album.id, title: album.title }); }} className="p-2.5 bg-red-500 text-white rounded-xl shadow-lg hover:scale-110 transition-transform"><Trash2 size={16}/></button>
                       </div>
@@ -283,7 +283,7 @@ export default function PhotoWallPage() {
 
                       <div className="text-center px-4 w-full" onClick={() => setCurrentAlbum(album)}>
                         <div className="flex items-center justify-center gap-2 mb-1">
-                          <h2 className="text-xl font-bold text-slate-900 dark:text-white transition-colors group-hover:text-indigo-600">{album.title}</h2>
+                          <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white transition-colors group-hover:text-indigo-600">{album.title}</h2>
                         </div>
                         <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-1">{album.description}</p>
                       </div>
@@ -296,17 +296,17 @@ export default function PhotoWallPage() {
 
           {currentAlbum && (
             <div className="animate-fade-in-up">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4 border-b border-slate-300/50 dark:border-slate-700/50 pb-6">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 sm:mb-12 gap-4 border-b border-slate-300/50 dark:border-slate-700/50 pb-6">
                 <div>
                   <button onClick={() => setCurrentAlbum(null)} className="group flex items-center gap-1.5 text-sm font-bold text-slate-500 dark:text-slate-400 hover:text-indigo-500 mb-4 transition-colors">
                     <div className="bg-white/40 dark:bg-slate-800/50 p-1.5 rounded-lg border border-white/50 shadow-sm"><X size={16} /></div> 返回画廊
                   </button>
-                  <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-wider mb-2">{currentAlbum.title}</h1>
+                  <h1 className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-wider mb-2">{currentAlbum.title}</h1>
                 </div>
                 <button onClick={() => setAlbumModal({ isOpen: true, mode: 'edit', data: currentAlbum })} className="px-5 py-2.5 rounded-2xl bg-white/40 dark:bg-slate-800/40 border border-white/50 text-xs font-black uppercase text-indigo-500 hover:bg-white transition-all shadow-sm">相册属性</button>
               </div>
 
-              <div className="columns-1 sm:columns-2 md:columns-3 lg:columns-4 gap-6 space-y-6">
+              <div className="columns-2 md:columns-3 lg:columns-4 gap-3 sm:gap-6 space-y-3 sm:space-y-6">
 
                 <div onClick={() => setPhotoModal({ isOpen: true, mode: 'add', data: {} })} className="break-inside-avoid group cursor-pointer border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-[32px] min-h-[200px] flex flex-col items-center justify-center bg-white/10 dark:bg-slate-800/10 hover:border-indigo-500 transition-all duration-500">
                    <Plus size={32} className="text-slate-400 group-hover:text-indigo-500 transition-all" />
@@ -316,7 +316,7 @@ export default function PhotoWallPage() {
                 {currentAlbum.photos.map((photo, index) => (
                   <div key={`${photo.url}-${index}`} className="break-inside-avoid relative group rounded-2xl overflow-hidden shadow-lg bg-white/20 dark:bg-slate-800/20 border border-white/30 dark:border-white/10 transition-all duration-500 hover:scale-[1.02] cursor-pointer">
 
-                    <div className="absolute top-3 left-3 z-30 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all translate-y-2 group-hover:translate-y-0">
+                    <div className="absolute top-3 left-3 z-30 flex gap-1.5 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all translate-y-0 md:translate-y-2 md:group-hover:translate-y-0">
                       <button onClick={(e) => { e.stopPropagation(); setPhotoModal({ isOpen: true, mode: 'edit', index, data: photo }); }} className="w-7 h-7 rounded-lg bg-white/80 backdrop-blur-md text-slate-700 flex items-center justify-center shadow-sm hover:bg-indigo-500 hover:text-white transition-all"><Pencil size={12}/></button>
                       <button onClick={(e) => { e.stopPropagation(); setDeleteModal({ isOpen: true, type: 'photo', photoIndex: index, title: '这张照片' }); }} className="w-7 h-7 rounded-lg bg-white/80 backdrop-blur-md text-red-500 flex items-center justify-center shadow-sm hover:bg-red-500 hover:text-white transition-all"><Trash2 size={12}/></button>
                     </div>

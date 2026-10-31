@@ -35,6 +35,10 @@ export default function Navbar() {
     rawRotation.set(rawRotation.get() + deltaAngle);
   };
 
+  // --- 🌟 轮盘尺寸：小屏收缩，保证 9 个入口不贴边 ---
+  const [wheelSize, setWheelSize] = useState(320);
+  const wheelRadius = Math.max(wheelSize / 2 - 40, 88);
+
   // --- 🌟 物理引擎：手机端按钮拖拽逻辑 ---
   const dragY = useMotionValue(0);
   const [constraints, setConstraints] = useState({ top: 0, bottom: 0 });
@@ -45,13 +49,17 @@ export default function Navbar() {
   const wasOpenRef = useRef(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    const syncLayout = () => {
+      setWheelSize(Math.min(window.innerWidth * 0.88, 360));
       const vh = window.innerHeight;
       setConstraints({
         top: -(vh / 2) + 80,
         bottom: (vh / 2) - 80
       });
-    }
+    };
+    syncLayout();
+    window.addEventListener('resize', syncLayout);
+    return () => window.removeEventListener('resize', syncLayout);
   }, []);
 
   useEffect(() => {
@@ -157,6 +165,18 @@ export default function Navbar() {
         </div>
       </header>
 
+      {/* 📱 手机端：顶部品牌胶囊 */}
+      <div className="md:hidden pointer-events-none fixed top-3 left-3 z-[55] max-w-[calc(100vw-6rem)]">
+        <div className="flex items-center gap-2 rounded-full bg-white/50 dark:bg-slate-900/60 backdrop-blur-xl border border-white/40 dark:border-white/10 shadow-sm px-3 py-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0"></span>
+          <span className="text-xs font-black tracking-wide text-slate-800 dark:text-white truncate">
+            {siteConfig.navTitle || siteConfig.authorName}
+            <span className="text-indigo-500 mx-0.5">{siteConfig.navSuffix || 'の'}</span>
+            {siteConfig.navAfter || '宝藏之地'}
+          </span>
+        </div>
+      </div>
+
       {/* 📱 手机端：可拖拽吸附的触发球 */}
       <div className="md:hidden">
         <motion.button
@@ -178,7 +198,7 @@ export default function Navbar() {
           aria-label="打开导航菜单"
           aria-expanded={isMobileMenuOpen}
           aria-haspopup="dialog"
-          className={`fixed top-1/2 right-0 -translate-y-1/2 w-12 h-28 bg-indigo-500/80 backdrop-blur-xl rounded-l-full shadow-[-5px_0_20px_rgba(99,102,241,0.4)] z-[60] flex items-center justify-center transition-[transform,opacity] duration-500 border-y border-l border-white/30 touch-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${isMobileMenuOpen ? 'translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
+          className={`fixed top-1/2 right-0 -translate-y-1/2 w-12 h-24 bg-indigo-500/80 backdrop-blur-xl rounded-l-full shadow-[-5px_0_20px_rgba(99,102,241,0.4)] z-[60] flex items-center justify-center transition-[transform,opacity] duration-500 border-y border-l border-white/30 touch-none active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 ${isMobileMenuOpen ? 'translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}
         >
           <div className="flex flex-col gap-1.5 items-center justify-center mr-2">
             <div className="w-1.5 h-1.5 bg-white/90 rounded-full"></div>
@@ -207,15 +227,16 @@ export default function Navbar() {
                 animate={{ scale: 1, opacity: 1, rotate: 0 }}
                 exit={{ scale: 0.5, opacity: 0, rotate: 90 }}
                 transition={{ type: 'spring', damping: 20, stiffness: 150 }}
-                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] h-[320px] z-[70] pointer-events-none"
+                style={{ width: wheelSize, height: wheelSize }}
+                className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[70] pointer-events-none"
               >
                 <motion.div
                   ref={wheelRef}
                   style={{ rotate: smoothRotation }}
                   onPan={handlePan}
-                  className="w-full h-full rounded-full border border-white/30 dark:border-slate-500/50 bg-white/40 dark:bg-slate-800/50 backdrop-blur-3xl shadow-[0_0_50px_rgba(0,0,0,0.3)] pointer-events-auto relative cursor-grab active:cursor-grabbing"
+                  className="w-full h-full rounded-full border border-white/30 dark:border-slate-500/50 bg-white/40 dark:bg-slate-800/50 backdrop-blur-3xl shadow-[0_0_50px_rgba(0,0,0,0.3)] pointer-events-auto relative cursor-grab active:cursor-grabbing touch-none overscroll-contain"
                 >
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 border-4 border-slate-300 dark:border-slate-500 flex items-center justify-center shadow-inner z-10">
+                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 border-4 border-slate-300 dark:border-slate-500 flex items-center justify-center shadow-inner z-10">
                     <button
                       ref={closeButtonRef}
                       onClick={closeMobileMenu}
@@ -235,9 +256,9 @@ export default function Navbar() {
                     return (
                       <div
                         key={link.href}
-                        className="absolute top-1/2 left-1/2 w-14 h-14 -ml-7 -mt-7 flex items-center justify-center"
+                        className="absolute top-1/2 left-1/2 w-16 h-16 -ml-8 -mt-8 flex items-center justify-center"
                         style={{
-                          transform: `rotate(${angle}deg) translateY(-115px) rotate(${-angle}deg)`
+                          transform: `rotate(${angle}deg) translateY(-${wheelRadius}px) rotate(${-angle}deg)`
                         }}
                       >
                         <motion.div style={{ rotate: inverseRotation }} className="w-full h-full">
@@ -251,7 +272,7 @@ export default function Navbar() {
                                 : 'bg-white/90 dark:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-md hover:scale-110 border border-white/50 dark:border-slate-600'
                             }`}
                           >
-                            <span className="text-[11px] font-black">{link.name}</span>
+                            <span className="text-xs font-black leading-none">{link.name}</span>
                           </Link>
                         </motion.div>
                       </div>

@@ -55,8 +55,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex-1 flex items-center justify-center px-4 py-16">
-      <div className="w-full max-w-md rounded-[32px] bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/60 dark:border-slate-800/60 shadow-2xl p-10">
+    <div className="flex-1 min-h-[100dvh] flex items-center justify-center px-4 py-10 sm:py-16">
+      <div className="w-full max-w-md rounded-3xl sm:rounded-[32px] bg-white/70 dark:bg-slate-900/70 backdrop-blur-2xl border border-white/60 dark:border-slate-800/60 shadow-2xl p-6 sm:p-10">
         <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 flex items-center justify-center mx-auto mb-6">
           <ShieldCheck className="text-indigo-500" size={30} />
         </div>
@@ -75,7 +75,7 @@ export default function LoginPage() {
               autoComplete="current-password"
               onChange={(event) => setPassword(event.target.value)}
               placeholder="管理密码"
-              className="w-full bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full min-h-[48px] bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-2xl pl-11 pr-4 py-3.5 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -89,7 +89,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy || !checked}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-sm font-black shadow-xl active:scale-95 transition-all disabled:opacity-60"
+            className="w-full min-h-[48px] flex items-center justify-center gap-2 py-3.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl text-sm font-black shadow-xl active:scale-95 transition-all disabled:opacity-60"
           >
             {busy ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
             {busy ? '验证中...' : '进入控制台'}

@@ -213,7 +213,52 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 /* ========================================================
-   9. 减少动态效果：停掉装饰性无限动画 / 平滑滚动
+   9. 移动端基础层：触控、安全区、输入缩放、滚动行为
+   ======================================================== */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+a, button, input, select, textarea {
+  touch-action: manipulation;
+}
+
+/* iOS 聚焦输入框会按 <16px 放大整个页面，这里兜底 */
+@media (max-width: 767px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+  .glass-heavy {
+    backdrop-filter: blur(12px) !important;
+  }
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.bottom-safe {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--safe-offset, 0px));
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* ========================================================
+   10. 减少动态效果：停掉装饰性无限动画 / 平滑滚动
    ======================================================== */
 @media (prefers-reduced-motion: reduce) {
   html, body {

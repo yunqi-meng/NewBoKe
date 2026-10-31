@@ -293,7 +293,7 @@ export default function CommentManager() {
 
   return (
     <div className="min-h-screen relative pb-16">
-      <div className="w-full max-w-7xl mx-auto mt-24 px-4 sm:px-6 relative z-10 space-y-6">
+      <div className="w-full max-w-7xl mx-auto mt-[72px] md:mt-24 px-4 sm:px-6 relative z-10 space-y-6">
         {/* 标题 */}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -301,7 +301,7 @@ export default function CommentManager() {
               <MessageSquareText className="text-indigo-500 w-6 h-6" />
             </div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-tight">
                 评论管理
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -384,7 +384,7 @@ export default function CommentManager() {
               <option value="likes">点赞最多</option>
             </select>
 
-            <div className="md:col-span-2 flex gap-2">
+            <div className="md:col-span-2 flex flex-wrap gap-2">
               <input
                 value={keywordInput}
                 onChange={(e) => setKeywordInput(e.target.value)}
@@ -395,7 +395,7 @@ export default function CommentManager() {
                   }
                 }}
                 placeholder="搜索昵称 / 内容 / 邮箱"
-                className="flex-1 min-w-0 bg-white/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-indigo-500"
+                className="w-full sm:w-64 min-w-0 bg-white/70 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-indigo-500"
               />
               <button
                 onClick={() => {
@@ -428,7 +428,7 @@ export default function CommentManager() {
 
         {/* 批量操作条 */}
         {selected.length > 0 && (
-          <div className="sticky top-4 z-20 flex flex-wrap items-center gap-2 rounded-2xl bg-indigo-500 text-white px-4 py-3 shadow-xl shadow-indigo-500/30">
+          <div className="sticky top-[64px] md:top-4 z-20 flex flex-wrap items-center gap-2 rounded-2xl bg-indigo-500 text-white px-4 py-3 shadow-xl shadow-indigo-500/30">
             <span className="text-xs font-bold">已选 {selected.length} 条</span>
             <button
               onClick={() => bulk('approve')}
@@ -660,7 +660,7 @@ export default function CommentManager() {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.96, y: 10 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-xl rounded-3xl bg-white dark:bg-slate-900 border border-white/50 dark:border-white/10 shadow-2xl p-6 space-y-4"
+              className="w-[calc(100vw-1.5rem)] sm:w-full max-w-xl max-h-[85dvh] overflow-y-auto overscroll-contain rounded-3xl sm:rounded-[40px] bg-white dark:bg-slate-900 border border-white/50 dark:border-white/10 shadow-2xl p-6 sm:p-10 space-y-4"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -721,7 +721,7 @@ export default function CommentManager() {
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.96, y: 10 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-md rounded-3xl bg-white dark:bg-slate-900 border border-white/50 dark:border-white/10 shadow-2xl p-6 space-y-4"
+              className="w-[calc(100vw-1.5rem)] sm:w-full max-w-md max-h-[85dvh] overflow-y-auto overscroll-contain rounded-3xl sm:rounded-[40px] bg-white dark:bg-slate-900 border border-white/50 dark:border-white/10 shadow-2xl p-6 sm:p-10 space-y-4"
             >
               <h3 className="text-lg font-black text-slate-900 dark:text-white">删除这条评论？</h3>
               <p className="text-xs text-slate-500 dark:text-slate-400 leading-6">

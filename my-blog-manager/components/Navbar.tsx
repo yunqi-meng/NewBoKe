@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useToast } from './ToastProvider';
 import { pushToGitHub } from '../lib/contentMutations';
-import { CloudUpload, Loader2, LogOut } from 'lucide-react';
+import { CloudUpload, Loader2, LogOut, Menu, X, ChevronRight } from 'lucide-react';
 import { useSiteConfig } from './SiteConfigProvider';
 
 export default function Navbar({ previewOnly = false, compact = false, unsavedGuard = false, onGuardClick }: {
@@ -26,6 +26,7 @@ export default function Navbar({ previewOnly = false, compact = false, unsavedGu
 
   const [pushModalOpen, setPushModalOpen] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const pathname = usePathname();
   const { showToast } = useToast();
@@ -92,6 +93,49 @@ export default function Navbar({ previewOnly = false, compact = false, unsavedGu
     window.location.href = withBasePath('/login');
   };
 
+  // 手机端抽屉：锁滚动 + Esc 关闭
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [mobileMenuOpen]);
+
+  const mobileNavLinks = compact ? navLinks.filter(link => ['/', '/settings'].includes(link.href)) : navLinks;
+  const contentLinks = mobileNavLinks.filter(link => !['/drafts', '/comments', '/settings'].includes(link.href));
+  const adminLinks = mobileNavLinks.filter(link => ['/drafts', '/comments', '/settings'].includes(link.href));
+
+  const renderMobileLink = (link: { name: string; href: string }) => {
+    const active = stripBasePath(pathname) === link.href;
+    return (
+      <Link
+        key={link.href}
+        href={link.href}
+        onClick={(e) => {
+          if (unsavedGuard) {
+            e.preventDefault();
+            e.stopPropagation();
+            setMobileMenuOpen(false);
+            onGuardClick?.();
+            return;
+          }
+          setMobileMenuOpen(false);
+        }}
+        className={`flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-bold transition-colors ${active ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25' : 'text-slate-700 dark:text-slate-200 hover:bg-white/60 dark:hover:bg-slate-800/60'}`}
+      >
+        <span>{link.name}</span>
+        <ChevronRight size={16} className={active ? 'opacity-80' : 'opacity-40'} />
+      </Link>
+    );
+  };
+
   // 📤 推送流程：内容保存后已经在线上生效，这里只把当前内容导成快照，
   // 提交并推送到 GitHub 仓库（服务器仓库同步保留），留一份可追溯、可回退的版本。
   const executePush = async () => {
@@ -112,9 +156,9 @@ export default function Navbar({ previewOnly = false, compact = false, unsavedGu
   return (
     <>
       <header className={`w-full fixed top-0 left-0 right-0 z-[100] transition-all duration-500 border-b ${showNav ? 'translate-y-0' : '-translate-y-full'} bg-white/40 dark:bg-slate-900/50 backdrop-blur-xl border-white/20 dark:border-white/5 shadow-sm pywebview-drag-region`}>
-        <div className="w-[95%] max-w-7xl mx-auto h-16 flex items-center justify-between px-4 box-border">
+        <div className="w-[95%] max-w-7xl mx-auto h-14 md:h-16 flex items-center justify-between gap-3 px-3 md:px-4 box-border">
 
-          <Link href="/" className="min-w-0 truncate text-xl font-black text-slate-800 dark:text-white tracking-tighter">
+          <Link href="/" className="min-w-0 flex-1 truncate text-base sm:text-lg md:text-xl font-black text-slate-800 dark:text-white tracking-tighter">
             {siteConfig.navTitle}
             <span className="text-indigo-500 mx-1">
               {siteConfig.navSuffix || 'の'}
@@ -122,7 +166,7 @@ export default function Navbar({ previewOnly = false, compact = false, unsavedGu
             {siteConfig.navAfter}
           </Link>
 
-          <div className="flex items-center gap-6" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <div className="flex items-center gap-2 md:gap-6 shrink-0" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
             <nav className="hidden lg:flex gap-8 text-sm font-bold">
               {(compact ? navLinks.filter(link => ['/', '/settings'].includes(link.href)) : navLinks).map((link) => (
                 <Link
@@ -152,12 +196,13 @@ export default function Navbar({ previewOnly = false, compact = false, unsavedGu
               </button>
             </div>
 
-            <div className="flex items-center gap-2 ml-2 pl-6 border-l border-slate-300/50 dark:border-slate-600/50">
-              {authOn && !previewOnly && (
-                <button onClick={handleLogout} title="退出登录" className="w-8 h-8 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center hover:scale-105 transition-all border border-white/20 shadow-sm cursor-pointer">
-                  <LogOut size={14} className="text-slate-600 dark:text-slate-300" />
-                </button>
-              )}
+            {authOn && !previewOnly && (
+              <button onClick={handleLogout} title="退出登录" className="w-10 h-10 md:w-8 md:h-8 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center hover:scale-105 transition-all border border-white/20 shadow-sm cursor-pointer">
+                <LogOut size={14} className="text-slate-600 dark:text-slate-300" />
+              </button>
+            )}
+
+            <div className="hidden md:flex items-center gap-2 ml-2 pl-6 border-l border-slate-300/50 dark:border-slate-600/50">
               <button onClick={handleMinimize} className="w-3.5 h-3.5 rounded-full bg-yellow-400 hover:bg-yellow-500 flex items-center justify-center group transition-colors shadow-sm cursor-pointer z-[101]">
                 <span className="opacity-0 group-hover:opacity-100 text-[8px] text-yellow-900 font-black">-</span>
               </button>
@@ -169,15 +214,68 @@ export default function Navbar({ previewOnly = false, compact = false, unsavedGu
               </button>
             </div>
 
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="打开导航菜单"
+              aria-expanded={mobileMenuOpen}
+              className="lg:hidden w-10 h-10 rounded-xl bg-white/50 dark:bg-slate-800/50 flex items-center justify-center border border-white/20 shadow-sm cursor-pointer active:scale-95 transition-transform"
+            >
+              <Menu size={18} className="text-slate-600 dark:text-slate-300" />
+            </button>
+
           </div>
         </div>
       </header>
 
       <AnimatePresence>
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-[150] lg:hidden">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMobileMenuOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="absolute top-0 right-0 h-[100dvh] w-[86vw] max-w-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl border-l border-white/40 dark:border-white/10 shadow-2xl flex flex-col"
+              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+            >
+              <div className="flex items-center justify-between px-5 h-14 shrink-0 border-b border-slate-200/60 dark:border-slate-700/60">
+                <span className="text-sm font-black text-slate-800 dark:text-white tracking-tight">导航菜单</span>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="关闭导航菜单"
+                  className="w-10 h-10 rounded-xl bg-white/60 dark:bg-slate-800/60 flex items-center justify-center border border-white/20 active:scale-95 transition-transform cursor-pointer"
+                >
+                  <X size={18} className="text-slate-600 dark:text-slate-300" />
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-4 space-y-1.5 pb-safe">
+                {contentLinks.map(renderMobileLink)}
+
+                {adminLinks.length > 0 && (
+                  <>
+                    <div className="px-4 pt-4 pb-2 text-[11px] font-black uppercase tracking-widest text-slate-400">管理</div>
+                    {adminLinks.map(renderMobileLink)}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {pushModalOpen && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isPushing && setPushModalOpen(false)} className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-[40px] shadow-2xl border border-white/50 p-10 text-center">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] shadow-2xl border border-white/50 p-6 sm:p-10 text-center">
               <div className="w-16 h-16 bg-indigo-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <CloudUpload className="text-indigo-500" size={32} />
               </div>

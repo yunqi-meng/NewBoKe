@@ -44,7 +44,7 @@ export default function PhotoWallClient({ albums }: { albums: Album[] }) {
       <Navbar />
 
       <PageTransition>
-        <div className="w-full max-w-7xl mx-auto mt-28 px-4 sm:px-10 relative z-10">
+        <div className="w-full max-w-7xl mx-auto mt-24 sm:mt-28 px-4 sm:px-10 relative z-10">
 
           {!currentAlbum && (
             <div className="animate-fade-in-up">
@@ -197,22 +197,22 @@ export default function PhotoWallClient({ albums }: { albums: Album[] }) {
 
       {selectedImage && (
         <div
-          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-4 sm:p-10 cursor-zoom-out animate-fade-in"
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex flex-col items-center justify-center p-2 sm:p-10 cursor-zoom-out animate-fade-in"
           onClick={() => setSelectedImage(null)}
         >
-          <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full p-2">
+          <button onClick={() => setSelectedImage(null)} aria-label="关闭大图" className="absolute top-4 right-4 sm:top-6 sm:right-6 w-11 h-11 flex items-center justify-center text-white/70 hover:text-white transition-colors bg-white/10 hover:bg-white/20 rounded-full">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
 
           <img
             src={selectedImage.url}
             alt={selectedImage.caption || '全屏照片'}
-            className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            className="max-w-[94vw] max-h-[82dvh] object-contain rounded-lg shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           />
 
           {selectedImage.caption && (
-            <div className="absolute bottom-10 px-6 py-3 bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-white text-sm font-medium tracking-wide shadow-2xl">
+            <div className="absolute bottom-8 sm:bottom-10 px-4 sm:px-6 py-2.5 sm:py-3 bg-white/10 backdrop-blur-md border border-white/10 rounded-full text-white text-xs sm:text-sm font-medium tracking-wide shadow-2xl max-w-[90vw] truncate">
               {selectedImage.caption}
             </div>
           )}

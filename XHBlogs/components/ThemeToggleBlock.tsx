@@ -10,12 +10,12 @@ export default function ThemeToggleBlock() {
     <div
       onClick={toggleTheme}
       // 【核心修复】：移除了定高限制 (h-[180px] md:h-auto)，换成了统一的 h-full w-full
-      className={`h-full w-full rounded-3xl backdrop-blur-md border shadow-xl p-6 flex flex-col justify-center items-center transition-all duration-500 hover:scale-[1.05] cursor-pointer group relative overflow-hidden
+      className={`h-full w-full rounded-3xl backdrop-blur-md border shadow-xl p-5 md:p-6 flex flex-row md:flex-col justify-center md:justify-center items-center gap-4 md:gap-0 transition-all duration-500 hover:scale-[1.05] cursor-pointer group relative overflow-hidden min-h-[120px] active:scale-[0.99]
         ${isDark ? 'bg-slate-800/40 border-slate-600/50' : 'bg-white/40 border-white/60'}
       `}
     >
        {/* 日夜交替动画图标 */}
-       <div className="relative w-20 h-20 rounded-full overflow-hidden mb-3 shadow-inner flex-shrink-0">
+       <div className="relative w-16 h-16 md:w-20 md:h-20 rounded-full overflow-hidden md:mb-3 shadow-inner flex-shrink-0">
           <div className={`absolute inset-0 transition-transform duration-700 ${isDark ? '-translate-y-full' : 'translate-y-0'} bg-gradient-to-tr from-sky-300 to-yellow-200`}></div>
           <div className={`absolute inset-0 transition-transform duration-700 ${isDark ? 'translate-y-0' : 'translate-y-full'} bg-gradient-to-tr from-indigo-900 to-slate-800`}></div>
 
@@ -26,8 +26,8 @@ export default function ThemeToggleBlock() {
             ✨
           </div>
        </div>
-       <div className="text-center z-10 mt-auto">
-           <h3 className={`text-xl font-bold transition-colors duration-500 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+       <div className="text-center md:text-center z-10 md:mt-auto">
+           <h3 className={`text-lg md:text-xl font-bold transition-colors duration-500 ${isDark ? 'text-white' : 'text-slate-800'}`}>
              {isDark ? '夜间模式' : '日间模式'}
            </h3>
            <p className={`text-sm font-medium mt-1 transition-colors duration-500 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>

@@ -214,12 +214,12 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.9 }}
       transition={{ duration: 0.4, type: 'spring', stiffness: 100 }}
-      className="flex flex-col bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl rounded-[40px] shadow-xl border border-white/40 dark:border-white/10 p-8 md:p-10 transition-shadow hover:shadow-2xl overflow-hidden relative group w-full"
+      className="flex flex-col bg-white/60 dark:bg-slate-800/50 backdrop-blur-xl rounded-[40px] shadow-xl border border-white/40 dark:border-white/10 p-5 sm:p-8 md:p-10 transition-shadow hover:shadow-2xl overflow-hidden relative group w-full"
     >
       {/* 悬浮删除按钮 */}
       <button
         onClick={() => handleDeleteClick(moment)}
-        className="absolute top-6 right-6 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 shadow-sm z-10"
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 w-10 h-10 min-h-[40px] rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-red-500 hover:text-white flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-300 shadow-sm z-10"
       >
         <Trash2 size={14} />
       </button>
@@ -260,19 +260,19 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
   );
 
   return (
-    <div className="w-[90%] max-w-6xl mx-auto py-10 mt-28 relative z-10 flex-1 flex flex-col min-h-[85vh]">
+    <div className="w-[90%] max-w-6xl mx-auto py-10 mt-[72px] md:mt-28 relative z-10 flex-1 flex flex-col min-h-[85vh]">
 
       <div className="mb-14 text-center relative">
-        <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter">生活动态</motion.h1>
+        <motion.h1 initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="text-2xl sm:text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter">生活动态</motion.h1>
         <p className="text-slate-500 dark:text-slate-400 font-medium italic opacity-80 flex items-center justify-center gap-2">
           <Sparkles size={14} className="text-indigo-500" /> “ 在代码之外捕捉瞬间的温度 ”
         </p>
       </div>
 
-      <div className="mb-16 flex flex-col items-center gap-8">
+      <div className="mb-8 sm:mb-16 flex flex-col items-center gap-4 sm:gap-8">
         <button
           onClick={() => setIsPublishOpen(true)}
-          className="group relative px-10 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl shadow-lg shadow-indigo-500/30 text-white font-black tracking-widest text-sm hover:shadow-indigo-500/50 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2 overflow-hidden"
+          className="group relative min-h-[44px] px-10 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl shadow-lg shadow-indigo-500/30 text-white font-black tracking-widest text-sm hover:shadow-indigo-500/50 hover:-translate-y-1 transition-all duration-300 flex items-center gap-2 overflow-hidden"
         >
           <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
           <Plus size={18} className="relative z-10" />
@@ -284,7 +284,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
           <input type="text" placeholder="搜寻被遗忘的记忆..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-white/40 dark:bg-slate-800/40 backdrop-blur-xl border border-white/40 dark:border-white/5 rounded-2xl px-6 py-4 pl-14 text-slate-800 dark:text-white shadow-2xl focus:outline-none focus:ring-2 focus:ring-indigo-500/50 transition-all font-medium relative z-10" />
         </div>
 
-        <div className="flex bg-white/50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-white/50 dark:border-white/10 shadow-sm relative z-10">
+        <div className="flex flex-wrap justify-center bg-white/50 dark:bg-slate-800/50 p-1.5 rounded-2xl border border-white/50 dark:border-white/10 shadow-sm relative z-10">
           <button onClick={() => setSortOrder('desc')} className={`flex items-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all duration-300 ${sortOrder === 'desc' ? 'bg-indigo-500 text-white shadow-lg scale-105' : 'text-slate-500 hover:text-indigo-500'}`}>
             <ArrowDownAZ size={14} /> 最新
           </button>
@@ -313,13 +313,13 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
           </div>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center py-24 min-h-[450px]">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center text-center px-10 py-20 bg-white/40 dark:bg-slate-800/30 backdrop-blur-3xl rounded-[50px] border border-white/30 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] max-w-lg w-full mx-auto">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center text-center px-6 py-12 sm:px-10 sm:py-20 bg-white/40 dark:bg-slate-800/30 backdrop-blur-3xl rounded-3xl sm:rounded-[50px] border border-white/30 dark:border-white/10 shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] max-w-lg w-full mx-auto">
               <div className="w-24 h-24 bg-indigo-500/10 rounded-3xl flex items-center justify-center mb-8 relative">
                 <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse"></div>
                 <Ghost size={48} className="text-indigo-500 relative z-10" strokeWidth={1.5} />
               </div>
-              <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">{searchQuery ? "没找到相关记忆" : "朋友圈空空如也"}</h2>
-              <p className="text-slate-500 dark:text-slate-400 font-medium text-lg leading-relaxed px-4">{searchQuery ? `尝试精简你的搜索词，或者换个心情再次出发。` : `还没有记录下任何生活碎片呢，不如现在就开始？`}</p>
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">{searchQuery ? "没找到相关记忆" : "朋友圈空空如也"}</h2>
+              <p className="text-slate-500 dark:text-slate-400 font-medium text-base sm:text-lg leading-relaxed px-4">{searchQuery ? `尝试精简你的搜索词，或者换个心情再次出发。` : `还没有记录下任何生活碎片呢，不如现在就开始？`}</p>
             </motion.div>
           </div>
         )}
@@ -336,15 +336,15 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
 
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative w-full max-w-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] border border-white/50 dark:border-white/10 p-10 overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto custom-scrollbar"
+              className="relative w-[calc(100vw-1.5rem)] max-w-2xl bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] shadow-[0_32px_64px_-16px_rgba(0,0,0,0.4)] border border-white/50 dark:border-white/10 p-4 sm:p-10 overflow-hidden flex flex-col max-h-[85dvh] overflow-y-auto overscroll-contain custom-scrollbar"
             >
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-60" />
 
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-3">
+              <div className="flex justify-between items-center gap-3 mb-6 sm:mb-8">
+                <h2 className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white tracking-tight flex items-center gap-2 sm:gap-3">
                   <Sparkles className="text-indigo-500" /> 记录新瞬间
                 </h2>
-                <button onClick={() => setIsPublishOpen(false)} className="w-10 h-10 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 transition-colors">
+                <button onClick={() => setIsPublishOpen(false)} className="shrink-0 w-11 h-11 flex items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-red-500 transition-colors">
                   <X size={20} />
                 </button>
               </div>
@@ -453,7 +453,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
         {deleteConfirmId && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setDeleteConfirmId(null)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" />
-            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-full max-w-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-[40px] shadow-2xl border border-white/50 p-10 text-center">
+            <motion.div initial={{ scale: 0.9, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.9, opacity: 0, y: 20 }} className="relative w-[calc(100vw-1.5rem)] max-w-sm bg-white/90 dark:bg-slate-900/90 backdrop-blur-2xl rounded-3xl sm:rounded-[40px] shadow-2xl border border-white/50 p-6 sm:p-10 text-center">
               <div className="w-16 h-16 bg-red-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
                 <AlertTriangle className="text-red-500" size={32} />
               </div>
@@ -486,7 +486,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
               </>
             )}
             <motion.div key={lightbox.index} initial={{ opacity: 0, scale: 0.9, x: 50 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: -50 }} className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-12 pointer-events-none">
-              <img src={lightbox.images[lightbox.index]} className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-white/10" alt="fullscreen" />
+              <img src={lightbox.images[lightbox.index]} className="max-w-full max-h-[70dvh] object-contain rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-white/10" alt="fullscreen" />
               <div className="absolute bottom-10 px-5 py-2 rounded-full bg-white/5 backdrop-blur-md text-white/70 text-xs font-black tracking-widest border border-white/10">
                 {lightbox.index + 1} / {lightbox.images.length}
               </div>

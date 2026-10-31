@@ -162,15 +162,15 @@ function SettingsContent() {
       <Navbar compact previewOnly={backendMode !== 'live'} />
 
       <PageTransition>
-        <main className="w-[95%] max-w-7xl mx-auto mt-24 flex flex-col md:flex-row gap-8 items-start relative z-10">
+        <main className="w-[95%] max-w-7xl mx-auto mt-[72px] md:mt-24 flex flex-col md:flex-row gap-6 md:gap-8 items-start relative z-10">
 
           <div className="w-full md:w-60 shrink-0 flex flex-col gap-4">
             <div className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-white/50 dark:border-slate-800/50 rounded-3xl p-4 shadow-xl">
               <h1 className="mb-4 ml-2 text-base font-bold text-slate-700 dark:text-slate-200">网站控制台</h1>
-              <nav aria-label="网站控制台设置" className="flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
+              <nav aria-label="网站控制台设置" className="sticky top-14 md:static z-20 -mx-1 px-1 py-2 md:p-0 rounded-2xl md:rounded-none bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl md:bg-transparent md:backdrop-blur-none scrollbar-none snap-x snap-mandatory overscroll-x-contain flex gap-2 overflow-x-auto md:flex-col md:overflow-visible">
 
                 {menuItems.map((item) => (
-                  <button key={item.id} aria-current={activeTab === item.id ? 'page' : undefined} onClick={() => selectTab(item.id)} className={`flex shrink-0 items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 font-bold text-sm ${activeTab === item.id ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 translate-x-1' : 'text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-slate-800/50'}`}>
+                  <button key={item.id} aria-current={activeTab === item.id ? 'page' : undefined} onClick={() => selectTab(item.id)} className={`flex shrink-0 snap-start min-h-[44px] items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 font-bold text-sm ${activeTab === item.id ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 translate-x-1' : 'text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-slate-800/50'}`}>
                     <span>{item.icon}</span>{item.name}
                   </button>
                 ))}
@@ -196,7 +196,7 @@ function SettingsContent() {
               {activeTab === 'publish' && backendMode === 'live' && <PublishSection key="publish" />}
             </AnimatePresence>
             </fieldset>
-            {activeTab === 'publish' && backendMode !== 'live' && <section className="rounded-3xl border border-white/60 bg-white/60 p-8 text-sm leading-8 text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300"><h2 className="mb-3 text-lg font-semibold">推送到 GitHub</h2>推送功能需要连接网站通用后台。此副本尚未接通，接通后可以在这里查看线上状态并把内容快照推送到 GitHub 仓库；当前不会执行任何推送动作。</section>}
+            {activeTab === 'publish' && backendMode !== 'live' && <section className="rounded-3xl border border-white/60 bg-white/60 p-5 sm:p-8 text-sm leading-8 text-slate-600 backdrop-blur-xl dark:border-white/10 dark:bg-slate-900/60 dark:text-slate-300"><h2 className="mb-3 text-lg font-semibold">推送到 GitHub</h2>推送功能需要连接网站通用后台。此副本尚未接通，接通后可以在这里查看线上状态并把内容快照推送到 GitHub 仓库；当前不会执行任何推送动作。</section>}
           </div>
 
         </main>

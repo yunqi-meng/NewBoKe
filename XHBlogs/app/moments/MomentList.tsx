@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
-import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost } from 'lucide-react';
+import { MapPin, MessageSquare, Clock, Sparkles, Search, ArrowDownAZ, ArrowUpZA, ChevronLeft, ChevronRight, Ghost, X } from 'lucide-react';
 import MomentComments from '../../components/MomentComments';
 
 function timeAgo(dateStr: string) {
@@ -59,7 +59,7 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
     if (count === 1) {
       return (
         <div className="mt-4 md:mt-8 flex justify-start sm:justify-center w-full">
-          <div onClick={() => setLightbox({ images, index: 0 })} className="max-w-[80%] sm:max-w-[280px] overflow-hidden rounded-xl md:rounded-2xl border border-slate-200/50 dark:border-white/10 shadow-lg md:shadow-xl cursor-zoom-in group">
+          <div onClick={() => setLightbox({ images, index: 0 })} className="max-w-[85%] sm:max-w-[280px] overflow-hidden rounded-xl md:rounded-2xl border border-slate-200/50 dark:border-white/10 shadow-lg md:shadow-xl cursor-zoom-in group">
             <img src={images[0]} alt="moment" loading="lazy" decoding="async" className="w-full h-auto max-h-[300px] md:max-h-[400px] object-contain group-hover:scale-105 transition-transform duration-500" />
           </div>
         </div>
@@ -205,12 +205,15 @@ export default function MomentList({ moments, authorName, avatarUrl }: any) {
           >
             {lightbox.images.length > 1 && (
               <>
-                <button className="absolute left-4 md:left-12 w-10 h-10 md:w-14 md:h-14 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-50 border border-white/5 backdrop-blur-md" onClick={prevImg}><ChevronLeft size={24} className="md:w-9 md:h-9"/></button>
-                <button className="absolute right-4 md:right-12 w-10 h-10 md:w-14 md:h-14 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-50 border border-white/5 backdrop-blur-md" onClick={nextImg}><ChevronRight size={24} className="md:w-9 md:h-9"/></button>
+                <button onClick={prevImg} className="absolute left-3 md:left-12 w-11 h-11 md:w-14 md:h-14 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-50 border border-white/5 backdrop-blur-md" aria-label="上一张"><ChevronLeft size={24} className="md:w-9 md:h-9"/></button>
+                <button onClick={nextImg} className="absolute right-3 md:right-12 w-11 h-11 md:w-14 md:h-14 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white transition-all z-50 border border-white/5 backdrop-blur-md" aria-label="下一张"><ChevronRight size={24} className="md:w-9 md:h-9"/></button>
               </>
             )}
+            <button onClick={(e) => { e.stopPropagation(); setLightbox(null); }} aria-label="关闭大图" className="absolute top-4 right-3 md:top-8 md:right-8 w-11 h-11 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white/80 hover:text-white transition-all z-50 border border-white/5 backdrop-blur-md">
+              <X size={20} />
+            </button>
             <motion.div key={lightbox.index} initial={{ opacity: 0, scale: 0.9, x: 50 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.9, x: -50 }} className="relative w-full h-full flex flex-col items-center justify-center p-4 md:p-12 pointer-events-none">
-              <img src={lightbox.images[lightbox.index]} className="max-w-full max-h-[75vh] md:max-h-[85vh] object-contain rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-white/10 pointer-events-auto" alt="fullscreen" />
+              <img src={lightbox.images[lightbox.index]} className="max-w-full max-h-[72dvh] md:max-h-[85vh] object-contain rounded-2xl shadow-[0_0_80px_rgba(0,0,0,0.5)] border border-white/10 pointer-events-auto" alt="fullscreen" />
               <div className="absolute bottom-8 md:bottom-10 px-4 md:px-5 py-1.5 md:py-2 rounded-full bg-white/10 backdrop-blur-md text-white/90 text-[10px] md:text-xs font-black tracking-widest border border-white/10">
                 {lightbox.index + 1} / {lightbox.images.length}
               </div>

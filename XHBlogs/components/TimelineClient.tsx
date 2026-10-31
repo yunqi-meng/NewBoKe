@@ -76,10 +76,10 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto mt-28 px-4 sm:px-10 relative z-10">
+    <div className="w-full max-w-5xl mx-auto mt-24 sm:mt-28 px-4 sm:px-10 relative z-10">
 
-      <div className="text-center mb-12 relative z-20">
-        <h1 className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-4">归档与探索</h1>
+      <div className="text-center mb-10 md:mb-12 relative z-20">
+        <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-3 md:mb-4">归档与探索</h1>
         <p className="text-slate-500 dark:text-slate-400 font-medium flex items-center justify-center gap-2 italic">
           <Sparkles size={16} className="text-indigo-500" /> 总计 {posts.length} 篇研究记录
         </p>
@@ -108,7 +108,7 @@ export default function TimelineClient({ posts: initialPosts, tags }: { posts: a
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: -10, scale: 0.98 }}
                 transition={{ duration: 0.2 }}
-                className="absolute top-full left-0 right-0 mt-3 bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden max-h-[360px] overflow-y-auto z-[100]"
+                className="absolute top-full left-0 right-0 mt-3 bg-white/80 dark:bg-slate-900/90 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-700/50 rounded-2xl shadow-2xl overflow-hidden max-h-[60vh] overflow-y-auto overscroll-contain z-[100]"
               >
                 {searchResults.length > 0 ? (
                   <div className="flex flex-col py-2">
