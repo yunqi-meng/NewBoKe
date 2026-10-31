@@ -35,9 +35,16 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const forwardHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    // 透传真实来源，否则后端只看到 127.0.0.1，全站登录共用同一个限流桶
+    const realIp = request.headers.get('x-real-ip');
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    if (realIp) forwardHeaders['x-real-ip'] = realIp;
+    if (forwardedFor) forwardHeaders['x-forwarded-for'] = forwardedFor;
+
     const backend = await fetch(`${base}/api/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: forwardHeaders,
       body: body || JSON.stringify({}),
       cache: 'no-store',
       signal: AbortSignal.timeout(15000),

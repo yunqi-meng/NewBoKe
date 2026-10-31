@@ -29,7 +29,7 @@ const SKIP_REQUEST_HEADERS = new Set([
   'user-agent',
 ]);
 
-// 响应里需要原样带回去的头（音频要支持 Range 拖动）
+// 响应里需要原样带回去的头（音频要支持 Range 拖动，缓存策略沿用后端的）
 const PASSTHROUGH_RESPONSE_HEADERS = [
   'content-type',
   'content-length',
@@ -37,6 +37,7 @@ const PASSTHROUGH_RESPONSE_HEADERS = [
   'accept-ranges',
   'etag',
   'last-modified',
+  'cache-control',
 ];
 
 function notFound(): Response {

@@ -20,6 +20,8 @@ function buildHeaders(request: NextRequest): Record<string, string> {
   const headers: Record<string, string> = {};
   const visitor = request.headers.get('x-visitor-token');
   if (visitor) headers['x-visitor-token'] = visitor.slice(0, 64);
+  const realIp = request.headers.get('x-real-ip');
+  if (realIp) headers['x-real-ip'] = realIp.slice(0, 64);
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded) headers['x-forwarded-for'] = forwarded.slice(0, 128);
   const agent = request.headers.get('user-agent');

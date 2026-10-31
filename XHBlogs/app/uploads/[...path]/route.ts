@@ -45,12 +45,13 @@ export async function GET(
       return new Response('图片不存在', { status: response.status });
     }
 
-    const body = await response.arrayBuffer();
     const extension = name.slice(name.lastIndexOf('.')).toLowerCase();
-    return new Response(body, {
+    return new Response(response.body, {
+      status: response.status,
       headers: {
         'Content-Type': MIME_TYPES[extension] || 'application/octet-stream',
         'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
       },
     });
   } catch {

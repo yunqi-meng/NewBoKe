@@ -12,11 +12,13 @@
 
 import json
 import os
+import time
 import urllib.error
 import urllib.request
+from collections import defaultdict
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter, Body, Request
 from fastapi.responses import JSONResponse
 
 from ..db import session_scope
@@ -25,6 +27,14 @@ from .config import read_config
 router = APIRouter()
 
 CHAT_TIMEOUT = 90
+
+# 公开接口的额度保护：单个来源每分钟最多 5 次，单条消息最多 500 字。
+# 这个接口会真实消耗模型额度，不限流等于把密钥交给全互联网。
+MAX_MESSAGE_CHARS = 500
+RATE_WINDOW_SECONDS = 60
+RATE_MAX_REQUESTS = 5
+
+_rate = defaultdict(list)
 
 DEFAULT_SETTINGS = {
     "modelId": "deepseek-flash",
@@ -42,6 +52,30 @@ def _log(*parts) -> None:
         print(*parts)
     except Exception:
         pass
+
+
+def _client_ip(request: Request) -> str:
+    """真实来源：nginx 的 x-real-ip 优先，其次 XFF 最后一段，最后直连地址。"""
+    real_ip = (request.headers.get("x-real-ip") or "").strip()
+    if real_ip:
+        return real_ip[:64]
+    forwarded = (request.headers.get("x-forwarded-for") or "").strip()
+    if forwarded:
+        last = forwarded.split(",")[-1].strip()
+        if last:
+            return last[:64]
+    return request.client.host if request.client else "unknown"
+
+
+def _too_many(ip: str) -> bool:
+    now = time.time()
+    hits = [t for t in _rate[ip] if now - t < RATE_WINDOW_SECONDS]
+    _rate[ip] = hits
+    if len(_rate) > 4096:
+        stale = [key for key, stamps in _rate.items() if not stamps]
+        for key in stale:
+            _rate.pop(key, None)
+    return len(hits) >= RATE_MAX_REQUESTS
 
 
 def _api_key() -> str:
@@ -97,9 +131,22 @@ def _request(base_url: str, key: str, body: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.post("")
 @router.post("/")
-def chat(payload: Dict[str, Any] = Body(default={})):
+def chat(request: Request, payload: Dict[str, Any] = Body(default={})):
     """发一句话给煤球。"""
-    message = str((payload or {}).get("message") or "")
+    message = str((payload or {}).get("message") or "").strip()
+    if not message:
+        return JSONResponse({"error": "消息不能为空"}, status_code=400)
+    if len(message) > MAX_MESSAGE_CHARS:
+        return JSONResponse(
+            {"error": "消息太长了，请控制在 {0} 字以内".format(MAX_MESSAGE_CHARS)},
+            status_code=400,
+        )
+
+    ip = _client_ip(request)
+    if _too_many(ip):
+        return JSONResponse({"error": "说话太快啦，歇一会儿再来喵"}, status_code=429)
+    _rate[ip].append(time.time())
+
     settings = _ai_settings()
 
     key = _api_key()

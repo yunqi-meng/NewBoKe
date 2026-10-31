@@ -108,9 +108,10 @@ def _import_into(tables: dict, db) -> dict:
     # 分两步走：
     #   1) 先按倒序清空所有表（子表先删，否则外键约束会拦下来）
     #   2) 再按正序写入（父表先写，父行先落地，子表的外键才有得指）
+    #
+    # 导入是「整份覆盖」：快照里缺某张表就按空表处理，不能留着旧数据，
+    # 否则残留行会和快照里的主键冲突，回退也就退不干净。
     for name, model in reversed(list(TABLES.items())):
-        if tables.get(name) is None:
-            continue
         db.query(model).delete()
     db.flush()
 

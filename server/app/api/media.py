@@ -7,6 +7,7 @@
 
 import hashlib
 import os
+import tempfile
 import time
 
 from fastapi import APIRouter, Depends, File, UploadFile
@@ -74,12 +75,13 @@ def upload_image(file: UploadFile = File(...), db: Session = Depends(get_db),
         target_dir = uploads_dir()
         os.makedirs(target_dir, exist_ok=True)
 
-        # 文件名要嵌内容哈希，先流式拷到临时文件、边拷边算哈希，再改名定稿
-        temp_path = os.path.join(target_dir, ".uploading-{0}".format(int(time.time() * 1000)))
+        # 文件名要嵌内容哈希，先流式拷到临时文件、边拷边算哈希，再改名定稿。
+        # mkstemp 保证临时文件名唯一：毫秒时间戳在并发上传时会撞名，把别人的半截文件覆盖掉。
+        temp_fd, temp_path = tempfile.mkstemp(dir=target_dir, prefix=".uploading-")
         hasher = hashlib.sha256()
         size = 0
         try:
-            with open(temp_path, "wb") as target:
+            with os.fdopen(temp_fd, "wb") as target:
                 while True:
                     chunk = file.file.read(1024 * 1024)
                     if not chunk:
@@ -156,10 +158,17 @@ async def read_image(name: str):
         return _not_found()
 
     extension = os.path.splitext(safe_name)[1].lower()
+    headers = {
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
+    }
+    # SVG 会被当作文档内联解析，可能带脚本；禁掉一切外部资源与脚本执行
+    if extension == ".svg":
+        headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     return FileResponse(
         file_path,
         media_type=MIME_TYPES.get(extension, "application/octet-stream"),
-        headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        headers=headers,
     )
 
 

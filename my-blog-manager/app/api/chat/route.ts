@@ -19,9 +19,15 @@ export async function POST(req: Request) {
   const base = await backendBaseUrl();
   try {
     const { message } = await req.json();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const realIp = req.headers.get('x-real-ip');
+    const forwardedFor = req.headers.get('x-forwarded-for');
+    if (realIp) headers['x-real-ip'] = realIp;
+    if (forwardedFor) headers['x-forwarded-for'] = forwardedFor;
+
     const response = await fetch(`${base}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ message: String(message ?? '') }),
       cache: 'no-store',
       signal: AbortSignal.timeout(120000),
