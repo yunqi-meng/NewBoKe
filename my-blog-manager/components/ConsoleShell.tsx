@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useSyncExternalStore } from 'react';
+import { ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
 import { usePathname } from 'next/navigation';
 import { stripBasePath } from '../lib/consoleBasePath';
 import BackgroundEffects from './BackgroundEffects';
@@ -34,6 +34,10 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const siteConfig = useSiteConfig();
   const isMobile = useSyncExternalStore(subscribeMobile, getMobileSnapshot, getServerSnapshot);
+  // 挂载后再判定，避免移动端首帧闪出桌面装饰层
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+  const showDecor = ready && !isMobile;
   const route = stripBasePath(pathname || '/');
   const isEditor = route === '/editor' || route.startsWith('/editor/');
 
@@ -49,11 +53,11 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
 
   return (
     <>
-      {!isMobile && <SplashScreen />}
+      {showDecor && <SplashScreen />}
       <MusicProvider>
         <div id="app-mount-root" className="flex-1 flex flex-col transition-opacity duration-1000">
           <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
-            {!isMobile && !siteConfig.useGradient && <BackgroundSlider />}
+            {showDecor && !siteConfig.useGradient && <BackgroundSlider />}
             <div className="absolute inset-0 z-[-9] bg-white/40 dark:bg-slate-900/50 transition-colors duration-1000"></div>
             <div
               className="absolute inset-[-30%] z-[-8] opacity-60 dark:opacity-20 transition-opacity duration-1000 transform-gpu will-change-transform"
@@ -66,14 +70,14 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/40 dark:bg-indigo-900/20 blur-[100px] rounded-full mix-blend-overlay z-[-7]"></div>
             <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-400/30 dark:bg-purple-900/30 blur-[100px] rounded-full mix-blend-overlay z-[-7]"></div>
 
-            {!isMobile && (
+            {showDecor && (
               <div className="bg-effects-wrapper transition-opacity duration-1000">
                 <BackgroundEffects />
               </div>
             )}
           </div>
 
-          {!isMobile && (
+          {showDecor && (
             <>
               <DanmakuBackground />
               <GlobalSnow />
@@ -84,7 +88,7 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
             {children}
           </div>
 
-          {!isMobile && (
+          {showDecor && (
             <>
               <FloatingPlayer />
               <GlobalToolbox />
@@ -112,7 +116,7 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
           }
         `}} />
       </MusicProvider>
-      {!isMobile && <CyberCat />}
+      {showDecor && <CyberCat />}
     </>
   );
 }
