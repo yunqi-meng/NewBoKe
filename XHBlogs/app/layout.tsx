@@ -80,11 +80,11 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
             <div id="app-mount-root" className="flex-1 flex flex-col">
               <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
                 {!siteConfig.useGradient && <BackgroundSlider />}
-                <div className="absolute inset-0 z-[-9] bg-white/30 dark:bg-slate-900/40 backdrop-blur-md transition-colors duration-1000"></div>
+                <div className="absolute inset-0 z-[-9] bg-white/40 dark:bg-slate-900/50 transition-colors duration-1000"></div>
 
                 {/* 渐变层：改用 transform 驱动（图层放大后平移），避免 background-position 全屏重绘 */}
                 <div
-                  className="absolute inset-[-30%] z-[-8] opacity-60 dark:opacity-20 mix-blend-color transition-opacity duration-1000 transform-gpu will-change-transform"
+                  className="absolute inset-[-30%] z-[-8] opacity-60 dark:opacity-20 transition-opacity duration-1000 transform-gpu will-change-transform"
                   style={{
                     background: `linear-gradient(-45deg, ${siteConfig.themeColors.join(', ')})`,
                     backgroundSize: '400% 400%',

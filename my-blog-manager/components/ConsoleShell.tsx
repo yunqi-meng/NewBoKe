@@ -43,13 +43,13 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
         <div id="app-mount-root" className="flex-1 flex flex-col transition-opacity duration-1000">
           <div className="fixed inset-0 z-[-1] pointer-events-none overflow-hidden">
             {!siteConfig.useGradient && <BackgroundSlider />}
-            <div className="absolute inset-0 z-[-9] bg-white/30 dark:bg-slate-900/40 backdrop-blur-md transition-colors duration-1000"></div>
+            <div className="absolute inset-0 z-[-9] bg-white/40 dark:bg-slate-900/50 transition-colors duration-1000"></div>
             <div
-              className="absolute inset-0 z-[-8] opacity-60 dark:opacity-20 mix-blend-color transition-opacity duration-1000 transform-gpu"
+              className="absolute inset-[-30%] z-[-8] opacity-60 dark:opacity-20 transition-opacity duration-1000 transform-gpu will-change-transform"
               style={{
                 background: `linear-gradient(-45deg, ${siteConfig.themeColors.join(', ')})`,
                 backgroundSize: '400% 400%',
-                animation: 'gradientMove 15s ease infinite'
+                animation: 'gradientDrift 15s ease infinite'
               }}
             ></div>
             <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/40 dark:bg-indigo-900/20 blur-[100px] rounded-full mix-blend-overlay z-[-7]"></div>
@@ -73,7 +73,7 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
         </div>
 
         <style suppressHydrationWarning dangerouslySetInnerHTML={{ __html: `
-          @keyframes gradientMove { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+          @keyframes gradientDrift { 0% { transform: translate3d(0, 0, 0); } 50% { transform: translate3d(8%, -6%, 0); } 100% { transform: translate3d(0, 0, 0); } }
           body.winter-mode .bg-effects-wrapper { opacity: 0 !important; visibility: hidden; }
           .winter-mode .snow-cap { position: relative !important; overflow: visible !important; }
           .dark.winter-mode .snow-cap {

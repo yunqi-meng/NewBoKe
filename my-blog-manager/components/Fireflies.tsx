@@ -19,7 +19,7 @@ export default function Fireflies() {
   const [flies, setFlies] = useState<Firefly[]>([]);
 
   useEffect(() => {
-    const generated: Firefly[] = Array.from({ length: 50 }).map((_, i) => ({
+    const generated: Firefly[] = Array.from({ length: 24 }).map((_, i) => ({
       id: i,
       // 初始出生点
       top: `${Math.random() * 100}%`,
@@ -41,7 +41,7 @@ export default function Fireflies() {
   }, []);
 
   return (
-    <div className="fixed inset-0 w-full h-full pointer-events-none z-10 overflow-hidden mix-blend-screen">
+    <div className="fixed inset-0 w-full h-full pointer-events-none z-10 overflow-hidden">
 
       {/* 动画引擎 */}
       <style>{`

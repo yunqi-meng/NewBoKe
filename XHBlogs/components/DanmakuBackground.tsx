@@ -20,7 +20,7 @@ export default function DanmakuBackground() {
     if (list.length === 0) return;
 
     const generatedDanmakus: DanmakuItem[] = [];
-    const count = 15;
+    const count = 10;
 
     for (let i = 0; i < count; i++) {
       generatedDanmakus.push({
@@ -57,14 +57,8 @@ export default function DanmakuBackground() {
       <style dangerouslySetInnerHTML={{
         __html: `
         @keyframes float-left {
-          0% {
-            right: -100%;
-            transform: translateX(100%);
-          }
-          100% {
-            right: 100%;
-            transform: translateX(-100%);
-          }
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-200vw); }
         }
       `}} />
     </div>
