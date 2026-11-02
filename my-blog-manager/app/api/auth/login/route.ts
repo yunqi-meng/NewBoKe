@@ -72,14 +72,19 @@ export async function POST(request: NextRequest) {
 }
 
 /** 查询当前是否需要登录 */
-export async function GET() {
+export async function GET(request: NextRequest) {
   const base = await backendBaseUrl();
   try {
     const backend = await fetch(`${base}/api/auth/session`, {
+      headers: { Cookie: request.headers.get('cookie') || '' },
       cache: 'no-store',
       signal: AbortSignal.timeout(8000),
     });
-    const payload = await backend.json().catch(() => ({}));
+    if (!backend.ok) throw new Error('会话服务不可用');
+    const payload = await backend.json();
+    if (payload?.success !== true || typeof payload.authEnabled !== 'boolean' || typeof payload.authenticated !== 'boolean') {
+      throw new Error('无效的会话响应');
+    }
     return Response.json(
       {
         authEnabled: Boolean(payload?.authEnabled),
@@ -89,10 +94,10 @@ export async function GET() {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch {
-    // 后端暂时不可达时，按「未启用登录」处理，让控制台仍能打开
+    // 服务异常时保持登录要求，与全局 proxy 的判断一致。
     return Response.json(
-      { authEnabled: false, authenticated: false, sessionTtl: 7 * 24 * 60 * 60 },
-      { headers: { 'Cache-Control': 'no-store' } },
+      { authEnabled: true, authenticated: false, detail: '会话服务暂时不可用' },
+      { status: 503, headers: { 'Cache-Control': 'no-store' } },
     );
   }
 }

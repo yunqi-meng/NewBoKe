@@ -97,6 +97,7 @@ def _ensure_indexes() -> None:
     statements = [
         "CREATE INDEX IF NOT EXISTS ix_comments_list ON comments (target, parent_id, status, created_at)",
         "CREATE INDEX IF NOT EXISTS ix_comments_visitor_time ON comments (visitor_id, created_at)",
+        "CREATE INDEX IF NOT EXISTS ix_comments_ip_time ON comments (author_ip, created_at)",
     ]
     with engine.begin() as connection:
         for statement in statements:

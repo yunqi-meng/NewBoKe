@@ -46,7 +46,7 @@ def _safe_file_name(name: str) -> str:
     """只接受纯文件名，任何路径分隔符或上级目录一律拒绝"""
     if not name:
         return ""
-    if name != os.path.basename(name):
+    if name != os.path.basename(name) or any(char in name for char in ("/", "\\", ":", "\x00")):
         return ""
     if name.startswith(".") or len(name) > 200:
         return ""

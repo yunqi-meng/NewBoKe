@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { withBasePath } from '../lib/consoleBasePath';
 import { siteConfig as staticSiteConfig } from '../siteConfig';
 import { deepMerge } from '../lib/siteConfigMerge';
@@ -20,24 +20,32 @@ const SiteConfigContext = createContext<SiteConfig>(staticSiteConfig);
 export function SiteConfigProvider({ initialConfig, children }: { initialConfig: SiteConfig; children: ReactNode }) {
   const [config, setConfig] = useState<SiteConfig>(initialConfig);
 
-  const refresh = useCallback(async () => {
-    try {
-      const response = await fetch(withBasePath('/api/proxy/api/config/get'), { cache: 'no-store' });
-      const payload = await response.json();
-      if (payload?.success && payload.data) {
-        setConfig(prev => deepMerge(prev as Record<string, any>, payload.data) as SiteConfig);
-      }
-    } catch {
-      // 引擎暂时不可达：保留当前配置，不打断界面
-    }
-  }, []);
-
   useEffect(() => {
-    refresh();
-    const handleFocus = () => { refresh(); };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [refresh]);
+    let controller: AbortController | undefined;
+    const refresh = async () => {
+      controller?.abort();
+      const active = new AbortController();
+      controller = active;
+      try {
+        const response = await fetch(withBasePath('/api/proxy/api/config/public'), {
+          cache: 'no-store', signal: active.signal,
+        });
+        if (!response.ok) return;
+        const payload = await response.json();
+        if (!active.signal.aborted && payload?.success && payload.data) {
+          setConfig(prev => deepMerge(prev, payload.data));
+        }
+      } catch {
+        // 请求取消或后端不可达时保留当前配置。
+      }
+    };
+    void refresh();
+    window.addEventListener('focus', refresh);
+    return () => {
+      controller?.abort();
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   return <SiteConfigContext.Provider value={config}>{children}</SiteConfigContext.Provider>;
 }

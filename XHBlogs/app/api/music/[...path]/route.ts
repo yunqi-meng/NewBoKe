@@ -49,7 +49,9 @@ export async function GET(
   context: { params: Promise<{ path: string[] }> },
 ) {
   const segments = (await context.params).path ?? [];
-  if (!segments.length) return notFound();
+  if (!segments.length || segments.some((part) => part === '.' || part === '..' || /[\\/\x00]/.test(part))) {
+    return notFound();
+  }
 
   const root = segments[0];
   if (!ALLOWED_ROOTS.includes(root)) return notFound();

@@ -18,6 +18,7 @@ import sys
 import urllib.error
 import urllib.request
 from typing import Any, Dict
+from uuid import uuid4
 
 for stream in (sys.stdout, sys.stderr):
     try:
@@ -25,7 +26,7 @@ for stream in (sys.stdout, sys.stderr):
     except (AttributeError, ValueError):
         pass
 
-PREFIX = "smoke-test"
+PREFIX = "smoke-test-" + uuid4().hex[:12]
 _passed = 0
 _failed = 0
 # 写操作要带的管理员身份，由 main() 从命令行或环境变量里取
@@ -35,7 +36,7 @@ _token = ""
 def request(base: str, method: str, path: str, payload: Any = None) -> Dict[str, Any]:
     url = base.rstrip("/") + path
     data = None
-    headers = {}
+    headers = {"X-Visitor-Token": PREFIX}
     if _token:
         headers["X-Admin-Token"] = _token
     if payload is not None:
@@ -124,14 +125,21 @@ def main() -> int:
     result = request(base, "GET", "/api/config/get")
     check("GET /api/config/get", result["status"] == 200 and result["json"].get("success"),
           str(result)[:200])
-    original_nav_title = (result["json"].get("data") or {}).get("navTitle")
+    original_config = result["json"].get("data") or {}
+    # 只暂改已存在的字段：更新 API 是 patch 语义，新增字段无法靠原值还原。
+    config_field = next((key for key in ("navTitle", "title", "authorName", "bio")
+                         if key in original_config), None)
+    original_value = original_config.get(config_field)
 
-    result = request(base, "POST", "/api/config/update", {"updates": {"navTitle": "冒烟测试导航"}})
+    updates = {config_field: "冒烟测试导航"} if config_field else {"_smoke_test": True}
+    result = request(base, "POST", "/api/config/update", {"updates": updates})
     check("POST /api/config/update", result["status"] == 200 and result["json"].get("success"),
           str(result)[:200])
 
     result = request(base, "GET", "/api/config/get")
-    check("配置已写入", (result["json"].get("data") or {}).get("navTitle") == "冒烟测试导航",
+    current_config = result["json"].get("data") or {}
+    check("配置已写入" if config_field else "空配置保持不变",
+          current_config.get(config_field) == "冒烟测试导航" if config_field else current_config == original_config,
           str(result["json"])[:200])
 
     print("\n▶ 草稿与发布")
@@ -158,10 +166,14 @@ def main() -> int:
 
     print("\n▶ 评论")
     result = request(base, "POST", "/api/comments/create", {
-        "target": slug, "author_name": "冒烟测试", "content": "这是一条测试评论",
+        "target": slug, "author_name": "冒烟测试", "author_email": "smoke@example.invalid",
+        "content": "这是一条测试评论",
     })
     check("POST /api/comments/create", result["status"] == 200 and result["json"].get("success"),
           str(result)[:200])
+    comment_id = (result["json"].get("data") or {}).get("id")
+    if comment_id and (result["json"].get("data") or {}).get("status") == "pending":
+        request(base, "POST", "/api/comments/admin/status", {"id": comment_id, "status": "approved"})
 
     result = request(base, "GET", "/api/comments/list?target=%s" % slug)
     items = (result["json"].get("data") or {}).get("items", [])
@@ -195,21 +207,18 @@ def main() -> int:
     request(base, "DELETE", "/api/articles/%s" % published_slug)
     request(base, "DELETE", "/api/moments/%s" % moment_id)
 
-    # 删掉刚才那条测试评论：后台审核接口需要管理员身份，这里直接按作者清
-    result = request(base, "GET", "/api/comments/list?target=%s" % slug)
-    for item in (result["json"].get("data") or {}).get("items", []):
-        if item.get("author_name") == "冒烟测试":
-            request(base, "POST", "/api/comments/admin/delete", {"id": item.get("id")})
+    if comment_id:
+        request(base, "POST", "/api/comments/admin/delete", {"id": comment_id})
 
     # 站点配置改过要还原，不能把冒烟测试的痕迹留在正式数据里
-    if original_nav_title is not None:
-        request(base, "POST", "/api/config/update", {"updates": {"navTitle": original_nav_title}})
+    if config_field:
+        request(base, "POST", "/api/config/update", {"updates": {config_field: original_value}})
 
     result = request(base, "GET", "/api/articles/%s" % slug)
     check("测试文章已删除", result["json"].get("success") is False, str(result)[:160])
 
     result = request(base, "GET", "/api/config/get")
-    check("配置已还原", (result["json"].get("data") or {}).get("navTitle") == original_nav_title,
+    check("配置已还原", (result["json"].get("data") or {}) == original_config,
           str(result["json"])[:160])
 
     print("\n%d 通过 / %d 失败" % (_passed, _failed))

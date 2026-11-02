@@ -59,7 +59,7 @@ def write_config(db: Session, payload: Dict[str, Any]) -> Dict[str, Any]:
 
 @router.get("")
 @router.get("/get")
-def get_site_config(db: Session = Depends(get_db)):
+def get_site_config(db: Session = Depends(get_db), _: None = Depends(require_admin)):
     return {"success": True, "data": read_config(db)}
 
 

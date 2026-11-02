@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     return Response.json({ revalidated: false, message: '未授权' }, { status: 401 });
   }
 
-  // Next 16：第二个参数为 stale 窗口；'max' 允许后台静默刷新
-  revalidateTag('content', 'max');
+  // 后端 webhook 要求下一次访问读取新内容，直接过期而非先返回旧内容。
+  revalidateTag('content', { expire: 0 });
   return Response.json({ revalidated: true });
 }

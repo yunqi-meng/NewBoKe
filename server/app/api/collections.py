@@ -6,7 +6,7 @@
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.orm import Session, selectinload
 
 from ..db import get_db
@@ -17,6 +17,30 @@ from ..security import require_admin
 albums_router = APIRouter()
 friends_router = APIRouter()
 projects_router = APIRouter()
+
+
+def _sync_items(payload: dict, key: str) -> List[dict]:
+    """删除旧数据之前验证整份输入；只有显式空数组才能清空集合。"""
+    if key in payload:
+        items = payload[key]
+    elif payload.get("id"):
+        items = [payload]
+    else:
+        raise HTTPException(status_code=422, detail=f"缺少 {key} 数组")
+    if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+        raise HTTPException(status_code=422, detail=f"{key} 必须是对象数组")
+    prefix = {"albums": "album", "friends": "friend", "projects": "project"}[key]
+    ids = [str(item.get("id") or f"{prefix}-{index}") for index, item in enumerate(items)]
+    if len(ids) != len(set(ids)):
+        raise HTTPException(status_code=422, detail="存在重复的 ID")
+    if key == "albums":
+        for item in items:
+            photos = item.get("photos")
+            if photos is None:
+                photos = []
+            if not isinstance(photos, list) or any(not isinstance(photo, dict) for photo in photos):
+                raise HTTPException(status_code=422, detail="photos 必须是对象数组")
+    return items
 
 
 # ------------------------------------------------------------------ 相册
@@ -52,9 +76,7 @@ def list_albums(db: Session = Depends(get_db)):
 def sync_albums(payload: Dict[str, Any] = Body(default={}), db: Session = Depends(get_db),
                 _: None = Depends(require_admin)):
     """整份覆盖相册。传单本相册对象时也可以（自动包一层）。"""
-    items: List[dict] = payload.get("albums")
-    if items is None:
-        items = [payload] if payload.get("id") else []
+    items = _sync_items(payload, "albums")
     db.query(AlbumPhoto).delete()
     db.query(Album).delete()
     for index, item in enumerate(items):
@@ -115,9 +137,7 @@ def list_friends(db: Session = Depends(get_db)):
 @friends_router.post("")
 def sync_friends(payload: Dict[str, Any] = Body(default={}), db: Session = Depends(get_db),
                  _: None = Depends(require_admin)):
-    items: List[dict] = payload.get("friends")
-    if items is None:
-        items = [payload] if payload.get("id") else []
+    items = _sync_items(payload, "friends")
     db.query(Friend).delete()
     for index, item in enumerate(items):
         db.add(
@@ -170,9 +190,7 @@ def list_projects(db: Session = Depends(get_db)):
 @projects_router.post("")
 def sync_projects(payload: Dict[str, Any] = Body(default={}), db: Session = Depends(get_db),
                   _: None = Depends(require_admin)):
-    items: List[dict] = payload.get("projects")
-    if items is None:
-        items = [payload] if payload.get("id") else []
+    items = _sync_items(payload, "projects")
     db.query(Project).delete()
     for index, item in enumerate(items):
         db.add(

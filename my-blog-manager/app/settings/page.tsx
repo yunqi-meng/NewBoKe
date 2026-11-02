@@ -97,7 +97,7 @@ function SettingsContent() {
             ...data.data,
             social: { ...((prev.social as Record<string, string>) || {}), ...(data.data.social || {}) },
             // 👇 🌟 合并后端发来的壁纸分组数据
-            bgGroups: data.data.bgGroups?.length ? data.data.bgGroups : prev.bgGroups,
+            bgGroups: Array.isArray(data.data.bgGroups) ? data.data.bgGroups : prev.bgGroups,
             activeBgGroup: data.data.activeBgGroup || prev.activeBgGroup,
             danmakuList: data.data.danmakuList ? [...data.data.danmakuList] : prev.danmakuList,
             buildDate: data.data.buildDate || prev.buildDate,

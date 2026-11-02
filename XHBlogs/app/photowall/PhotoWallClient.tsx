@@ -11,14 +11,11 @@ export default function PhotoWallClient({ albums }: { albums: Album[] }) {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeQuery, setActiveQuery] = useState('');
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const isTransitioning = searchQuery.trim().toLowerCase() !== activeQuery;
 
   useEffect(() => {
-    setIsTransitioning(true);
-
     const timer = setTimeout(() => {
-      setActiveQuery(searchQuery.toLowerCase());
-      setIsTransitioning(false);
+      setActiveQuery(searchQuery.trim().toLowerCase());
     }, 250);
 
     return () => clearTimeout(timer);

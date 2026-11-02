@@ -5,7 +5,7 @@
  * 运行时再从磁盘读回最新配置，两者在这里做深合并。
  */
 
-export function isPlainObject(value: unknown): value is Record<string, any> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
@@ -15,12 +15,12 @@ export function isPlainObject(value: unknown): value is Record<string, any> {
  * - 数组整体替换（壁纸分组、徽章、弹幕列表都是整份换掉）
  * - undefined 的字段直接忽略，避免磁盘上的配置漏字段时把界面清空
  */
-export function deepMerge<T extends Record<string, any>>(base: T, patch: Record<string, any> | undefined | null): T {
+export function deepMerge<T extends Record<string, unknown>>(base: T, patch: Record<string, unknown> | undefined | null): T {
   if (!isPlainObject(patch)) return base;
 
-  const result: Record<string, any> = { ...base };
+  const result: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(patch)) {
-    if (value === undefined) continue;
+    if (value === undefined || key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
     const current = result[key];
     result[key] = isPlainObject(value) && isPlainObject(current) ? deepMerge(current, value) : value;
   }

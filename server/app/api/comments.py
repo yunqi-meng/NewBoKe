@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Body, Depends, Request
-from sqlalchemy import case, func, update
+from sqlalchemy import case, func, or_, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -189,9 +189,9 @@ def _clean_text(value: Any, limit: int) -> str:
     return text[:limit]
 
 
-def _check_rate_limit(identity: str, db: Session) -> Optional[str]:
+def _check_rate_limit(identity: str, db: Session, ip: str = "") -> Optional[str]:
     """返回限流提示语；None 表示放行。"""
-    if not identity:
+    if not identity and not ip:
         return None
     now = datetime.now()
     window_start = (now - timedelta(minutes=RATE_WINDOW_MINUTES)).strftime("%Y-%m-%d %H:%M:%S")
@@ -202,7 +202,11 @@ def _check_rate_limit(identity: str, db: Session) -> Optional[str]:
             func.sum(case((Comment.created_at >= window_start, 1), else_=0)),
             func.sum(case((Comment.created_at >= hour_start, 1), else_=0)),
         )
-        .filter(Comment.visitor_id == identity)
+        .filter(
+            or_(Comment.visitor_id == identity, Comment.author_ip == ip) if ip
+            else Comment.visitor_id == identity,
+            Comment.created_at >= hour_start,
+        )
         .one()
     )
     if int(recent or 0) >= RATE_LIMIT_WINDOW:
@@ -348,13 +352,16 @@ def create_comment(request: Request, payload: Dict[str, Any] = Body(...),
     # ⚠️ 顺序很重要：若先按 max_length 截断，下面的超长判断就永远不成立，
     #    超长留言会被悄悄截断而不是被拒绝。
     max_length = min(int(settings.get("maxLength") or DEFAULT_SETTINGS["maxLength"]), MAX_CONTENT_LENGTH)
-    content = _clean_text(payload.get("content"), MAX_CONTENT_LENGTH)
+    content = _clean_text(payload.get("content"), MAX_CONTENT_LENGTH + 1)
     if not content:
         return {"success": False, "message": "评论内容不能为空"}
     if len(content) > max_length:
         return {"success": False, "message": f"评论内容不能超过 {max_length} 字"}
 
-    limit_message = _check_rate_limit(_identity(request), db)
+    identity = _identity(request)
+    if not identity:
+        return {"success": False, "message": "缺少访客标识，请刷新页面后重试"}
+    limit_message = _check_rate_limit(identity, db, _client_ip(request))
     if limit_message:
         return {"success": False, "message": limit_message}
 
@@ -367,8 +374,14 @@ def create_comment(request: Request, payload: Dict[str, Any] = Body(...),
             parent_id = 0
     if parent_id:
         parent = db.query(Comment).filter(Comment.id == parent_id).first()
-        if not parent or parent.target != target:
+        if not parent or parent.target != target or parent.status != STATUS_APPROVED:
             return {"success": False, "message": "回复的评论不存在"}
+        # 前台只展示两层：回复别人的回复时仍挂在同一顶层评论下。
+        if parent.parent_id:
+            root = db.query(Comment).filter(Comment.id == parent.parent_id).first()
+            if not root or root.target != target or root.status != STATUS_APPROVED:
+                return {"success": False, "message": "回复的评论不存在"}
+            parent_id = root.id
 
     status = STATUS_PENDING if settings.get("requireApproval") else STATUS_APPROVED
     comment_id = _insert_comment(
@@ -380,7 +393,7 @@ def create_comment(request: Request, payload: Dict[str, Any] = Body(...),
             "author_email": email,
             "author_website": website,
             "author_ip": _client_ip(request),
-            "visitor_id": _visitor_id(request),
+            "visitor_id": identity,
             "author_agent": _clean_text(request.headers.get("user-agent"), 300),
             "content": content,
             "status": status,
@@ -407,10 +420,13 @@ def like_comment(request: Request, payload: Dict[str, Any] = Body(...),
     if not comment_id:
         return {"success": False, "message": "缺少评论 ID"}
 
-    if not get_settings(db).get("allowLike", True):
+    settings = get_settings(db)
+    if not settings.get("enabled", True) or not settings.get("allowLike", True):
         return {"success": False, "message": "评论点赞已关闭"}
 
-    visitor_id = _visitor_id(request)
+    visitor_id = _identity(request)
+    if not visitor_id:
+        return {"success": False, "message": "缺少访客标识，请刷新页面后重试"}
     row = db.query(Comment).filter(Comment.id == comment_id).first()
     if not row or row.status != STATUS_APPROVED:
         return {"success": False, "message": "评论不存在"}
@@ -613,6 +629,8 @@ def admin_reply(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_d
     parent = db.query(Comment).filter(Comment.id == parent_id).first()
     if not parent:
         return {"success": False, "message": "被回复的评论不存在"}
+    if parent.parent_id:
+        parent_id = parent.parent_id
 
     comment_id = _insert_comment(
         {
@@ -660,10 +678,7 @@ def admin_delete(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_
     if not clean_ids:
         return {"success": False, "message": "缺少评论 ID"}
 
-    db.query(Comment).filter(Comment.parent_id.in_(clean_ids)).delete(synchronize_session=False)
-    db.query(CommentLike).filter(CommentLike.comment_id.in_(clean_ids)).delete(synchronize_session=False)
-    db.query(Comment).filter(Comment.id.in_(clean_ids)).delete(synchronize_session=False)
-    db.commit()
+    _delete_threads(clean_ids, db)
     return {"success": True, "message": f"已删除 {len(clean_ids)} 条评论"}
 
 
@@ -677,10 +692,7 @@ def admin_bulk(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_db
         return {"success": False, "message": "请先勾选要处理的评论"}
 
     if action == "delete":
-        db.query(Comment).filter(Comment.parent_id.in_(clean_ids)).delete(synchronize_session=False)
-        db.query(CommentLike).filter(CommentLike.comment_id.in_(clean_ids)).delete(synchronize_session=False)
-        db.query(Comment).filter(Comment.id.in_(clean_ids)).delete(synchronize_session=False)
-        db.commit()
+        _delete_threads(clean_ids, db)
         return {"success": True, "message": f"已删除 {len(clean_ids)} 条评论"}
 
     status = str(payload.get("status") or "")
@@ -691,6 +703,21 @@ def admin_bulk(payload: Dict[str, Any] = Body(...), db: Session = Depends(get_db
     )
     db.commit()
     return {"success": True, "message": f"已批量处理 {len(clean_ids)} 条评论"}
+
+
+def _delete_threads(ids: List[int], db: Session) -> None:
+    """删除整条回复链及其点赞，包括旧数据中的多层回复。"""
+    all_ids = set(ids)
+    pending = set(ids)
+    while pending:
+        children = {
+            row[0] for row in db.query(Comment.id).filter(Comment.parent_id.in_(pending)).all()
+        } - all_ids
+        all_ids.update(children)
+        pending = children
+    db.query(CommentLike).filter(CommentLike.comment_id.in_(all_ids)).delete(synchronize_session=False)
+    db.query(Comment).filter(Comment.id.in_(all_ids)).delete(synchronize_session=False)
+    db.commit()
 
 
 def _clean_ids(payload: Dict[str, Any]) -> List[int]:

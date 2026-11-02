@@ -8,47 +8,9 @@ import PageTransition from '../../components/PageTransition';
 import { useMusic } from '../../components/MusicProvider';
 import Comments from '../../components/Comments';
 
-type LyricLine = { time: number; text: string };
-
-/**
- * 把一首歌的歌词字段解析成带时间轴的列表。
- *
- * 以前靠 useState + useEffect 在切歌后再 set 一次，等于每切一首歌多渲一轮，
- * 中间还会闪一帧空歌词。歌词只由 song 决定，直接 useMemo 派生即可。
- */
-function parseLyrics(lrc?: string, lyric?: string, lyrics?: unknown): LyricLine[] {
-  const rawLrc = lrc || lyric || (typeof lyrics === 'string' ? lyrics : '');
-
-  if (Array.isArray(lyrics) && lyrics.length > 0) return lyrics as LyricLine[];
-  if (!rawLrc || typeof rawLrc !== 'string') return [];
-
-  const lines = rawLrc.split('\n');
-  const parsed: LyricLine[] = [];
-  const timeExp = /\[(\d{2,}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
-  let hasValidTime = false;
-
-  for (const line of lines) {
-    const text = line.replace(/\[\d{2,}:\d{2}(?:[.:]\d{2,3})?\]/g, '').trim();
-    if (!text) continue;
-
-    let match;
-    while ((match = timeExp.exec(line)) !== null) {
-      hasValidTime = true;
-      const min = parseInt(match[1], 10);
-      const sec = parseInt(match[2], 10);
-      const ms = match[3] ? parseFloat(`0.${match[3]}`) : 0;
-      parsed.push({ time: min * 60 + sec + ms, text });
-    }
-  }
-
-  if (hasValidTime) return parsed.sort((a, b) => a.time - b.time);
-  // 兜底：没有时间戳的纯文本歌词也照原样排出列表
-  return lines.map((l) => ({ time: -1, text: l.trim() })).filter((l) => l.text);
-}
-
 export default function MusicClient() {
   const {
-    playlist, currentSong, isPlaying, progress, currentTime, duration, currentLyric,
+    playlist, currentSong, lyrics: parsedLyrics, isPlaying, progress, currentTime, duration, currentLyric,
     isLoading, togglePlay, nextSong, prevSong, handleSeek,
     playSong,
     playMode, togglePlayMode,
@@ -61,15 +23,9 @@ export default function MusicClient() {
   const [showVolumeSlider, setShowVolumeSlider] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // 歌词由当前歌曲直接派生，切歌即换，不需要再 setState 引发第二轮渲染
-  const parsedLyrics = useMemo(
-    () => parseLyrics(currentSong?.lrc, currentSong?.lyric, currentSong?.lyrics),
-    [currentSong?.lrc, currentSong?.lyric, currentSong?.lyrics]
-  );
-
   const activeLyricIndex = useMemo(() => {
     if (!parsedLyrics.length) return -1;
-    let idx = parsedLyrics.findIndex((l: any) => l.time > currentTime) - 1;
+    let idx = parsedLyrics.findIndex((l) => l.time > currentTime) - 1;
     if (idx === -2) idx = parsedLyrics.length - 1;
     return Math.max(0, idx);
   }, [currentTime, parsedLyrics]);
@@ -106,9 +62,9 @@ export default function MusicClient() {
   const filteredPlaylist = useMemo(() => {
     if (!searchQuery.trim()) return playlist;
     const lowerQuery = searchQuery.toLowerCase();
-    return playlist.filter((song: any) =>
-      (song.title || song.name || '').toLowerCase().includes(lowerQuery) ||
-      (song.artist || song.author || '').toLowerCase().includes(lowerQuery)
+    return playlist.filter((song) =>
+      (song.title || '').toLowerCase().includes(lowerQuery) ||
+      (song.artist || '').toLowerCase().includes(lowerQuery)
     );
   }, [playlist, searchQuery]);
 
@@ -139,7 +95,7 @@ export default function MusicClient() {
     );
   }
 
-  const songCover = currentSong.cover || currentSong.pic || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop";
+  const songCover = currentSong.cover || "https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?q=80&w=1000&auto=format&fit=crop";
 
   return (
     <div className="min-h-screen relative pb-10 flex flex-col">
@@ -174,8 +130,8 @@ export default function MusicClient() {
                    </motion.div>
                 </div>
                 <div className="w-full text-center px-2 md:px-4 mb-2 md:mb-6">
-                  <h1 className="text-lg md:text-xl lg:text-2xl font-black text-slate-900 dark:text-white truncate drop-shadow-sm tracking-tight">{currentSong.title || currentSong.name}</h1>
-                  <h2 className="text-xs md:text-sm font-bold text-slate-500 dark:text-slate-400 truncate mt-1 md:mt-2 tracking-widest">{currentSong.artist || currentSong.author}</h2>
+                  <h1 className="text-lg md:text-xl lg:text-2xl font-black text-slate-900 dark:text-white truncate drop-shadow-sm tracking-tight">{currentSong.title}</h1>
+                  <h2 className="text-xs md:text-sm font-bold text-slate-500 dark:text-slate-400 truncate mt-1 md:mt-2 tracking-widest">{currentSong.artist}</h2>
                 </div>
               </div>
 
@@ -222,12 +178,12 @@ export default function MusicClient() {
                     <div ref={lyricContainerRef} className="h-full overflow-y-auto no-scrollbar scroll-smooth relative px-4 md:px-6 lyric-mask-container">
                         <div className="py-[30vh] md:py-[35vh] flex flex-col gap-4 md:gap-6 text-center lg:px-10">
                             {parsedLyrics.length > 0 ? (
-                              parsedLyrics.map((line: any, index: number) => {
+                              parsedLyrics.map((line, index: number) => {
                                 const isActive = index === activeLyricIndex;
                                 return (
                                   <div key={index} ref={isActive ? activeLyricRef : null}
                                     className={`transition-all duration-700 cursor-pointer px-2 md:px-4 rounded-2xl ${isActive ? 'opacity-100 scale-105 py-2 md:py-3 bg-white/10' : 'opacity-20 hover:opacity-40'}`}
-                                    onClick={() => duration > 0 && handleSeek({ target: { value: String((line.time / duration) * 100) } } as any)}
+                                    onClick={() => duration > 0 && handleSeek((line.time / duration) * 100)}
                                   >
                                     <p className={`font-black tracking-tight leading-relaxed transition-all duration-700 ${isActive ? 'text-lg md:text-2xl text-indigo-600 dark:text-indigo-400' : 'text-sm md:text-lg text-slate-700 dark:text-slate-300'}`} style={isActive ? { textShadow: '0 0 20px rgba(99,102,241,0.15)' } : {}}>{line.text}</p>
                                   </div>
@@ -255,17 +211,17 @@ export default function MusicClient() {
                     </div>
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 flex flex-col gap-2 md:gap-2.5">
                       <AnimatePresence mode='popLayout'>
-                        {filteredPlaylist.map((song: any) => {
-                          const originalIndex = playlist.findIndex((s: any) => s.id === song.id);
+                        {filteredPlaylist.map((song) => {
+                          const originalIndex = playlist.findIndex((s) => s.id === song.id);
                           const isPlayingThis = (song.id === currentSong.id);
                           return (
                             <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} key={song.id} onClick={() => handlePlaySong(originalIndex)} className={`group flex items-center justify-between p-3 md:p-4 rounded-xl md:rounded-2xl cursor-pointer transition-all border ${isPlayingThis ? 'bg-white/60 dark:bg-slate-700/80 shadow-md border-indigo-500/30' : 'border-transparent hover:bg-white/30 dark:hover:bg-slate-700/40'}`}>
                               <div className="flex items-center gap-3 md:gap-4 w-[85%]">
                                 <div className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-lg md:rounded-xl overflow-hidden shadow-sm">
-                                  <img src={song.cover || song.pic} alt="cover" className="w-full h-full object-cover" />
+                                  <img src={song.cover} alt="cover" className="w-full h-full object-cover" />
                                   {isPlayingThis && isPlaying && <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]"><div className="flex gap-[3px] items-end h-2 md:h-3"><span className="w-0.5 bg-white rounded-full animate-[bounce_1s_infinite_0ms]" /><span className="w-0.5 bg-white rounded-full animate-[bounce_1s_infinite_200ms]" /><span className="w-0.5 bg-white rounded-full animate-[bounce_1s_infinite_400ms]" /></div></div>}
                                 </div>
-                                <div className="flex flex-col truncate"><span className={`text-sm md:text-[15px] font-black truncate ${isPlayingThis ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>{song.title || song.name}</span><span className="text-[10px] md:text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5">{song.artist || song.author}</span></div>
+                                <div className="flex flex-col truncate"><span className={`text-sm md:text-[15px] font-black truncate ${isPlayingThis ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-800 dark:text-slate-200'}`}>{song.title}</span><span className="text-[10px] md:text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate mt-0.5">{song.artist}</span></div>
                               </div>
                             </motion.div>
                           );

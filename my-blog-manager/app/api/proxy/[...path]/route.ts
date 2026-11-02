@@ -25,32 +25,16 @@ const SKIP_HEADERS = new Set([
   'upgrade',
   'origin',
   'referer',
-  'user-agent',
   // 客户端可能带 Expect: 100-continue（curl 对 >1KB 的请求体就会带），
   // 后端用的是 h11/uvicorn，不走 100-continue 握手，带过去反而会挂住。
   'expect',
 ]);
 
-/**
- * 读取请求体。
- *
- * 优先整块读成字节（后端的 multipart 解析依赖确定的 Content-Length），
- * 读不到时退回到流式转发，避免整个转发直接失败。
- */
-async function readRequestBody(request: NextRequest): Promise<{
-  buffer?: ArrayBuffer;
-  stream?: ReadableStream<Uint8Array>;
-}> {
-  try {
-    return { buffer: await request.arrayBuffer() };
-  } catch (error) {
-    console.error('[proxy] 读取请求体失败，改为流式转发：', error);
-    return { stream: request.body ?? undefined };
-  }
-}
-
 async function forward(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const segments = (await context.params).path ?? [];
+  if (segments.some((part) => part === '.' || part === '..' || /[\\/\x00]/.test(part))) {
+    return Response.json({ detail: '非法代理路径' }, { status: 400 });
+  }
   const base = await backendBaseUrl();
   const target = `${base}/${segments.map((part) => encodeURIComponent(part)).join('/')}${request.nextUrl.search}`;
 
@@ -62,32 +46,26 @@ async function forward(request: NextRequest, context: { params: Promise<{ path: 
   const hasBody = !['GET', 'HEAD'].includes(request.method);
 
   try {
-    let body: Buffer | ReadableStream<Uint8Array> | undefined;
-    let duplex: 'half' | undefined;
-
-    if (hasBody) {
-      const read = await readRequestBody(request);
-      if (read.buffer !== undefined) {
-        body = Buffer.from(read.buffer);
-      } else if (read.stream) {
-        body = read.stream;
-        duplex = 'half';
-      }
-    }
+    // multipart 可按 chunked 解析；流式转发避免每个音乐上传占用整文件内存。
+    const body = hasBody ? request.body ?? undefined : undefined;
 
     const response = await fetch(target, {
       method: request.method,
       headers,
       body: body as BodyInit | undefined,
-      duplex: duplex as 'half' | undefined,
+      ...(body ? { duplex: 'half' as const } : {}),
       cache: 'no-store',
       redirect: 'manual',
       signal: AbortSignal.timeout(120000),
     } as RequestInit & { duplex?: 'half' });
 
     const responseHeaders = new Headers();
-    const contentType = response.headers.get('content-type');
-    if (contentType) responseHeaders.set('Content-Type', contentType);
+    for (const key of ['content-type', 'content-range', 'accept-ranges', 'content-disposition',
+      'content-security-policy', 'x-content-type-options', 'etag', 'last-modified']) {
+      const value = response.headers.get(key);
+      if (value) responseHeaders.set(key, value);
+    }
+    for (const cookie of response.headers.getSetCookie()) responseHeaders.append('Set-Cookie', cookie);
     responseHeaders.set('Cache-Control', 'no-store');
     return new Response(response.body, { status: response.status, headers: responseHeaders });
   } catch (error) {

@@ -3,16 +3,12 @@
 import { usePathname } from 'next/navigation';
 import { useMusic } from './MusicProvider';
 import { motion } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useHydrated } from '../lib/useHydrated';
 
 export default function FloatingPlayer() {
   const pathname = usePathname();
   const { currentSong, isPlaying, togglePlay, nextSong, currentLyric, isLoading } = useMusic();
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const isMounted = useHydrated();
 
   // 这里只拦截还没有初始化的情况，不拦截首页
   if (!isMounted || isLoading || !currentSong) return null;

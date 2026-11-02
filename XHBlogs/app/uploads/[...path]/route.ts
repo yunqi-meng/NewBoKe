@@ -30,7 +30,7 @@ export async function GET(
   const name = segments.join('/');
 
   // 只接受纯文件名，任何路径分隔符或上级目录一律拒绝
-  if (!name || name !== name.split('/').pop() || name.startsWith('.')) {
+  if (segments.length !== 1 || !name || /[\\/:\x00]/.test(name) || name.startsWith('.')) {
     return new Response('非法文件名', { status: 400 });
   }
 
@@ -46,13 +46,17 @@ export async function GET(
     }
 
     const extension = name.slice(name.lastIndexOf('.')).toLowerCase();
+    const headers = new Headers({
+      'Content-Type': MIME_TYPES[extension] || 'application/octet-stream',
+      'Cache-Control': 'public, max-age=31536000, immutable',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    if (extension === '.svg') {
+      headers.set('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; sandbox");
+    }
     return new Response(response.body, {
       status: response.status,
-      headers: {
-        'Content-Type': MIME_TYPES[extension] || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=31536000, immutable',
-        'X-Content-Type-Options': 'nosniff',
-      },
+      headers,
     });
   } catch {
     return new Response('图片暂时读不到', { status: 502 });

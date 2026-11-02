@@ -22,7 +22,7 @@ export type SiteConfig = typeof staticSiteConfig;
  * 后端暂时不可用时，站点照常显示，不会整页空白。
  */
 export const getLiveSiteConfig = cache(async (): Promise<SiteConfig> => {
-  const base = { ...(staticSiteConfig as unknown as Record<string, any>) };
+  const base = { ...(staticSiteConfig as unknown as Record<string, unknown>) };
   // 静态兜底里也带着 aiConfig，这里一并摘掉
   delete base.aiConfig;
   delete base.geminiConfig;
@@ -33,7 +33,7 @@ export const getLiveSiteConfig = cache(async (): Promise<SiteConfig> => {
 
     // 后端公开接口已经不带 aiConfig / geminiConfig，这里再兜一次：
     // 无论后端返回什么，内部配置都不进页面。
-    const publicLive = { ...(live as Record<string, any>) };
+    const publicLive = { ...live };
     delete publicLive.aiConfig;
     delete publicLive.geminiConfig;
 

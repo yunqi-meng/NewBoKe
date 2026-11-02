@@ -33,7 +33,11 @@ async function checkSession(request: NextRequest): Promise<{ authEnabled: boolea
       cache: 'no-store',
       signal: AbortSignal.timeout(5000),
     });
+    if (!response.ok) throw new Error('会话校验失败');
     const payload = await response.json();
+    if (payload?.success !== true || typeof payload.authEnabled !== 'boolean' || typeof payload.authenticated !== 'boolean') {
+      throw new Error('无效的会话响应');
+    }
     return {
       authEnabled: Boolean(payload?.authEnabled),
       authenticated: Boolean(payload?.authenticated),

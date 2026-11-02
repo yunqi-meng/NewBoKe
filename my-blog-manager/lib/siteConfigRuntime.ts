@@ -19,18 +19,22 @@ export type SiteConfig = typeof siteConfig;
  * /api/config/get），现在只打一次，结果在本次请求内复用。
  */
 export const getLiveSiteConfig = cache(async (): Promise<SiteConfig> => {
+  // 登录页同样使用根布局，内部 AI 配置仅通过已鉴权的设置接口读取。
+  const baseConfig = { ...siteConfig } as Record<string, unknown>;
+  delete baseConfig.aiConfig;
+  delete baseConfig.geminiConfig;
   try {
     const base = await backendBaseUrl();
-    const response = await fetch(`${base}/api/config/get`, {
+    const response = await fetch(`${base}/api/config/public`, {
       cache: 'no-store',
       signal: AbortSignal.timeout(8000),
     });
     const payload = await response.json();
     if (payload?.success && payload.data) {
-      return deepMerge(siteConfig as unknown as Record<string, any>, payload.data) as SiteConfig;
+      return deepMerge(baseConfig, payload.data) as SiteConfig;
     }
   } catch {
     // 后端暂时不可达：用编译期快照兜底
   }
-  return siteConfig;
+  return baseConfig as SiteConfig;
 });

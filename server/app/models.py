@@ -194,6 +194,7 @@ class Comment(Base):
     __table_args__ = (
         Index("ix_comments_list", "target", "parent_id", "status", "created_at"),
         Index("ix_comments_visitor_time", "visitor_id", "created_at"),
+        Index("ix_comments_ip_time", "author_ip", "created_at"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -13,7 +13,7 @@ export async function GET() {
   const config = await getLivePublicSiteConfig();
   // 复制一份再摘掉内部字段，避免把 aiConfig / geminiConfig 带到浏览器。
   // （用解构剔除会留下两个「声明了但不用」的变量，lint 不干净。）
-  const publicConfig = { ...(config as Record<string, any>) };
+    const publicConfig = { ...(config as Record<string, unknown>) };
   delete publicConfig.aiConfig;
   delete publicConfig.geminiConfig;
 

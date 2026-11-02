@@ -1,6 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect, useState, useSyncExternalStore } from 'react';
+import { ReactNode, useSyncExternalStore } from 'react';
+import { useHydrated } from '../lib/useHydrated';
 import { usePathname } from 'next/navigation';
 import { stripBasePath } from '../lib/consoleBasePath';
 import BackgroundEffects from './BackgroundEffects';
@@ -35,8 +36,7 @@ export default function ConsoleShell({ children }: { children: ReactNode }) {
   const siteConfig = useSiteConfig();
   const isMobile = useSyncExternalStore(subscribeMobile, getMobileSnapshot, getServerSnapshot);
   // 挂载后再判定，避免移动端首帧闪出桌面装饰层
-  const [ready, setReady] = useState(false);
-  useEffect(() => setReady(true), []);
+  const ready = useHydrated();
   const showDecor = ready && !isMobile;
   const route = stripBasePath(pathname || '/');
   const isEditor = route === '/editor' || route.startsWith('/editor/');
